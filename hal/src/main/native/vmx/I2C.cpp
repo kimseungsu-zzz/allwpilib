@@ -30,8 +30,8 @@ class DriverI2CBackend final : public I2CBackend {
         VMXChannelCapability::I2C_SDA);
     auto scl = m_context->io.GetSoleChannelIndex(
         VMXChannelCapability::I2C_SCL);
-    VMXChannelInfo sdaChannel{sda, VMXChannelCapability::I2C_SDA};
-    VMXChannelInfo sclChannel{scl, VMXChannelCapability::I2C_SCL};
+    ::VMXChannelInfo sdaChannel{sda, VMXChannelCapability::I2C_SDA};
+    ::VMXChannelInfo sclChannel{scl, VMXChannelCapability::I2C_SCL};
     if (!sdaChannel.IsValid() || !sclChannel.IsValid()) {
       return;
     }
@@ -40,6 +40,10 @@ class DriverI2CBackend final : public I2CBackend {
     VMXErrorCode error;
     m_initialized = m_context->io.ActivateDualchannelResource(
         sdaChannel, sclChannel, &config, m_resourceHandle, &error);
+    if (m_initialized) {
+      m_sda = sda;
+      m_scl = scl;
+    }
   }
 
   ~DriverI2CBackend() override {
@@ -97,9 +101,21 @@ class DriverI2CBackend final : public I2CBackend {
                        static_cast<uint16_t>(receiveSize));
   }
 
+  bool GetPhysicalChannels(int32_t& sda,
+                           int32_t& scl) const noexcept override {
+    if (!m_initialized) {
+      return false;
+    }
+    sda = m_sda;
+    scl = m_scl;
+    return true;
+  }
+
  private:
   std::shared_ptr<VMXPi> m_context;
   VMXResourceHandle m_resourceHandle = 0;
+  int32_t m_sda = -1;
+  int32_t m_scl = -1;
   bool m_initialized = false;
 };
 
@@ -113,7 +129,7 @@ std::unique_ptr<I2CBackend> CreateI2CBackend() {
 }
 
 I2CManager& GetI2CManager() {
-  static I2CManager manager{CreateI2CBackend};
+  static I2CManager manager{CreateI2CBackend, GetDigitalChannelRegistry()};
   return manager;
 }
 
@@ -151,6 +167,10 @@ void SetI2CResult(I2CResult result, int32_t* status,
       return;
     case I2CResult::kNoResources:
       *status = NO_AVAILABLE_RESOURCES;
+      hal::SetLastError(status, message);
+      return;
+    case I2CResult::kResourceConflict:
+      *status = RESOURCE_IS_ALLOCATED;
       hal::SetLastError(status, message);
       return;
   }

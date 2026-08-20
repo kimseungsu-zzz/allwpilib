@@ -42,6 +42,25 @@ between supported HAL paths, incomplete primitives, and separate Studica
 vendor APIs, is maintained in
 [VMX_SENSOR_COMPATIBILITY.md](VMX_SENSOR_COMPATIBILITY.md).
 
+## I/O capability and channel mapping audit
+
+The public WPILib channel number is a logical address, not always a VMX pin:
+
+| WPILib logical range | VMX physical range | VMX bank | Direction/capability rule |
+| --- | --- | --- | --- |
+| DIO 0-11 / PWM 0-11 | 0-11 | FlexDIO | SDK-selected input/output; interrupt, encoder, counter and PWM routes are available when advertised. |
+| DIO 12-21 / PWM 12-21 | 12-21 | HighCurrent DIO | One bank-wide jumper selects INPUT or OUTPUT. `HAL_SetDIODirection()` never changes it. |
+| DIO 22-29 / PWM 22-27 | 26-33 | CommDIO | Fixed UART/I2C/SPI and digital capabilities; no runtime direction switch. |
+| Analog 0-3 | 22-25 | AnalogIn | Dedicated analog input and AccumulatorInput resources. |
+
+`VMXChannelCapabilities` is the adapter-side capability layer. Static FRC
+compatibility maps enforce encoder pairs `0+1` through `8+9` and counter
+pairs `0+1` through `10+11`; the SDK `ChannelSupportsCapability()` query is
+then used for live jumper/fixed-port state. DIO, PWM, Encoder, Counter,
+Interrupt, and communication reservations share one physical registry, so
+logical CommDIO DIO/PWM and I2C/SPI/UART resources cannot be allocated
+simultaneously.
+
 ## Runtime lifecycle
 
 `HAL_Initialize()` creates one process-local `VMXPi(true, 50)` context and
@@ -109,7 +128,7 @@ command. That service boundary does not alter the monotonic HAL time domain.
 
 ## DIO support
 
-The VMX DIO core supports channels 0 through 21 through the existing WPILib
+The VMX DIO core supports logical channels 0 through 29 through the existing WPILib
 `hal/DIO.h` ABI. Allocation uses WPILib digital handles, rejects duplicate
 channel ownership with the original allocation location, and rolls the handle
 back if VMX resource activation fails. Set, get, free, and runtime direction
@@ -121,6 +140,11 @@ VMX inputs are configured by `studica_driver::DIO` as pull-up inputs, so an
 otherwise floating input normally reads high. Outputs use push-pull mode. All
 DIO drivers receive the single `VMXPi` context owned by `VMXRuntime`; the HAL
 never invokes the driver's convenience context constructor.
+
+FlexDIO direction changes are supported. HighCurrent direction is accepted
+only when the SDK reports the corresponding bank-wide jumper capability, and
+CommDIO direction is fixed by the SDK. An unsupported request returns an
+incompatible-state HAL error without changing jumper state.
 
 Current DIO feature status:
 
@@ -159,7 +183,7 @@ sensors.
 
 ## PWM support
 
-The VMX PWM core supports channels 0 through 21 through the existing
+The VMX PWM core supports logical channels 0 through 27 through the existing
 `hal/PWM.h` ABI. DIO and PWM use one shared VMX digital-channel reservation
 registry, so neither facility can claim a channel already owned by the other.
 PWM handles remain WPILib `HAL_DigitalHandle` values; they never expose driver

@@ -1,0 +1,62 @@
+// Copyright (c) FIRST and other WPILib contributors.
+// Open Source Software; you can modify and/or share it under the terms of
+// the WPILib BSD license file in the root directory of this project.
+
+#include <gtest/gtest.h>
+
+#include "../../../../main/native/vmx/VMXChannelCapabilities.h"
+#include "../../../../main/native/vmx/VMXConstants.h"
+
+namespace hal::vmx {
+
+TEST(VMXChannelMappingTest, LogicalChannelsTranslateToPhysicalChannels) {
+  EXPECT_EQ(ToVMXDigitalChannel(0), 0);
+  EXPECT_EQ(ToVMXDigitalChannel(11), 11);
+  EXPECT_EQ(ToVMXDigitalChannel(12), 12);
+  EXPECT_EQ(ToVMXDigitalChannel(21), 21);
+  EXPECT_EQ(ToVMXDigitalChannel(22), 26);
+  EXPECT_EQ(ToVMXDigitalChannel(29), 33);
+  EXPECT_EQ(ToVMXAnalogChannel(0), 22);
+  EXPECT_EQ(ToVMXAnalogChannel(3), 25);
+}
+
+TEST(VMXChannelMappingTest, PhysicalBanksAndOfficialPairsAreExplicit) {
+  EXPECT_TRUE(IsFlexDIOChannel(0));
+  EXPECT_TRUE(IsFlexDIOChannel(11));
+  EXPECT_TRUE(IsHighCurrentDIOChannel(12));
+  EXPECT_TRUE(IsHighCurrentDIOChannel(21));
+  EXPECT_TRUE(IsCommDIOChannel(22));
+  EXPECT_TRUE(IsCommDIOChannel(29));
+  EXPECT_TRUE(IsVMXEncoderPair(0, 1));
+  EXPECT_TRUE(IsVMXEncoderPair(8, 9));
+  EXPECT_FALSE(IsVMXEncoderPair(1, 2));
+  EXPECT_FALSE(IsVMXEncoderPair(10, 11));
+  EXPECT_TRUE(IsVMXCounterPair(10, 11));
+  EXPECT_FALSE(IsVMXCounterPair(1, 2));
+}
+
+TEST(VMXChannelCapabilityTest, MockSdkCapabilitiesModelJumperAndCommDio) {
+  VMXCapabilityProvider mock{[](int32_t physical, VMXCapability capability) {
+    if (physical >= 12 && physical <= 21) {
+      return capability == VMXCapability::kDigitalOutput ||
+             capability == VMXCapability::kPWMGenerator;
+    }
+    if (physical >= 26 && physical <= 33) {
+      return capability == VMXCapability::kDigitalInput ||
+             capability == VMXCapability::kInterruptInput;
+    }
+    return capability == VMXCapability::kDigitalInput ||
+           capability == VMXCapability::kDigitalOutput ||
+           capability == VMXCapability::kInterruptInput ||
+           capability == VMXCapability::kPWMGenerator;
+  }};
+
+  EXPECT_TRUE(mock.SupportsLogicalDIO(12, VMXCapability::kDigitalOutput));
+  EXPECT_FALSE(mock.SupportsLogicalDIO(12, VMXCapability::kDigitalInput));
+  EXPECT_TRUE(mock.SupportsLogicalDIO(22, VMXCapability::kDigitalInput));
+  EXPECT_FALSE(mock.SupportsLogicalDIO(22, VMXCapability::kPWMGenerator));
+  EXPECT_TRUE(mock.SupportsLogicalDIO(0, VMXCapability::kDigitalInput));
+  EXPECT_TRUE(mock.SupportsLogicalDIO(0, VMXCapability::kDigitalOutput));
+}
+
+}  // namespace hal::vmx

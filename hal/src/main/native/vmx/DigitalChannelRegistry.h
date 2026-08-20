@@ -13,7 +13,16 @@
 
 namespace hal::vmx {
 
-enum class DigitalChannelOwner { kNone, kDIO, kPWM, kEncoder, kCounter };
+enum class DigitalChannelOwner {
+  kNone,
+  kDIO,
+  kPWM,
+  kEncoder,
+  kCounter,
+  kI2C,
+  kSPI,
+  kUART,
+};
 
 struct DigitalChannelReservation {
   bool reserved = false;
@@ -26,7 +35,7 @@ class DigitalChannelRegistry final {
   DigitalChannelReservation Reserve(int32_t channel, DigitalChannelOwner owner,
                                     std::string_view allocationLocation) {
     std::scoped_lock lock{m_mutex};
-    if (channel < 0 || channel >= kNumDigitalChannels) {
+    if (channel < 0 || channel >= kNumPhysicalChannels) {
       return {};
     }
 
@@ -41,7 +50,7 @@ class DigitalChannelRegistry final {
 
   void Release(int32_t channel, DigitalChannelOwner owner) noexcept {
     std::scoped_lock lock{m_mutex};
-    if (channel < 0 || channel >= kNumDigitalChannels) {
+    if (channel < 0 || channel >= kNumPhysicalChannels) {
       return;
     }
     auto& entry = m_entries[channel];
@@ -54,7 +63,7 @@ class DigitalChannelRegistry final {
                 DigitalChannelOwner newOwner,
                 std::string_view allocationLocation) {
     std::scoped_lock lock{m_mutex};
-    if (channel < 0 || channel >= kNumDigitalChannels) {
+    if (channel < 0 || channel >= kNumPhysicalChannels) {
       return false;
     }
     auto& entry = m_entries[channel];
@@ -71,8 +80,8 @@ class DigitalChannelRegistry final {
                     DigitalChannelOwner newOwner,
                     std::string_view allocationLocation) {
     std::scoped_lock lock{m_mutex};
-    if (channelA < 0 || channelA >= kNumDigitalChannels || channelB < 0 ||
-        channelB >= kNumDigitalChannels || channelA == channelB ||
+    if (channelA < 0 || channelA >= kNumPhysicalChannels || channelB < 0 ||
+        channelB >= kNumPhysicalChannels || channelA == channelB ||
         m_entries[channelA].owner != expectedOwner ||
         m_entries[channelB].owner != expectedOwner) {
       return false;
@@ -89,7 +98,7 @@ class DigitalChannelRegistry final {
   };
 
   std::mutex m_mutex;
-  std::array<Entry, kNumDigitalChannels> m_entries;
+  std::array<Entry, kNumPhysicalChannels> m_entries;
 };
 
 inline DigitalChannelRegistry& GetDigitalChannelRegistry() {

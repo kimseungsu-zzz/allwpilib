@@ -15,6 +15,7 @@
 #include "HALInitializer.h"
 #include "HALInternal.h"
 #include "InterruptInternal.h"
+#include "VMXChannelCapabilities.h"
 #include "VMXDigitalSource.h"
 #include "VMXRuntime.h"
 #include "hal/Errors.h"
@@ -44,9 +45,9 @@ class DriverEncoderBackend final : public EncoderBackend {
         break;
     }
     EncoderConfig config{hardwareEdge};
-    VMXChannelInfo channels[2] = {
-        VMXChannelInfo(channelA, VMXChannelCapability::EncoderAInput),
-        VMXChannelInfo(channelB, VMXChannelCapability::EncoderBInput)};
+    ::VMXChannelInfo channels[2] = {
+        ::VMXChannelInfo(channelA, VMXChannelCapability::EncoderAInput),
+        ::VMXChannelInfo(channelB, VMXChannelCapability::EncoderBInput)};
     VMXErrorCode error;
     m_initialized = m_context->io.ActivateDualchannelResource(
         channels[0], channels[1], &config, m_resourceHandle, &error);
@@ -188,6 +189,13 @@ EncoderSourceClaim ClaimEncoderSources(HAL_Handle sourceA,
   }
   auto claim = GetDIOManager().ClaimEncoderSources(sourceA, sourceB,
                                                    "VMX Encoder source");
+  if (claim.result == DIOResult::kOk &&
+      !IsVMXEncoderPair(claim.channelA, claim.channelB)) {
+    GetDIOManager().ReleaseEncoderSources(sourceA, sourceB, claim.channelA,
+                                           claim.channelB);
+    return {EncoderResult::kUnsupportedSource, claim.channelA,
+            claim.channelB};
+  }
   switch (claim.result) {
     case DIOResult::kOk:
       return {EncoderResult::kOk, claim.channelA, claim.channelB};

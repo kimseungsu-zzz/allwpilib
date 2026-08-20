@@ -278,5 +278,20 @@ TEST(VMXI2CTest, MultipleDeviceAddressesShareOneBus) {
   EXPECT_EQ(fixture.manager.GetReferenceCount(HAL_I2C_kMXP), 1);
 }
 
+TEST(VMXI2CTest, CommDioPhysicalReservationConflictsWithI2C) {
+  auto hardware = std::make_shared<FakeI2CHardware>();
+  DigitalChannelRegistry registry;
+  ASSERT_TRUE(registry.Reserve(26, DigitalChannelOwner::kDIO,
+                                "logical CommDIO 22")
+                  .reserved);
+  I2CManager manager{
+      [hardware] {
+        return std::unique_ptr<I2CBackend>{
+            std::make_unique<FakeI2CBackend>(hardware)};
+      },
+      registry};
+  EXPECT_EQ(manager.Initialize(HAL_I2C_kMXP), I2CResult::kResourceConflict);
+}
+
 }  // namespace
 }  // namespace hal::vmx

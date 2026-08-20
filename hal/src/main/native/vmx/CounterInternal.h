@@ -48,6 +48,9 @@ using CounterBackendFactory =
     std::function<std::unique_ptr<CounterBackend>(
         int32_t channelUp, int32_t channelDown, bool upRising, bool upFalling,
         bool downRising, bool downFalling)>;
+using CounterModeBackendFactory = std::function<std::unique_ptr<CounterBackend>(
+    HAL_Counter_Mode mode, int32_t channelUp, int32_t channelDown,
+    bool upRising, bool upFalling, bool downRising, bool downFalling)>;
 using CounterClock =
     std::function<std::chrono::steady_clock::time_point(void)>;
 
@@ -68,9 +71,11 @@ class CounterPort final {
  public:
   CounterPort(HAL_Counter_Mode mode, CounterBackendFactory factory,
               CounterSourceClaimer claimer, CounterSourceReleaser releaser,
-              CounterClock clock)
+              CounterClock clock,
+              CounterModeBackendFactory modeFactory = {})
       : m_mode{mode},
         m_factory{std::move(factory)},
+        m_modeFactory{std::move(modeFactory)},
         m_claimer{std::move(claimer)},
         m_releaser{std::move(releaser)},
         m_clock{std::move(clock)} {
@@ -103,7 +108,8 @@ class CounterPort final {
     if (m_faulted) {
       return CounterResult::kHardwareFailure;
     }
-    if (m_mode != HAL_Counter_kTwoPulse) {
+    if (m_mode == HAL_Counter_kSemiperiod ||
+        m_mode == HAL_Counter_kPulseLength) {
       return CounterResult::kUnsupportedMode;
     }
     auto oldSource = m_downSource;
@@ -136,7 +142,8 @@ class CounterPort final {
     if (m_faulted) {
       return CounterResult::kHardwareFailure;
     }
-    if (m_mode != HAL_Counter_kTwoPulse) {
+    if (m_mode == HAL_Counter_kSemiperiod ||
+        m_mode == HAL_Counter_kPulseLength) {
       return CounterResult::kUnsupportedMode;
     }
     StopResourceLocked();
@@ -160,7 +167,8 @@ class CounterPort final {
     if (m_faulted) {
       return CounterResult::kHardwareFailure;
     }
-    if (m_mode != HAL_Counter_kTwoPulse) {
+    if (m_mode != HAL_Counter_kTwoPulse &&
+        m_mode != HAL_Counter_kExternalDirection) {
       return CounterResult::kUnsupportedMode;
     }
     m_downRising = rising;
@@ -291,8 +299,37 @@ class CounterPort final {
 
   CounterResult SetTwoPulseMode() noexcept {
     std::scoped_lock lock{m_mutex};
-    return m_mode == HAL_Counter_kTwoPulse ? CounterResult::kOk
-                                           : CounterResult::kUnsupportedMode;
+    if (m_mode == HAL_Counter_kTwoPulse) {
+      return CounterResult::kOk;
+    }
+    if (m_faulted) {
+      return CounterResult::kHardwareFailure;
+    }
+    m_mode = HAL_Counter_kTwoPulse;
+    return RecreateResourceLocked();
+  }
+
+  CounterResult SetSemiPeriodMode(bool highSemiPeriod) noexcept {
+    std::scoped_lock lock{m_mutex};
+    static_cast<void>(highSemiPeriod);
+    if (m_faulted) {
+      return CounterResult::kHardwareFailure;
+    }
+    StopResourceLocked();
+    m_mode = HAL_Counter_kSemiperiod;
+    m_downSource = HAL_kInvalidHandle;
+    m_downChannel = -1;
+    return TryActivateLocked();
+  }
+
+  CounterResult SetExternalDirectionMode() noexcept {
+    std::scoped_lock lock{m_mutex};
+    if (m_faulted) {
+      return CounterResult::kHardwareFailure;
+    }
+    StopResourceLocked();
+    m_mode = HAL_Counter_kExternalDirection;
+    return TryActivateLocked();
   }
 
   CounterResult SetUnsupportedMode() noexcept {
@@ -388,14 +425,35 @@ class CounterPort final {
   }
 
   CounterResult TryActivateLocked() noexcept {
-    if (m_mode != HAL_Counter_kTwoPulse ||
-        m_upSource == HAL_kInvalidHandle ||
+    if (m_upSource == HAL_kInvalidHandle) {
+      return CounterResult::kOk;
+    }
+    if (m_mode == HAL_Counter_kPulseLength) {
+      return CounterResult::kUnsupportedMode;
+    }
+    if (m_mode == HAL_Counter_kSemiperiod &&
+        m_downSource != HAL_kInvalidHandle) {
+      return CounterResult::kUnsupportedSource;
+    }
+    if ((m_mode == HAL_Counter_kTwoPulse ||
+         m_mode == HAL_Counter_kExternalDirection) &&
         m_downSource == HAL_kInvalidHandle) {
       return CounterResult::kOk;
     }
+    if (m_mode == HAL_Counter_kTwoPulse && m_upSource != m_downSource) {
+      // VMX has one hardware up/down input capture resource; two independent
+      // source handles are not a supported TwoPulse configuration.
+      return CounterResult::kUnsupportedSource;
+    }
+    if (m_mode == HAL_Counter_kExternalDirection &&
+        m_upSource == m_downSource) {
+      return CounterResult::kUnsupportedSource;
+    }
     CounterSourceClaim claim;
+    const HAL_Handle claimDownSource =
+        m_mode == HAL_Counter_kSemiperiod ? m_upSource : m_downSource;
     try {
-      claim = m_claimer(m_upSource, m_downSource);
+      claim = m_claimer(m_upSource, claimDownSource);
     } catch (...) {
       return CounterResult::kHardwareFailure;
     }
@@ -405,7 +463,7 @@ class CounterPort final {
     auto result = ActivateBackendLocked(claim.channelUp, claim.channelDown);
     if (result != CounterResult::kOk) {
       try {
-        m_releaser(m_upSource, m_downSource, claim.channelUp,
+        m_releaser(m_upSource, claimDownSource, claim.channelUp,
                    claim.channelDown);
       } catch (...) {
       }
@@ -417,8 +475,13 @@ class CounterPort final {
                                       int32_t channelDown) noexcept {
     std::unique_ptr<CounterBackend> backend;
     try {
-      backend = m_factory(channelUp, channelDown, m_upRising, m_upFalling,
-                          m_downRising, m_downFalling);
+      if (m_modeFactory) {
+        backend = m_modeFactory(m_mode, channelUp, channelDown, m_upRising,
+                                m_upFalling, m_downRising, m_downFalling);
+      } else {
+        backend = m_factory(channelUp, channelDown, m_upRising, m_upFalling,
+                            m_downRising, m_downFalling);
+      }
     } catch (...) {
       backend.reset();
     }
@@ -464,11 +527,13 @@ class CounterPort final {
       m_hardwareCount = 0;
       m_backend.reset();
     }
+    const HAL_Handle releaseDownSource =
+        m_mode == HAL_Counter_kSemiperiod ? m_upSource : m_downSource;
     if (m_upSource != HAL_kInvalidHandle &&
-        m_downSource != HAL_kInvalidHandle &&
+        releaseDownSource != HAL_kInvalidHandle &&
         m_claimedChannelUp >= 0 && m_claimedChannelDown >= 0) {
       try {
-        m_releaser(m_upSource, m_downSource, m_claimedChannelUp,
+        m_releaser(m_upSource, releaseDownSource, m_claimedChannelUp,
                    m_claimedChannelDown);
       } catch (...) {
       }
@@ -505,6 +570,7 @@ class CounterPort final {
   std::chrono::steady_clock::time_point m_previousEventTime;
   double m_lastPeriod = std::numeric_limits<double>::infinity();
   CounterBackendFactory m_factory;
+  CounterModeBackendFactory m_modeFactory;
   CounterSourceClaimer m_claimer;
   CounterSourceReleaser m_releaser;
   CounterClock m_clock;
@@ -530,19 +596,21 @@ class CounterManager final {
  public:
   CounterManager(CounterBackendFactory factory, CounterSourceClaimer claimer,
                  CounterSourceReleaser releaser,
-                 CounterClock clock = std::chrono::steady_clock::now)
+                 CounterClock clock = std::chrono::steady_clock::now,
+                 CounterModeBackendFactory modeFactory = {})
       : m_factory{std::move(factory)},
         m_claimer{std::move(claimer)},
         m_releaser{std::move(releaser)},
-        m_clock{std::move(clock)} {}
+        m_clock{std::move(clock)},
+        m_modeFactory{std::move(modeFactory)} {}
 
   CounterAllocationResult Allocate(HAL_Counter_Mode mode, int32_t* index) {
     std::scoped_lock lock{m_allocationMutex};
-    if (mode != HAL_Counter_kTwoPulse) {
+    if (mode == HAL_Counter_kPulseLength) {
       return {HAL_kInvalidHandle, CounterResult::kUnsupportedMode};
     }
     auto port = std::make_shared<CounterPort>(
-        mode, m_factory, m_claimer, m_releaser, m_clock);
+        mode, m_factory, m_claimer, m_releaser, m_clock, m_modeFactory);
     auto handle = m_handles.Allocate(port);
     if (handle == HAL_kInvalidHandle) {
       return {HAL_kInvalidHandle, CounterResult::kNoResources};
@@ -634,6 +702,19 @@ class CounterManager final {
     return port ? port->SetUnsupportedMode() : CounterResult::kInvalidHandle;
   }
 
+  CounterResult SetSemiPeriodMode(HAL_CounterHandle handle,
+                                  bool highSemiPeriod) {
+    auto port = GetPort(handle);
+    return port ? port->SetSemiPeriodMode(highSemiPeriod)
+                : CounterResult::kInvalidHandle;
+  }
+
+  CounterResult SetExternalDirectionMode(HAL_CounterHandle handle) {
+    auto port = GetPort(handle);
+    return port ? port->SetExternalDirectionMode()
+                : CounterResult::kInvalidHandle;
+  }
+
   CounterResult SetTwoPulseMode(HAL_CounterHandle handle) {
     auto port = GetPort(handle);
     return port ? port->SetTwoPulseMode() : CounterResult::kInvalidHandle;
@@ -648,6 +729,7 @@ class CounterManager final {
   CounterSourceClaimer m_claimer;
   CounterSourceReleaser m_releaser;
   CounterClock m_clock;
+  CounterModeBackendFactory m_modeFactory;
   std::mutex m_allocationMutex;
   CounterHandleResource m_handles;
 };

@@ -40,7 +40,8 @@ class DriverDIOBackend final : public DIOBackend {
     }
     VMXErrorCode error;
     m_initialized = m_context->io.ActivateSinglechannelResource(
-        VMXChannelInfo(channel, capability), &config, m_resourceHandle, &error);
+        ::VMXChannelInfo(channel, capability), &config, m_resourceHandle,
+        &error);
   }
 
   ~DriverDIOBackend() override {
@@ -153,7 +154,8 @@ bool CheckHandleForUnsupported(HAL_DigitalHandle handle, int32_t* status) {
 }  // namespace
 
 DIOManager& GetDIOManager() {
-  static DIOManager manager{CreateDIOBackend};
+  static DIOManager manager{CreateDIOBackend, GetDigitalChannelRegistry(),
+                            &GetVMXCapabilityProvider()};
   return manager;
 }
 }  // namespace hal::vmx
@@ -187,6 +189,11 @@ HAL_DigitalHandle HAL_InitializeDIOPort(HAL_PortHandle portHandle,
     return HAL_kInvalidHandle;
   }
   if (result.result != hal::vmx::DIOResult::kOk) {
+    if (result.result == hal::vmx::DIOResult::kUnsupportedCapability) {
+      hal::vmx::SetHardwareError(
+          status, "VMX DIO channel does not support the requested direction");
+      return HAL_kInvalidHandle;
+    }
     hal::vmx::SetHardwareError(
         status, "Failed to activate the VMX DIO hardware resource");
     return HAL_kInvalidHandle;
@@ -259,6 +266,11 @@ void HAL_SetDIODirection(HAL_DigitalHandle dioPortHandle, HAL_Bool input,
     return;
   }
   if (result != hal::vmx::DIOResult::kOk) {
+    if (result == hal::vmx::DIOResult::kUnsupportedCapability) {
+      hal::vmx::SetHardwareError(
+          status, "VMX DIO channel does not support the requested direction");
+      return;
+    }
     hal::vmx::SetHardwareError(
         status, "VMX DIO direction change failed; previous direction restored");
     return;

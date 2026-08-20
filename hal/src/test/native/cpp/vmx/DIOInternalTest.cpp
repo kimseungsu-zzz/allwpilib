@@ -103,11 +103,45 @@ struct DIOFixture {
   DIOManager manager;
 };
 
-TEST(VMXDIOTest, ChannelRangeIsZeroThroughTwentyOne) {
+TEST(VMXDIOTest, ChannelRangeIsZeroThroughTwentyNine) {
   EXPECT_FALSE(IsDIOChannelValid(-1));
   EXPECT_TRUE(IsDIOChannelValid(0));
   EXPECT_TRUE(IsDIOChannelValid(21));
-  EXPECT_FALSE(IsDIOChannelValid(22));
+  EXPECT_TRUE(IsDIOChannelValid(22));
+  EXPECT_TRUE(IsDIOChannelValid(29));
+  EXPECT_FALSE(IsDIOChannelValid(30));
+}
+
+TEST(VMXDIOTest, CapabilityProviderEnforcesHighCurrentAndCommDioRules) {
+  auto hardware = std::make_shared<FakeDIOHardware>();
+  DigitalChannelRegistry registry;
+  VMXCapabilityProvider capabilities{[](int32_t physical,
+                                        VMXCapability capability) {
+    if (physical >= 12 && physical <= 21) {
+      return capability == VMXCapability::kDigitalOutput ||
+             capability == VMXCapability::kPWMGenerator;
+    }
+    if (physical >= 26 && physical <= 33) {
+      return capability == VMXCapability::kDigitalInput ||
+             capability == VMXCapability::kInterruptInput;
+    }
+    return true;
+  }};
+  DIOManager manager{
+      [hardware](int32_t channel, bool) {
+        return std::unique_ptr<DIOBackend>{
+            std::make_unique<FakeDIOBackend>(hardware, channel)};
+      },
+      registry, &capabilities};
+
+  EXPECT_EQ(manager.Allocate(12, false, "high-current output").result,
+            DIOResult::kOk);
+  EXPECT_EQ(manager.Allocate(13, true, "high-current input").result,
+            DIOResult::kUnsupportedCapability);
+  auto commInput = manager.Allocate(22, true, "comm input");
+  ASSERT_EQ(commInput.result, DIOResult::kOk);
+  EXPECT_EQ(manager.SetDirection(commInput.handle, false),
+            DIOResult::kUnsupportedCapability);
 }
 
 TEST(VMXDIOTest, AllocatesInputAndOutputAndRejectsDuplicate) {

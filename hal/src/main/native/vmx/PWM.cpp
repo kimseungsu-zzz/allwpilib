@@ -44,7 +44,7 @@ class DriverPWMBackend final : public PWMBackend {
           kPeriodMicroseconds));
       VMXErrorCode error;
       if (!m_context->io.PWMGenerator_SetDutyCycle(
-              m_resourceHandle, m_channel, duty, &error)) {
+              m_resourceHandle, 0, duty, &error)) {
         applied = 0;
         return false;
       }
@@ -67,7 +67,7 @@ class DriverPWMBackend final : public PWMBackend {
       uint16_t duty = 0;
       VMXErrorCode error;
       if (!m_context->io.PWMGenerator_GetDutyCycle(
-              m_resourceHandle, m_channel, &duty, &error)) {
+              m_resourceHandle, 0, &duty, &error)) {
         pulse = 0;
         return false;
       }
@@ -114,8 +114,7 @@ class DriverPWMBackend final : public PWMBackend {
     config.SetMaxDutyCycleValue(kMaxDutyCycleValue);
     VMXErrorCode error;
     m_active = m_context->io.ActivateSinglechannelResource(
-        VMXChannelInfo(m_channel,
-                       VMXChannelCapability::PWMGeneratorOutput),
+        ::VMXChannelInfo(m_channel, VMXChannelCapability::PWMGeneratorOutput),
         &config, m_resourceHandle, &error);
     return m_active;
   }
@@ -137,7 +136,8 @@ std::unique_ptr<PWMBackend> CreatePWMBackend(int32_t channel) {
 }
 
 PWMManager& GetPWMManager() {
-  static PWMManager manager{CreatePWMBackend};
+  static PWMManager manager{CreatePWMBackend, GetDigitalChannelRegistry(),
+                            &GetVMXCapabilityProvider()};
   return manager;
 }
 
@@ -220,6 +220,11 @@ HAL_DigitalHandle HAL_InitializePWMPort(HAL_PortHandle portHandle,
     return HAL_kInvalidHandle;
   }
   if (result.result != hal::vmx::PWMResult::kOk) {
+    if (result.result == hal::vmx::PWMResult::kUnsupportedCapability) {
+      hal::vmx::SetPWMHardwareError(
+          status, "VMX channel does not support PWM generation");
+      return HAL_kInvalidHandle;
+    }
     hal::vmx::SetPWMHardwareError(
         status, "Failed to activate the VMX PWM hardware resource");
     return HAL_kInvalidHandle;

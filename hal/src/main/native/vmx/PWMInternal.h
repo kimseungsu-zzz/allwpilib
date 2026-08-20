@@ -15,6 +15,7 @@
 #include <utility>
 
 #include "DigitalChannelRegistry.h"
+#include "VMXChannelCapabilities.h"
 #include "VMXConstants.h"
 #include "hal/Errors.h"
 #include "hal/Types.h"
@@ -40,6 +41,7 @@ enum class PWMResult {
   kInvalidHandle,
   kHardwareFailure,
   kScaleError,
+  kUnsupportedCapability,
 };
 
 class PWMBackend {
@@ -56,11 +58,13 @@ using PWMBackendFactory =
 
 class PWMPort final {
  public:
-  bool Initialize(int32_t channel, PWMBackendFactory factory) noexcept {
+  bool Initialize(int32_t channel, PWMBackendFactory factory,
+                  int32_t physicalChannel = -1) noexcept {
     std::scoped_lock lock{m_mutex};
     m_channel = channel;
+    m_physicalChannel = physicalChannel >= 0 ? physicalChannel : channel;
     try {
-      m_backend = factory ? factory(channel) : nullptr;
+      m_backend = factory ? factory(m_physicalChannel) : nullptr;
     } catch (...) {
       m_backend.reset();
     }
@@ -247,6 +251,7 @@ class PWMPort final {
   }
 
   int32_t GetChannel() const noexcept { return m_channel; }
+  int32_t GetPhysicalChannel() const noexcept { return m_physicalChannel; }
 
   void Close() noexcept {
     std::scoped_lock lock{m_mutex};
@@ -315,6 +320,7 @@ class PWMPort final {
 
   mutable std::mutex m_mutex;
   int32_t m_channel = -1;
+  int32_t m_physicalChannel = -1;
   PWMConfig m_config;
   bool m_eliminateDeadband = false;
   int32_t m_currentPulseMicroseconds = kPWMDisabledPulse;
@@ -339,16 +345,25 @@ class PWMManager final {
  public:
   explicit PWMManager(
       PWMBackendFactory factory,
-      DigitalChannelRegistry& registry = GetDigitalChannelRegistry())
-      : m_factory{std::move(factory)}, m_registry{registry} {}
+      DigitalChannelRegistry& registry = GetDigitalChannelRegistry(),
+      const VMXCapabilityProvider* capabilities = nullptr)
+      : m_factory{std::move(factory)},
+        m_registry{registry},
+        m_capabilities{capabilities} {}
 
   PWMAllocationResult Allocate(int32_t channel, std::string_view location) {
     std::scoped_lock allocationLock{m_allocationMutex};
     if (!IsPWMChannelValid(channel)) {
       return {HAL_kInvalidHandle, PWMResult::kOutOfRange, {}};
     }
-    auto reservation =
-        m_registry.Reserve(channel, DigitalChannelOwner::kPWM, location);
+    const auto physicalChannel = ToVMXDigitalChannel(channel);
+    if (m_capabilities && !m_capabilities->SupportsPhysical(
+                              physicalChannel,
+                              VMXCapability::kPWMGenerator)) {
+      return {HAL_kInvalidHandle, PWMResult::kUnsupportedCapability, {}};
+    }
+    auto reservation = m_registry.Reserve(physicalChannel,
+                                          DigitalChannelOwner::kPWM, location);
     if (!reservation.reserved) {
       return {HAL_kInvalidHandle, PWMResult::kAlreadyAllocated,
               std::move(reservation.previousAllocation)};
@@ -359,12 +374,12 @@ class PWMManager final {
     auto port =
         m_handles.Allocate(channel, HAL_HandleEnum::PWM, &handle, &status);
     if (status != 0) {
-      m_registry.Release(channel, DigitalChannelOwner::kPWM);
+      m_registry.Release(physicalChannel, DigitalChannelOwner::kPWM);
       return {HAL_kInvalidHandle, PWMResult::kHardwareFailure, {}};
     }
-    if (!port->Initialize(channel, m_factory)) {
+    if (!port->Initialize(channel, m_factory, physicalChannel)) {
       m_handles.Free(handle, HAL_HandleEnum::PWM);
-      m_registry.Release(channel, DigitalChannelOwner::kPWM);
+      m_registry.Release(physicalChannel, DigitalChannelOwner::kPWM);
       return {HAL_kInvalidHandle, PWMResult::kHardwareFailure, {}};
     }
     return {handle, PWMResult::kOk, {}};
@@ -376,10 +391,9 @@ class PWMManager final {
     if (!port) {
       return;
     }
-    int32_t channel = port->GetChannel();
     port->Close();
     m_handles.Free(handle, HAL_HandleEnum::PWM);
-    m_registry.Release(channel, DigitalChannelOwner::kPWM);
+    m_registry.Release(port->GetPhysicalChannel(), DigitalChannelOwner::kPWM);
   }
 
   PWMResult SetConfig(HAL_DigitalHandle handle, PWMConfig config) noexcept {
@@ -449,6 +463,7 @@ class PWMManager final {
 
   PWMBackendFactory m_factory;
   DigitalChannelRegistry& m_registry;
+  const VMXCapabilityProvider* m_capabilities;
   std::mutex m_allocationMutex;
   PWMHandleResource m_handles;
 };

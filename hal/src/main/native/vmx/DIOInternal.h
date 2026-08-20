@@ -13,6 +13,7 @@
 #include <utility>
 
 #include "VMXConstants.h"
+#include "VMXChannelCapabilities.h"
 #include "DigitalChannelRegistry.h"
 #include "hal/Types.h"
 #include "hal/handles/DigitalHandleResource.h"
@@ -28,6 +29,7 @@ enum class DIOResult {
   kHardwareFailure,
   kRollbackFailure,
   kOutputChannel,
+  kUnsupportedCapability,
 };
 
 class DIOBackend {
@@ -45,9 +47,11 @@ using DIOBackendFactory =
 class DIOPort final {
  public:
   bool Initialize(int32_t channel, bool input, std::string_view location,
-                  DIOBackendFactory factory) noexcept {
+                  DIOBackendFactory factory,
+                  int32_t physicalChannel = -1) noexcept {
     std::scoped_lock lock{m_mutex};
     m_channel = channel;
+    m_physicalChannel = physicalChannel >= 0 ? physicalChannel : channel;
     m_input = input;
     m_previousAllocation = location;
     m_factory = std::move(factory);
@@ -191,6 +195,7 @@ class DIOPort final {
   }
 
   int32_t GetChannel() const noexcept { return m_channel; }
+  int32_t GetPhysicalChannel() const noexcept { return m_physicalChannel; }
 
   std::string GetPreviousAllocation() const {
     std::scoped_lock lock{m_mutex};
@@ -200,7 +205,7 @@ class DIOPort final {
  private:
   std::unique_ptr<DIOBackend> CreateBackend(bool input) noexcept {
     try {
-      return m_factory ? m_factory(m_channel, input) : nullptr;
+      return m_factory ? m_factory(m_physicalChannel, input) : nullptr;
     } catch (...) {
       return nullptr;
     }
@@ -208,6 +213,7 @@ class DIOPort final {
 
   mutable std::mutex m_mutex;
   int32_t m_channel = -1;
+  int32_t m_physicalChannel = -1;
   bool m_input = true;
   bool m_faulted = true;
   bool m_suspendedForResource = false;
@@ -241,8 +247,11 @@ class DIOManager final {
  public:
   explicit DIOManager(
       DIOBackendFactory factory,
-      DigitalChannelRegistry& registry = GetDigitalChannelRegistry())
-      : m_factory{std::move(factory)}, m_registry{registry} {}
+      DigitalChannelRegistry& registry = GetDigitalChannelRegistry(),
+      const VMXCapabilityProvider* capabilities = nullptr)
+      : m_factory{std::move(factory)},
+        m_registry{registry},
+        m_capabilities{capabilities} {}
 
   DIOManager(const DIOManager&) = delete;
   DIOManager& operator=(const DIOManager&) = delete;
@@ -254,8 +263,15 @@ class DIOManager final {
       return {HAL_kInvalidHandle, DIOResult::kOutOfRange, {}};
     }
 
-    auto reservation =
-        m_registry.Reserve(channel, DigitalChannelOwner::kDIO, location);
+    const auto physicalChannel = ToVMXDigitalChannel(channel);
+    if (m_capabilities && !m_capabilities->SupportsPhysical(
+                              physicalChannel,
+                              input ? VMXCapability::kDigitalInput
+                                    : VMXCapability::kDigitalOutput)) {
+      return {HAL_kInvalidHandle, DIOResult::kUnsupportedCapability, {}};
+    }
+    auto reservation = m_registry.Reserve(physicalChannel,
+                                          DigitalChannelOwner::kDIO, location);
     if (!reservation.reserved) {
       return {HAL_kInvalidHandle, DIOResult::kAlreadyAllocated,
               std::move(reservation.previousAllocation)};
@@ -266,16 +282,17 @@ class DIOManager final {
     auto port =
         m_handles.Allocate(channel, HAL_HandleEnum::DIO, &handle, &status);
     if (status != 0) {
-      m_registry.Release(channel, DigitalChannelOwner::kDIO);
+      m_registry.Release(physicalChannel, DigitalChannelOwner::kDIO);
       return {HAL_kInvalidHandle,
               status == RESOURCE_IS_ALLOCATED ? DIOResult::kAlreadyAllocated
                                               : DIOResult::kOutOfRange,
               port ? port->GetPreviousAllocation() : std::string{}};
     }
 
-    if (!port->Initialize(channel, input, location, m_factory)) {
+    if (!port->Initialize(channel, input, location, m_factory,
+                          physicalChannel)) {
       m_handles.Free(handle, HAL_HandleEnum::DIO);
-      m_registry.Release(channel, DigitalChannelOwner::kDIO);
+      m_registry.Release(physicalChannel, DigitalChannelOwner::kDIO);
       return {HAL_kInvalidHandle, DIOResult::kHardwareFailure, {}};
     }
     m_ports[channel] = port;
@@ -292,7 +309,7 @@ class DIOManager final {
     port->Close();
     m_ports[channel].reset();
     m_handles.Free(handle, HAL_HandleEnum::DIO);
-    m_registry.Release(channel, DigitalChannelOwner::kDIO);
+    m_registry.Release(port->GetPhysicalChannel(), DigitalChannelOwner::kDIO);
   }
 
   DIOResult Set(HAL_DigitalHandle handle, bool value) noexcept {
@@ -307,7 +324,16 @@ class DIOManager final {
 
   DIOResult SetDirection(HAL_DigitalHandle handle, bool input) noexcept {
     auto port = Get(handle);
-    return port ? port->SetDirection(input) : DIOResult::kInvalidHandle;
+    if (!port) {
+      return DIOResult::kInvalidHandle;
+    }
+    if (m_capabilities && !m_capabilities->SupportsPhysical(
+                              port->GetPhysicalChannel(),
+                              input ? VMXCapability::kDigitalInput
+                                    : VMXCapability::kDigitalOutput)) {
+      return DIOResult::kUnsupportedCapability;
+    }
+    return port->SetDirection(input);
   }
 
   std::pair<DIOResult, bool> GetDirection(HAL_DigitalHandle handle) noexcept {
@@ -396,6 +422,7 @@ class DIOManager final {
       return {DIOResult::kInvalidHandle, -1, -1};
     }
     int32_t channel = port->GetChannel();
+    const int32_t physicalChannel = port->GetPhysicalChannel();
     if (port->IsSuspendedForResource()) {
       return {DIOResult::kAlreadyAllocated, channel, -1};
     }
@@ -406,16 +433,17 @@ class DIOManager final {
     if (!direction.second) {
       return {DIOResult::kOutputChannel, channel, -1};
     }
-    if (!m_registry.Transfer(channel, DigitalChannelOwner::kDIO, owner,
+    if (!m_registry.Transfer(physicalChannel, DigitalChannelOwner::kDIO,
+                             owner,
                              allocationLocation)) {
       return {DIOResult::kAlreadyAllocated, channel, -1};
     }
     if (port->SuspendForResource() != DIOResult::kOk) {
-      m_registry.Transfer(channel, owner, DigitalChannelOwner::kDIO,
+      m_registry.Transfer(physicalChannel, owner, DigitalChannelOwner::kDIO,
                           "restored DIO source");
       return {DIOResult::kHardwareFailure, channel, -1};
     }
-    return {DIOResult::kOk, channel, -1};
+    return {DIOResult::kOk, physicalChannel, -1};
   }
 
   std::pair<DIOResult, int32_t> ValidateInputSource(
@@ -433,8 +461,9 @@ class DIOManager final {
     if (direction.first != DIOResult::kOk) {
       return {DIOResult::kHardwareFailure, channel};
     }
-    return direction.second ? std::pair{DIOResult::kOk, channel}
-                            : std::pair{DIOResult::kOutputChannel, channel};
+    return direction.second
+               ? std::pair{DIOResult::kOk, port->GetPhysicalChannel()}
+               : std::pair{DIOResult::kOutputChannel, channel};
   }
 
   DIOResourceClaimResult ClaimResourceSources(
@@ -449,6 +478,8 @@ class DIOManager final {
     }
     int32_t channelA = portA->GetChannel();
     int32_t channelB = portB->GetChannel();
+    const int32_t physicalChannelA = portA->GetPhysicalChannel();
+    const int32_t physicalChannelB = portB->GetPhysicalChannel();
     if (channelA == channelB) {
       return {DIOResult::kOutOfRange, channelA, channelB};
     }
@@ -465,7 +496,7 @@ class DIOManager final {
     if (!directionA.second || !directionB.second) {
       return {DIOResult::kOutputChannel, channelA, channelB};
     }
-    if (!m_registry.TransferPair(channelA, channelB,
+    if (!m_registry.TransferPair(physicalChannelA, physicalChannelB,
                                  DigitalChannelOwner::kDIO,
                                  owner,
                                  allocationLocation)) {
@@ -482,13 +513,13 @@ class DIOManager final {
       if (resultB == DIOResult::kOk) {
         portB->ResumeFromResource();
       }
-      m_registry.TransferPair(channelA, channelB,
+      m_registry.TransferPair(physicalChannelA, physicalChannelB,
                               owner,
                               DigitalChannelOwner::kDIO,
                               "restored DIO source");
       return {DIOResult::kHardwareFailure, channelA, channelB};
     }
-    return {DIOResult::kOk, channelA, channelB};
+    return {DIOResult::kOk, physicalChannelA, physicalChannelB};
   }
 
   void ReleaseResourceSource(HAL_Handle sourceHandle, int32_t channel,
@@ -496,7 +527,7 @@ class DIOManager final {
     std::scoped_lock allocationLock{m_allocationMutex};
     auto port = m_handles.Get(sourceHandle, HAL_HandleEnum::DIO);
     if (port) {
-      m_registry.Transfer(channel, owner,
+      m_registry.Transfer(port->GetPhysicalChannel(), owner,
                           DigitalChannelOwner::kDIO, "restored DIO source A");
       port->ResumeFromResource();
     } else {
@@ -511,14 +542,15 @@ class DIOManager final {
     auto portA = m_handles.Get(sourceHandleA, HAL_HandleEnum::DIO);
     auto portB = m_handles.Get(sourceHandleB, HAL_HandleEnum::DIO);
     if (portA) {
-      m_registry.Transfer(channelA, owner, DigitalChannelOwner::kDIO,
+      m_registry.Transfer(portA->GetPhysicalChannel(), owner,
+                          DigitalChannelOwner::kDIO,
                           "restored DIO source A");
       portA->ResumeFromResource();
     } else {
       m_registry.Release(channelA, owner);
     }
     if (portB) {
-      m_registry.Transfer(channelB, owner,
+      m_registry.Transfer(portB->GetPhysicalChannel(), owner,
                           DigitalChannelOwner::kDIO, "restored DIO source B");
       portB->ResumeFromResource();
     } else {
@@ -540,6 +572,7 @@ class DIOManager final {
 
   DIOBackendFactory m_factory;
   DigitalChannelRegistry& m_registry;
+  const VMXCapabilityProvider* m_capabilities;
   // Serializes channel allocation with driver destruction so a new owner
   // cannot activate a channel while the previous VMX resource is closing.
   std::mutex m_allocationMutex;

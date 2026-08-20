@@ -31,7 +31,7 @@ class DriverInterruptBackend final : public InterruptBackend {
       return;
     }
     InterruptConfig config{ToSdkEdge(edge), &OnInterrupt, state, false};
-    VMXChannelInfo channelInfo(
+    ::VMXChannelInfo channelInfo(
         static_cast<VMXChannelIndex>(channel),
         VMXChannelCapability::InterruptInput);
     VMXErrorCode error;

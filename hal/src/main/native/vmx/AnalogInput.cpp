@@ -42,7 +42,7 @@ class DriverAnalogInputBackend final : public AnalogInputBackend {
     config.SetAccumulationCounterCenter(static_cast<int16_t>(center));
     config.SetAccumulationCounterDeadband(static_cast<int16_t>(deadband));
     if (!m_context->io.ActivateSinglechannelResource(
-            VMXChannelInfo(physicalChannel,
+            ::VMXChannelInfo(physicalChannel,
                            VMXChannelCapability::AccumulatorInput),
             &config, m_resourceHandle, &error)) {
       return;

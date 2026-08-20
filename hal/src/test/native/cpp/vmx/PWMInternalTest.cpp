@@ -120,7 +120,9 @@ TEST(VMXPWMTest, ChannelRangeIsZeroThroughTwentyOne) {
   EXPECT_FALSE(IsPWMChannelValid(-1));
   EXPECT_TRUE(IsPWMChannelValid(0));
   EXPECT_TRUE(IsPWMChannelValid(21));
-  EXPECT_FALSE(IsPWMChannelValid(22));
+  EXPECT_TRUE(IsPWMChannelValid(22));
+  EXPECT_TRUE(IsPWMChannelValid(27));
+  EXPECT_FALSE(IsPWMChannelValid(28));
 }
 
 TEST(VMXPWMTest, RejectsDuplicateAllocationAndRollsBackDriverFailure) {

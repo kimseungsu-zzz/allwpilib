@@ -28,19 +28,21 @@ are available but still awaiting sensor verification are `NOT_TESTED`.
 
 | WPILib sensor/class | Status | Current HAL path | Evidence and next validation |
 | --- | --- | --- | --- |
-| DigitalInput / limit switch | `SUPPORTED` | VMX DIO input | DIO channels 0–21, stable WPILib handles, and allocation/read/free tests are implemented. Hardware input and pull-up behavior still need a smoke test. |
+| DigitalInput / limit switch | `NOT_TESTED` | Input-capable VMX DIO | Logical DIO 0–29 maps through the capability layer; selected FlexDIO/HighCurrent/CommDIO input capability and hardware smoke test remain. |
+| Beam Break / digital sensor | `NOT_TESTED` | Input-capable VMX DIO | Same input-capability and interrupt/resource constraints as a limit switch. |
 | AnalogInput | `SUPPORTED` | VMX AnalogInput / AccumulatorInput | Logical analog channels 0–3, voltage conversion, averaging, and resource lifecycle are implemented and covered by native tests. |
 | AnalogPotentiometer | `NOT_TESTED` | Existing WPILib class → AnalogInput | No additional HAL is required. Add a compatibility test for voltage-to-position scaling and channel lifetime. |
 | AnalogAccelerometer | `NOT_TESTED` | Existing WPILib class → AnalogInput average voltage | No additional HAL is required. Add a compatibility test for zero, sensitivity, and units. |
 | AnalogEncoder | `NOT_TESTED` | Existing WPILib class → AnalogInput voltage | No additional HAL is required. Add a compatibility test for 5 V normalization, range mapping, and inversion. |
 | SharpIR (WPILib) | `NOT_TESTED` | Existing WPILib class → AnalogInput voltage | No additional HAL is required. Add a compatibility test for the published voltage-to-distance curves and clamping. |
-| Encoder | `SUPPORTED` | VMX Encoder + DIO sources + optional DIO index source | Quadrature modes, count/period/direction, lifecycle, source claims, and index reset semantics are implemented in the VMX adapter. Physical encoder/index wiring remains a hardware smoke-test item. |
+| Encoder | `NOT_TESTED` | VMX Encoder + valid DIO pair | Only FRC pairs 0+1, 2+3, 4+5, 6+7, and 8+9 are accepted; invalid pairs are rejected before activation. |
 | DutyCycle | `BLOCKED_BY_HAL` | Required DutyCycle HAL is not present in the VMX backend | Implement the shared `DutyCycle` HAL core before validating absolute PWM inputs. Do not modify `vmxdrivers` for this. |
-| DutyCycleEncoder | `BLOCKED_BY_HAL` | Depends on DutyCycle HAL | The WPILib class can use the standard API once DutyCycle is implemented; no VMX-specific class is needed. |
+| DutyCycleEncoder | `BLOCKED_BY_HAL` | PWMCapture-capable DIO input + DutyCycle HAL | The standard class can be used once DutyCycle is implemented; the selected physical input must advertise PWMCapture. |
 | DutyCycleInput | `BLOCKED_BY_HAL` | Depends on DutyCycle HAL | Same dependency as DutyCycleEncoder; defer compatibility testing until the shared core exists. |
-| Tachometer | `BLOCKED_BY_HAL` | Counter single-source period / semiperiod path | The current Counter adapter supports the TwoPulse mode but does not yet activate a single-source tachometer or semiperiod mode. |
-| Counter | `PARTIAL` | VMX InputCapture Counter + DIO sources | TwoPulse counting, reset, period, direction, stop detection, and source coordination are available. SemiPeriod, PulseLength, ExternalDirection, averaging, and AnalogTrigger sources remain explicitly unsupported. |
-| Ultrasonic | `BLOCKED_BY_HAL` | DIO pulse + Counter semiperiod/timing | VMX DIO pulse generation is available, but the WPILib Ultrasonic path also requires a working single-source Counter semiperiod measurement. Validate only after that HAL gap is closed. |
+| Tachometer | `NOT_TESTED` | Counter single-source InputCapture | Single-source hardware-backed activation is available; sensor-level period validation remains. |
+| Counter | `PARTIAL` | VMX InputCapture Counter + DIO sources | Six official pairs are recognized. TwoPulse accepts one source configured as both Up and Down and rejects independent Up/Down handles; SemiPeriod is hardware-backed; ExternalDirection is limited to pairs 0+1 through 8+9; PulseLength remains unsupported. |
+| Ultrasonic | `NOT_TESTED` | Output-capable DIO ping + Counter SemiPeriod echo | DIO output capability and single-source SemiPeriod must both be available on the selected physical channels; add a hardware smoke test. |
+| PWM output / PWMVictorSPX | `NOT_TESTED` | PWMGenerator-capable logical PWM | Logical PWM 0–27 maps to physical 0–21 and 26–31; SDK output capability and shared resource ownership are enforced. |
 | ADXL345_I2C | `SUPPORTED` | WPILib `I2C` → VMX MXP I2C HAL | Standard WPILib register transactions now reach the shared VMX I2C resource. The ADXL345 WHO_AM_I and one-register read/write sequence are the first sensor-level I2C smoke test. |
 | ADXL345_SPI | `BLOCKED_BY_HAL` | Required SPI HAL is not present in the VMX backend | Schedule after SPI Core; use the existing WPILib driver unchanged. |
 | ADXL362 | `BLOCKED_BY_HAL` | Required SPI HAL is not present in the VMX backend | Schedule after SPI Core; no VMX-specific ADXL362 wrapper is needed. |
@@ -58,8 +60,8 @@ are available but still awaiting sensor verification are `NOT_TESTED`.
 | PWM | `SUPPORTED` | WPILib pulse/speed/position semantics, quantized readback, disable, and reactivation. Unsupported optional modes remain explicit HAL errors. |
 | AnalogInput | `SUPPORTED` | Four logical analog channels backed by the VMX AccumulatorInput resource. |
 | AnalogAccumulator | `SUPPORTED` | Standard accumulator surface on logical channels 0 and 1, including atomic value/count output and continuity offsets. |
-| Counter | `PARTIAL` | TwoPulse/InputCapture path only; see the sensor row above for missing modes. |
-| Encoder | `SUPPORTED` | Quadrature encoder path and DIO index reset source. |
+| Counter | `PARTIAL` | TwoPulse, single-source SemiPeriod, and restricted ExternalDirection InputCapture paths; PulseLength remains unsupported. |
+| Encoder | `NOT_TESTED` | Quadrature encoder path with official pair validation and DIO index reset source. |
 | Interrupt | `PARTIAL` | DIO interrupt sources and VMX timestamps are available; AnalogTrigger sources remain blocked. |
 | AnalogTrigger | `PARTIAL` | AnalogInput-backed raw/voltage trigger state and window semantics are available; filtered mode, pulse outputs, and DutyCycle sources are blocked. |
 | Timing / Notifier | `SUPPORTED` | VMX monotonic time and one global VMX timer-notification scheduler. |

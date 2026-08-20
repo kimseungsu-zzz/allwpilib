@@ -5,10 +5,12 @@
 #include "hal/Counter.h"
 
 #include <memory>
+#include <chrono>
 #include <string_view>
 
 #include "CounterInternal.h"
 #include "DIOInternal.h"
+#include "VMXChannelCapabilities.h"
 #include "HALInitializer.h"
 #include "HALInternal.h"
 #include "VMXDigitalSource.h"
@@ -34,19 +36,31 @@ class DriverCounterBackend final : public CounterBackend {
     config.SetCounterDirection(InputCaptureConfig::DIRECTION_UP);
     config.SetCaptureChannelSource(InputCaptureConfig::CH1,
                                    InputCaptureConfig::CAPTURE_SIGNAL_A);
-    config.SetCaptureChannelSource(InputCaptureConfig::CH2,
-                                   InputCaptureConfig::CAPTURE_SIGNAL_B);
     config.SetCaptureChannelActiveEdge(
         InputCaptureConfig::CH1, ToActiveEdge(upRising, upFalling));
     config.SetCaptureChannelActiveEdge(
         InputCaptureConfig::CH2, ToActiveEdge(downRising, downFalling));
     config.SetVirtualCounterMode(
-        InputCaptureConfig::VC_MODE_DUAL_INPUT_UPDOWN);
+        channelUp == channelDown
+            ? InputCaptureConfig::VC_MODE_DISABLED
+            : InputCaptureConfig::VC_MODE_DUAL_INPUT_UPDOWN);
     VMXErrorCode error;
-    m_initialized = m_context->io.ActivateDualchannelResource(
-        VMXChannelInfo(channelUp, VMXChannelCapability::InputCaptureInput),
-        VMXChannelInfo(channelDown, VMXChannelCapability::InputCaptureInput2),
-        &config, m_resourceHandle, &error);
+    if (channelUp == channelDown) {
+      m_singleChannel = true;
+      m_initialized = m_context->io.ActivateSinglechannelResource(
+          ::VMXChannelInfo(channelUp,
+                           VMXChannelCapability::InputCaptureInput),
+          &config, m_resourceHandle, &error);
+    } else {
+      config.SetCaptureChannelSource(InputCaptureConfig::CH2,
+                                     InputCaptureConfig::CAPTURE_SIGNAL_B);
+      m_initialized = m_context->io.ActivateDualchannelResource(
+          ::VMXChannelInfo(channelUp,
+                           VMXChannelCapability::InputCaptureInput),
+          ::VMXChannelInfo(channelDown,
+                           VMXChannelCapability::InputCaptureInput2),
+          &config, m_resourceHandle, &error);
+    }
   }
 
   ~DriverCounterBackend() override {
@@ -62,6 +76,14 @@ class DriverCounterBackend final : public CounterBackend {
       return false;
     }
     VMXErrorCode error;
+    if (m_singleChannel) {
+      int32_t count = 0;
+      auto ok = m_context->io.InputCapture_GetCount(m_resourceHandle, count,
+                                                    &error);
+      channel1 = ok && count >= 0 ? static_cast<uint32_t>(count) : 0;
+      channel2 = 0;
+      return ok;
+    }
     return m_context->io.InputCapture_GetChannelCounts(
         m_resourceHandle, channel1, channel2, &error);
   }
@@ -100,6 +122,7 @@ class DriverCounterBackend final : public CounterBackend {
   std::shared_ptr<VMXPi> m_context;
   VMXResourceHandle m_resourceHandle = 0;
   bool m_initialized = false;
+  bool m_singleChannel = false;
 };
 
 std::unique_ptr<CounterBackend> CreateCounterBackend(
@@ -117,9 +140,26 @@ std::unique_ptr<CounterBackend> CreateCounterBackend(
 
 CounterSourceClaim ClaimCounterSources(HAL_Handle sourceUp,
                                        HAL_Handle sourceDown) {
-  auto claim = GetDIOManager().ClaimResourceSources(
-      sourceUp, sourceDown, DigitalChannelOwner::kCounter,
-      "VMX Counter InputCapture source");
+  DIOResourceClaimResult claim;
+  if (sourceUp == sourceDown) {
+    claim = GetDIOManager().ClaimResourceSource(
+        sourceUp, DigitalChannelOwner::kCounter,
+        "VMX Counter InputCapture source");
+    claim.channelB = claim.channelA;
+  } else {
+    claim = GetDIOManager().ClaimResourceSources(
+        sourceUp, sourceDown, DigitalChannelOwner::kCounter,
+        "VMX Counter InputCapture source");
+  }
+  if (claim.result == DIOResult::kOk &&
+      sourceUp != sourceDown &&
+      !IsVMXCounterPair(claim.channelA, claim.channelB)) {
+    GetDIOManager().ReleaseResourceSources(
+        sourceUp, sourceDown, claim.channelA, claim.channelB,
+        DigitalChannelOwner::kCounter);
+    return {CounterResult::kUnsupportedSource, claim.channelA,
+            claim.channelB};
+  }
   switch (claim.result) {
     case DIOResult::kOk:
       return {CounterResult::kOk, claim.channelA, claim.channelB};
@@ -144,7 +184,21 @@ void ReleaseCounterSources(HAL_Handle sourceUp, HAL_Handle sourceDown,
 
 CounterManager& GetCounterManager() {
   static CounterManager manager{CreateCounterBackend, ClaimCounterSources,
-                                ReleaseCounterSources};
+                                ReleaseCounterSources,
+                                std::chrono::steady_clock::now,
+                                [](HAL_Counter_Mode mode, int32_t channelUp,
+                                   int32_t channelDown, bool upRising,
+                                   bool upFalling, bool downRising,
+                                   bool downFalling) {
+                                  // The VMX InputCapture adapter uses the
+                                  // same hardware primitive for all supported
+                                  // counter modes; the mode controls source
+                                  // validation and single/dual routing.
+                                  static_cast<void>(mode);
+                                  return CreateCounterBackend(
+                                      channelUp, channelDown, upRising,
+                                      upFalling, downRising, downFalling);
+                                }};
   return manager;
 }
 
@@ -331,16 +385,17 @@ void HAL_SetCounterUpDownMode(HAL_CounterHandle counterHandle,
 void HAL_SetCounterExternalDirectionMode(HAL_CounterHandle counterHandle,
                                          int32_t* status) {
   hal::vmx::SetCounterResult(
-      hal::vmx::GetCounterManager().SetUnsupportedMode(counterHandle), status,
-      "VMX Counter ExternalDirection mode has no documented InputCapture mapping");
+      hal::vmx::GetCounterManager().SetExternalDirectionMode(counterHandle),
+      status, "VMX Counter ExternalDirection requires a supported channel pair");
 }
 
 void HAL_SetCounterSemiPeriodMode(HAL_CounterHandle counterHandle,
                                   HAL_Bool highSemiPeriod, int32_t* status) {
   static_cast<void>(highSemiPeriod);
   hal::vmx::SetCounterResult(
-      hal::vmx::GetCounterManager().SetUnsupportedMode(counterHandle), status,
-      "VMX Counter SemiPeriod mode is deferred to the timing/Interrupt milestone");
+      hal::vmx::GetCounterManager().SetSemiPeriodMode(counterHandle,
+                                                      highSemiPeriod != 0),
+      status, "Failed to activate VMX Counter SemiPeriod input capture");
 }
 
 void HAL_SetCounterPulseLengthMode(HAL_CounterHandle counterHandle,

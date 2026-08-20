@@ -12,6 +12,7 @@
 #include <utility>
 
 #include "hal/I2CTypes.h"
+#include "DigitalChannelRegistry.h"
 
 namespace hal::vmx {
 
@@ -24,6 +25,7 @@ enum class I2CResult {
   kNullPointer,
   kNotInitialized,
   kNoResources,
+  kResourceConflict,
   kHardwareFailure,
 };
 
@@ -40,6 +42,13 @@ class I2CBackend {
                      int32_t sendSize) noexcept = 0;
   virtual bool Read(uint8_t deviceAddress, uint8_t* dataReceived,
                     int32_t receiveSize) noexcept = 0;
+
+  virtual bool GetPhysicalChannels(int32_t& sda,
+                                   int32_t& scl) const noexcept {
+    static_cast<void>(sda);
+    static_cast<void>(scl);
+    return false;
+  }
 };
 
 using I2CBackendFactory = std::function<std::unique_ptr<I2CBackend>()>;
@@ -47,6 +56,8 @@ using I2CBackendFactory = std::function<std::unique_ptr<I2CBackend>()>;
 struct I2CPortState {
   std::mutex mutex;
   int32_t referenceCount = 0;
+  int32_t sdaChannel = -1;
+  int32_t sclChannel = -1;
   std::unique_ptr<I2CBackend> backend;
 };
 
@@ -59,8 +70,22 @@ constexpr I2CResult ValidateI2CPort(HAL_I2CPort port) noexcept {
 
 class I2CManager final {
  public:
-  explicit I2CManager(I2CBackendFactory factory = {})
-      : m_factory{std::move(factory)} {}
+  explicit I2CManager(
+      I2CBackendFactory factory = {},
+      DigitalChannelRegistry& registry = GetDigitalChannelRegistry())
+      : m_factory{std::move(factory)}, m_registry{registry} {}
+
+  ~I2CManager() {
+    for (auto& state : m_ports) {
+      std::scoped_lock lock{state.mutex};
+      if (state.referenceCount > 0) {
+        m_registry.Release(state.sdaChannel, DigitalChannelOwner::kI2C);
+        m_registry.Release(state.sclChannel, DigitalChannelOwner::kI2C);
+      }
+      state.referenceCount = 0;
+      state.backend.reset();
+    }
+  }
 
   I2CResult Initialize(HAL_I2CPort port) noexcept {
     auto portResult = ValidateI2CPort(port);
@@ -78,6 +103,24 @@ class I2CManager final {
       if (!state.backend) {
         return I2CResult::kHardwareFailure;
       }
+      int32_t sda = 26;
+      int32_t scl = 27;
+      state.backend->GetPhysicalChannels(sda, scl);
+      auto sdaReservation = m_registry.Reserve(
+          sda, DigitalChannelOwner::kI2C, "VMX I2C SDA");
+      if (!sdaReservation.reserved) {
+        state.backend.reset();
+        return I2CResult::kResourceConflict;
+      }
+      auto sclReservation = m_registry.Reserve(
+          scl, DigitalChannelOwner::kI2C, "VMX I2C SCL");
+      if (!sclReservation.reserved) {
+        m_registry.Release(sda, DigitalChannelOwner::kI2C);
+        state.backend.reset();
+        return I2CResult::kResourceConflict;
+      }
+      state.sdaChannel = sda;
+      state.sclChannel = scl;
     }
     ++state.referenceCount;
     return I2CResult::kOk;
@@ -95,7 +138,11 @@ class I2CManager final {
     }
     --state.referenceCount;
     if (state.referenceCount == 0) {
+      m_registry.Release(state.sdaChannel, DigitalChannelOwner::kI2C);
+      m_registry.Release(state.sclChannel, DigitalChannelOwner::kI2C);
       state.backend.reset();
+      state.sdaChannel = -1;
+      state.sclChannel = -1;
     }
     return I2CResult::kOk;
   }
@@ -203,6 +250,7 @@ class I2CManager final {
   }
 
   I2CBackendFactory m_factory;
+  DigitalChannelRegistry& m_registry;
   mutable std::array<I2CPortState, 2> m_ports;
 };
 
