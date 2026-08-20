@@ -170,3 +170,32 @@ starts at zero, while HAL output remains the saved offset plus the new hardware
 output. A failed replacement is rolled back with the same saved offsets, and a
 snapshot failure leaves the live resource untouched. Only an explicit
 `HAL_ResetAccumulator()` clears both the hardware counter and software offsets.
+
+## Interrupt support
+
+The VMX Interrupt adapter implements the existing `hal/Interrupts.h` C ABI for
+DIO sources. `HAL_InitializeInterrupts()` allocates only the WPILib interrupt
+handle; `HAL_RequestInterrupts()` validates the existing DIO input handle and
+then activates the VMX `InterruptInput` resource. AnalogTrigger sources remain
+an explicit incompatible-state result until the AnalogTrigger milestone.
+
+The VMX callback does not enter JNI, Python, or any other public HAL API. It
+only records rising/falling sequence numbers and the SDK callback timestamp in
+a native callback state, then notifies a condition variable. Waits use those
+independent sequences so `ignorePrevious`, rapid consecutive edges, rising /
+falling masks, timeout, and `HAL_ReleaseWaitingInterrupt()` retain WPILib
+semantics. `HAL_CleanInterrupts()` closes the callback state before disabling,
+deactivating, and deallocating the SDK resource, so a teardown callback cannot
+touch a destroyed port.
+
+The adapter leaves the existing DIO resource and ownership registry intact.
+This preserves `DigitalInput.Get()` while the SDK decides whether the DIO and
+Interrupt routes can coexist; a routing conflict is reported as a hardware
+activation failure rather than being hidden by a fake-success fallback.
+
+Rising and falling timestamps are read from the VMX hardware APIs
+`Interrupt_GetLastRisingEdgeTimestampMicroseconds()` and
+`Interrupt_GetLastFallingEdgeTimestampMicroseconds()`, not from a host clock.
+Those values must share the time domain that the future VMX
+`HAL_GetFPGATime()` implementation will expose; until that HAL core exists,
+this is an explicit integration dependency.
