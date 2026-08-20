@@ -4,6 +4,8 @@ plugins {
 
 apply plugin: 'edu.wpi.first.NativeUtils'
 
+def vmxBuildEnabled = project.hasProperty('vmxBuild')
+
 description = 'Standalone Studica VMX hardware drivers for Linux aarch64'
 
 apply from: "${rootDir}/shared/config.gradle"
@@ -138,43 +140,47 @@ def verifyVmxSdk = tasks.register('verifyVmxSdk') {
     }
 }
 
-model {
-    components {
-        vmxdrivers(NativeLibrarySpec) {
-            sources.cpp {
-                source {
-                    srcDir projectDir
-                    include '*.cpp'
-                }
-                exportedHeaders {
-                    srcDir projectDir
-                    sdkIncludeDirs.each { srcDir it }
+if (vmxBuildEnabled) {
+    model {
+        components {
+            vmxdrivers(NativeLibrarySpec) {
+                sources.cpp {
+                    source {
+                        srcDir projectDir
+                        include '*.cpp'
+                    }
+                    exportedHeaders {
+                        srcDir projectDir
+                        sdkIncludeDirs.each { srcDir it }
+                    }
                 }
             }
         }
-    }
-    binaries {
-        all {
-            if (!(it instanceof NativeBinarySpec) || it.component.name != 'vmxdrivers') {
-                return
-            }
+        binaries {
+            all {
+                if (!(it instanceof NativeBinarySpec) || it.component.name != 'vmxdrivers') {
+                    return
+                }
 
-            // Linux aarch64 is a CPU/OS target shared by multiple devices. VMX is
-            // selected explicitly by building this component, not inferred from
-            // every linuxarm64 WPILib build.
-            if (it.targetPlatform.name != nativeUtils.wpi.platforms.linuxarm64 ||
-                    it instanceof SharedLibraryBinarySpec) {
-                it.buildable = false
-                return
-            }
+                // Linux aarch64 is a CPU/OS target shared by multiple devices. VMX is
+                // selected explicitly by building this component, not inferred from
+                // every linuxarm64 WPILib build.
+                if (it.targetPlatform.name != nativeUtils.wpi.platforms.linuxarm64 ||
+                        it instanceof SharedLibraryBinarySpec) {
+                    it.buildable = false
+                    return
+                }
 
-            it.cppCompiler.args '-pthread'
+                it.cppCompiler.args '-pthread'
+            }
         }
     }
 }
 
-tasks.withType(CppCompile).configureEach {
-    dependsOn verifyVmxSdk
+if (vmxBuildEnabled) {
+    tasks.withType(CppCompile).configureEach {
+        dependsOn verifyVmxSdk
+    }
 }
 
 tasks.register('printVmxSdkConfiguration') {
