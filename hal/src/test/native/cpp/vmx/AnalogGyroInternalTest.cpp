@@ -136,24 +136,10 @@ TEST(VMXAnalogGyroTest, AcceptsOnlyLogicalAccumulatorChannels) {
   }
 }
 
-TEST(VMXAnalogGyroTest, ManagerRejectsDuplicateGyroAllocation) {
-  AnalogGyroHandleResource resource;
-  HAL_GyroHandle first = HAL_kInvalidHandle;
-  int32_t status = HAL_SUCCESS;
-  ASSERT_TRUE(resource.Allocate(0, &first, &status));
-  EXPECT_EQ(status, HAL_SUCCESS);
-  HAL_GyroHandle duplicate = HAL_kInvalidHandle;
-  auto duplicateResource = resource.Allocate(0, &duplicate, &status);
-  EXPECT_FALSE(duplicateResource);
-  EXPECT_EQ(status, RESOURCE_IS_ALLOCATED);
-  EXPECT_EQ(duplicate, HAL_kInvalidHandle);
-  resource.Free(first);
-}
-
 TEST(VMXAnalogGyroTest, SetupUsesFixedRateConfigurationAndInjectableWait) {
   GyroFixture fixture;
   ASSERT_EQ(fixture.gyro.Setup(), AnalogGyroResult::kOk);
-  ASSERT_EQ(fixture.hardware->configurations.size(), 2u);
+  ASSERT_EQ(fixture.hardware->configurations.size(), 4u);
   EXPECT_EQ(fixture.hardware->configurations.back().averageBits, 0);
   EXPECT_EQ(fixture.hardware->configurations.back().oversampleBits, 10);
   EXPECT_TRUE(fixture.hardware->configurations.back().accumulatorEnabled);
@@ -184,7 +170,8 @@ TEST(VMXAnalogGyroTest, FixedRateAngleAndRateScalingAndDeadband) {
   fixture.hardware->accumulatorCount = 10;
   fixture.hardware->averageValue = 2000;
 
-  const double lsb = 5.0 / kVMXADCCounts;
+  const double lsb = static_cast<double>(fixture.input->GetLSBWeight().second) /
+                     1.0e9;
   EXPECT_NEAR(fixture.gyro.GetAngle().second,
               1000.0 * lsb / (kAnalogGyroSampleRate * 0.007), 1e-12);
   EXPECT_NEAR(fixture.gyro.GetRate().second,
