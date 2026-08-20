@@ -123,6 +123,33 @@ Current DIO feature status:
 - Multi-channel pulse requests: supported for allocated VMX DIO outputs
 - Digital glitch filters: not yet implemented (explicit incompatible-state error)
 
+## I2C support
+
+The VMX SDK exposes one independent I2C bus: the sole channels advertising
+`I2C_SDA` and `I2C_SCL`. The VMX-pi communication port map identifies this as
+the WPILib MXP I2C port. The VMX HAL maps that bus to
+`HAL_I2C_kMXP`; `HAL_I2C_kOnboard` is explicitly unsupported rather than being
+reported as a second fake bus. One VMX I2C resource is shared by all objects
+using the supported port, with reference-counted initialization and final-close
+deallocation, so different device addresses can be used concurrently on the
+same bus.
+
+`HAL_TransactionI2C`, `HAL_WriteI2C`, and `HAL_ReadI2C` validate 7-bit device
+addresses (`0x00` through `0x7f`) without applying an 8-bit address shift.
+Negative or oversized lengths and non-null buffers for nonzero transfers are
+rejected. Zero-length operations may use null pointers. The bus mutex remains
+held across each complete blocking VMX operation, including the write/read
+sequence of a transaction, and close waits for an in-flight operation before
+releasing the resource.
+
+The SDK's blocking `I2C_Transaction()` is the canonical primitive for combined
+and read-only operations. WPILib write buffers retain their normal layout: the
+first byte is the register address and the remaining bytes are passed through
+the SDK's register-aware `I2C_Write()` call. The SDK documents that a combined
+transaction writes before reading; the exact repeated-start versus
+stop/start wire behavior remains a hardware smoke-test item for register-based
+sensors.
+
 ## PWM support
 
 The VMX PWM core supports channels 0 through 21 through the existing
