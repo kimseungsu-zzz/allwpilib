@@ -67,6 +67,11 @@ cc_test(
     srcs = glob([
         "src/test/native/**/*.cpp",
         "src/test/native/**/*.h",
+    ]) + glob([
+        # VMX internal tests include adapter headers through their repository
+        # relative paths. Keep those production headers in the Bazel sandbox
+        # without compiling the VMX SDK-dependent implementation sources.
+        "src/main/native/vmx/**/*.h",
     ]),
     deps = [
         ":wpiHal.static",
