@@ -55,6 +55,51 @@ The runtime guarantees lifecycle safety only; each future DIO/PWM/I2C/etc.
 adapter must provide any synchronization required by its VMX resource and SDK
 calls.
 
+## Timing and Notifier support
+
+VMX HAL time uses the VMX SDK's monotonic hardware clock,
+`VMXPi::getTime().GetCurrentTotalMicroseconds()`, as its canonical WPILib time
+domain. `HAL_GetFPGATime()` returns that raw 64-bit timestamp without a HAL
+initialization offset or a host-clock conversion. The SDK's
+[VMXTime API](https://www.kauailabs.com/public_files/vmx-pi/apidocs/hal_cpp/html/class_v_m_x_time.html)
+documents the monotonic timer and its microsecond accessor; the shared
+[VMXPi context](https://www.kauailabs.com/public_files/vmx-pi/apidocs/hal_cpp/html/class_v_m_x_pi.html)
+is used for every read.
+
+The existing `hal/Notifier.h` ABI is implemented by one process-wide VMX
+notifier scheduler thread. Each notifier owns its alarm, generation, waiter,
+and diagnostic name. The global scheduler registers only its single earliest
+deadline with `VMXTime::RegisterTimerNotificationAbsolute()` and uses the VMX
+callback as the primary wakeup; it deregisters and re-arms that one notification
+whenever the earliest deadline changes. A host condition variable remains as a
+bounded safety wakeup and for update/cancel/stop operations, and every wake
+re-reads the VMX clock. This keeps WPILib's unbounded notifier count above the
+SDK's maximum of ten timer registrations. Alarm comparisons use 64-bit
+wrap-safe subtraction, and an alarm at or before the current timestamp fires
+immediately. Updating an alarm replaces the previous deadline, while
+cancellation removes only the alarm and never releases the waiter. Stop is
+permanent and wakes waiters with timestamp zero; clean is idempotent and
+performs the same safe wake-up. Wait returns the fired absolute VMX timestamp.
+
+Notifier thread priority uses the Linux thread scheduling ABI. Normal mode is
+priority zero, real-time mode validates priorities 1 through 99, and scheduler
+permission failures are returned as HAL errors rather than reported as fake
+success. `HAL_Shutdown()` stops the scheduler before releasing the shared VMX
+runtime, so blocked waits cannot outlive the hardware context.
+
+Interrupt edge timestamps remain in the SDK timestamp domain and therefore can
+be compared directly with `HAL_GetFPGATime()`. No Java, C++, or Python public
+API changes are required, and `vmxdrivers/` remains an unchanged upstream
+driver area.
+
+RTC is deliberately a separate wall-clock concern. VMX `GetRTCTime()`,
+`GetRTCDate()`, RTC setters, and daylight-savings settings are not used by
+`HAL_GetFPGATime()`, Notifier, interrupt timestamps, or TimedRobot scheduling;
+the SDK explicitly distinguishes its RTC and hardware timer APIs. A future VMX
+runtime/service will use the VMX RTC as the offline boot-time source for the
+Linux system clock and will provide an administrative Linux/PC-to-VMX RTC sync
+command. That service boundary does not alter the monotonic HAL time domain.
+
 ## DIO support
 
 The VMX DIO core supports channels 0 through 21 through the existing WPILib
@@ -196,9 +241,10 @@ activation failure rather than being hidden by a fake-success fallback.
 Rising and falling timestamps are read from the VMX hardware APIs
 `Interrupt_GetLastRisingEdgeTimestampMicroseconds()` and
 `Interrupt_GetLastFallingEdgeTimestampMicroseconds()`, not from a host clock.
-Those values must share the time domain that the future VMX
-`HAL_GetFPGATime()` implementation will expose; until that HAL core exists,
-this is an explicit integration dependency.
+Those values share the time domain that VMX
+`HAL_GetFPGATime()` exposes. The Timing + Notifier core now supplies that
+shared domain directly from the VMX hardware timer, so a hardware smoke check
+can verify each interrupt timestamp is no later than the current VMX time.
 
 ## AnalogTrigger support
 
