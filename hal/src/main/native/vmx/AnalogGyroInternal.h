@@ -180,7 +180,12 @@ class AnalogGyroPort final {
     }
     const double average = static_cast<double>(output.value) /
                            static_cast<double>(output.count);
-    const auto newCenter = static_cast<int32_t>(std::llround(average));
+    const double roundedCenter = std::round(average);
+    if (!std::isfinite(roundedCenter) || roundedCenter < INT16_MIN ||
+        roundedCenter > INT16_MAX) {
+      return AnalogGyroResult::kInvalidParameter;
+    }
+    const auto newCenter = static_cast<int32_t>(roundedCenter);
     const auto oldCenter = m_center;
     const auto oldOffset = m_offset;
     if (m_input->SetAccumulatorCenter(newCenter) != AnalogInputResult::kOk) {
