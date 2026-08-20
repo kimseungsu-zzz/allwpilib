@@ -449,6 +449,12 @@ class CounterPort final {
         m_upSource == m_downSource) {
       return CounterResult::kUnsupportedSource;
     }
+    if (m_mode == HAL_Counter_kExternalDirection &&
+        !IsValidEncoderPair(m_upChannel, m_downChannel)) {
+      // FRC exposes ExternalDirection only on the first five counter pairs;
+      // the 10+11 pair is reserved for TwoPulse/SemiPeriod.
+      return CounterResult::kUnsupportedSource;
+    }
     CounterSourceClaim claim;
     const HAL_Handle claimDownSource =
         m_mode == HAL_Counter_kSemiperiod ? m_upSource : m_downSource;
