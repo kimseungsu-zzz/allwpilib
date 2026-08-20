@@ -183,14 +183,21 @@ TEST(NotifierInternalTest, UsesOneHardwareTimerForGlobalEarliestDeadline) {
   ASSERT_EQ(first->Update(1000000), NotifierResult::kOk);
   ASSERT_EQ(second->Update(2000000), NotifierResult::kOk);
   scheduler.Wake();
-  std::this_thread::sleep_for(10ms);
+  const auto waitFor = [](auto&& predicate) {
+    const auto deadline = std::chrono::steady_clock::now() + 500ms;
+    while (!predicate() && std::chrono::steady_clock::now() < deadline) {
+      std::this_thread::sleep_for(1ms);
+    }
+    return predicate();
+  };
+  ASSERT_TRUE(waitFor([&] { return arms.load() >= 1; }));
   EXPECT_EQ(arms.load(), 1);
 
   ASSERT_EQ(second->Update(500000), NotifierResult::kOk);
   scheduler.Wake();
-  std::this_thread::sleep_for(10ms);
+  ASSERT_TRUE(waitFor([&] { return arms.load() >= 2; }));
   EXPECT_GE(arms.load(), 2);
-  EXPECT_GE(disarms.load(), 1);
+  ASSERT_TRUE(waitFor([&] { return disarms.load() >= 1; }));
   EXPECT_TRUE(parameterValid.load(std::memory_order_acquire));
 }
 
