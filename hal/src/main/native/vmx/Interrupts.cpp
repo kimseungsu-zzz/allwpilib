@@ -12,6 +12,7 @@
 #include "HALInitializer.h"
 #include "HALInternal.h"
 #include "InterruptInternal.h"
+#include "VMXChannelCapabilities.h"
 #include "VMXDigitalSource.h"
 #include "VMXPi.h"
 #include "VMXRuntime.h"
@@ -151,6 +152,11 @@ InterruptResult ValidateInterruptSource(HAL_Handle sourceHandle,
   channel = validation.second;
   switch (validation.first) {
     case DIOResult::kOk:
+      if (IsRuntimeInitialized() &&
+          !GetVMXCapabilityProvider().SupportsPhysical(
+              channel, VMXCapability::kInterruptInput)) {
+        return InterruptResult::kUnsupportedSource;
+      }
       return InterruptResult::kOk;
     case DIOResult::kAlreadyAllocated:
       return InterruptResult::kAlreadyAllocated;
