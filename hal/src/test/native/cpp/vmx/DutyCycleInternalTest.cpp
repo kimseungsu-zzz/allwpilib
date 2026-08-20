@@ -15,19 +15,20 @@ namespace {
 
 class FakeDutyCycleBackend final : public DutyCycleBackend {
  public:
-  FakeDutyCycleBackend(uint32_t period, uint32_t high)
-      : m_period{period}, m_high{high} {}
+  FakeDutyCycleBackend(uint32_t period, uint32_t high, bool success = true)
+      : m_period{period}, m_high{high}, m_success{success} {}
 
   bool GetTiming(uint32_t& period,
                  uint32_t& high) noexcept override {
     period = m_period;
     high = m_high;
-    return true;
+    return m_success;
   }
 
  private:
   uint32_t m_period;
   uint32_t m_high;
+  bool m_success;
 };
 
 class FakeDIOBackend final : public DIOBackend {
@@ -64,6 +65,18 @@ TEST(VMXDutyCycleTest, ConvertsPeriodHighTimeFrequencyAndOutput) {
             DutyCycleResult::kInvalidHandle);
   manager.Free(allocation.handle);
   EXPECT_EQ(releases, 1);
+
+  DutyCycleManager halfRange{
+      [](int32_t) {
+        return std::unique_ptr<DutyCycleBackend>{
+            std::make_unique<FakeDutyCycleBackend>(4096, 2048)};
+      },
+      [](HAL_Handle) { return DutyCycleSourceClaim{DutyCycleResult::kOk, 2}; },
+      [](HAL_Handle, int32_t) {}};
+  auto halfAllocation = halfRange.Allocate(static_cast<HAL_Handle>(2));
+  ASSERT_EQ(halfAllocation.result, DutyCycleResult::kOk);
+  EXPECT_DOUBLE_EQ(halfRange.GetOutput(halfAllocation.handle).second, 0.5);
+  halfRange.Free(halfAllocation.handle);
 }
 
 TEST(VMXDutyCycleTest, ZeroPeriodIsDisconnectedAndHighTimeOverflowFails) {
@@ -107,6 +120,16 @@ TEST(VMXDutyCycleTest, FlexTimerGroupsAreSharedByPwmCaptureAndPwm) {
                   .ReserveFlexTimerGroup(2, DigitalChannelOwner::kDutyCycle,
                                          "DutyCycle 2")
                   .reserved);
+  registry.ReleaseFlexTimerGroup(2, DigitalChannelOwner::kDutyCycle);
+  EXPECT_TRUE(registry
+                  .ReserveFlexTimerGroup(2, DigitalChannelOwner::kEncoder,
+                                         "Encoder 2/3")
+                  .reserved);
+  EXPECT_FALSE(registry
+                   .ReserveFlexTimerGroup(3, DigitalChannelOwner::kDutyCycle,
+                                          "DutyCycle 3")
+                   .reserved);
+  registry.ReleaseFlexTimerGroup(2, DigitalChannelOwner::kEncoder);
   EXPECT_TRUE(registry
                   .ReserveFlexTimerGroup(4, DigitalChannelOwner::kEncoder,
                                          "Encoder 4/5")
@@ -193,6 +216,20 @@ TEST(VMXDutyCycleTest, InvalidTimingIsReportedAsHardwareFailure) {
   auto allocation = manager.Allocate(static_cast<HAL_Handle>(4));
   ASSERT_EQ(allocation.result, DutyCycleResult::kOk);
   EXPECT_EQ(manager.GetOutput(allocation.handle).first,
+            DutyCycleResult::kHardwareFailure);
+}
+
+TEST(VMXDutyCycleTest, BackendReadFailureIsReportedAsHardwareFailure) {
+  DutyCycleManager manager{
+      [](int32_t) {
+        return std::unique_ptr<DutyCycleBackend>{
+            std::make_unique<FakeDutyCycleBackend>(1000, 500, false)};
+      },
+      [](HAL_Handle) { return DutyCycleSourceClaim{DutyCycleResult::kOk, 0}; },
+      [](HAL_Handle, int32_t) {}};
+  auto allocation = manager.Allocate(static_cast<HAL_Handle>(7));
+  ASSERT_EQ(allocation.result, DutyCycleResult::kOk);
+  EXPECT_EQ(manager.GetFrequency(allocation.handle).first,
             DutyCycleResult::kHardwareFailure);
 }
 
