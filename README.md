@@ -56,6 +56,18 @@ ELF32 links are intentionally absent. Linux ARM64 Debug/Release source checks
 remain available, while the final VMX HAL link requires a matching ELF64
 AArch64 SDK.
 
+The VMX AnalogGyro HAL is now implemented on the existing AnalogInput and
+AccumulatorInput resource. It accepts only logical accumulator channels 0 and
+1, uses the VMX fixed 46,500 samples/second rate for angle/rate scaling, and
+keeps the five-second calibration wait injectable for native tests. The
+RobotController power path reports hardware-backed VMX input voltage and
+Linux thermal-sysfs CPU temperature. VMX input current, 3V3/5V/6V rail
+telemetry/control, brownout status/threshold, FPGA button, RSL, and Driver
+Station disable count are explicit incompatible-state results because the
+current SDK has no equivalent APIs; VMX overcurrent is never treated as
+brownout. System-time validity uses the Linux wall clock and remains separate
+from VMX monotonic FPGA time and RTC synchronization.
+
 # Quick Start
 
 Below is a list of instructions that guide you through cloning, building, publishing and using local allwpilib binaries in a robot project. This quick start is not intended as a replacement for the information further listed in this document.

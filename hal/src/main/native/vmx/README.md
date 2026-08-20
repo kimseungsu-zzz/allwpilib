@@ -408,6 +408,40 @@ output. A failed replacement is rolled back with the same saved offsets, and a
 snapshot failure leaves the live resource untouched. Only an explicit
 `HAL_ResetAccumulator()` clears both the hardware counter and software offsets.
 
+## AnalogGyro support
+
+The VMX AnalogGyro adapter implements the existing `hal/AnalogGyro.h` C ABI
+without adding a VMX-specific public API. A gyro retains the caller's
+`HAL_AnalogInputHandle` and uses that port's existing `AccumulatorInput`
+resource; no second ADC or gyro resource is allocated. Only logical analog
+accumulator channels 0 and 1 are accepted, matching the standard WPILib
+accumulator surface even though VMX exposes four analog inputs.
+
+`HAL_SetupAnalogGyro()` configures average bits 0, oversample bits 10, and a
+zero deadband. VMX's ADC rate is fixed at 46,500 samples/second, so the
+adapter uses that hardware rate for angle/rate scaling and does not claim that
+the roboRIO 51,200 samples/second setting was applied. The default sensitivity
+is 0.007 V/(degree/second). Calibration waits five seconds, reads value and
+count atomically, rejects a failed or zero-count sample set, rounds the center,
+stores the residual offset, and resets only after the new center is installed
+successfully. Native tests inject the wait callback, so calibration tests never
+sleep for five seconds.
+
+## RobotController power and system status
+
+`HAL_GetVinVoltage()` is hardware-backed by
+`VMXPi::getPower().GetSystemVoltage()`. The current VMX SDK does not expose
+input current, 3V3/5V/6V rail telemetry or control, fault reset, or a
+brownout/undervoltage signal. Those HAL calls return `INCOMPATIBLE_STATE` and
+zero/false output values; they never report fake constants and `GetOvercurrent()`
+is deliberately not mapped to brownout. `HAL_GetCPUTemp()` discovers a
+CPU-like Linux thermal zone by reading its `type` and milli-Celsius `temp`
+files, without assuming `thermal_zone0`. `HAL_GetSystemActive()` reflects VMX
+runtime readiness. System-time validity uses a readable Linux wall clock with
+a documented post-2020 validity policy. It is independent of the VMX monotonic
+clock used by `HAL_GetFPGATime()`, Notifier, interrupt timestamps, and
+TimedRobot; the future VMX RTC/system-clock sync service remains separate.
+
 ## Interrupt support
 
 The VMX Interrupt adapter implements the existing `hal/Interrupts.h` C ABI for
