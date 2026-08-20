@@ -57,6 +57,31 @@ struct VMXChannelInventory {
   bool valid = false;
 };
 
+// The eight CommDIO channels are shared by the communication peripherals and
+// the logical DIO surface.  Keep this map in the capability layer so every
+// adapter (DIO, I2C, SPI, and UART) makes the same physical reservation.
+struct VMXCommDIOChannelMap {
+  int32_t i2cSDA = 26;
+  int32_t i2cSCL = 27;
+  int32_t spiCLK = 28;
+  int32_t spiMOSI = 29;
+  int32_t spiMISO = 30;
+  int32_t spiCS = 31;
+  int32_t uartTX = 32;
+  int32_t uartRX = 33;
+  bool valid = true;
+  bool i2cValid = true;
+  bool spiValid = true;
+  bool uartValid = true;
+};
+
+constexpr VMXCommDIOChannelMap kDefaultVMXCommDIOChannelMap{};
+
+// Reads the board's canonical capability-to-channel mapping.  The host
+// fallback is intentionally the documented VMX-pi map so internal adapters
+// remain testable without the VMX SDK.
+VMXCommDIOChannelMap GetVMXCommDIOChannelMap() noexcept;
+
 // A small injectable seam around VMXIO::ChannelSupportsCapability.  The
 // production instance queries the SDK; tests provide lambdas that model
 // FlexDIO, HighCurrent jumper, and CommDIO capabilities.
@@ -134,7 +159,12 @@ constexpr std::array<std::array<int32_t, 2>, 6> kVMXCounterPairs{{
     {{0, 1}}, {{2, 3}}, {{4, 5}}, {{6, 7}}, {{8, 9}}, {{10, 11}},
 }};
 
-bool IsVMXEncoderPair(int32_t channelA, int32_t channelB) noexcept;
-bool IsVMXCounterPair(int32_t channelA, int32_t channelB) noexcept;
+constexpr bool IsVMXEncoderPair(int32_t channelA, int32_t channelB) noexcept {
+  return IsValidEncoderPair(channelA, channelB);
+}
+
+constexpr bool IsVMXCounterPair(int32_t channelA, int32_t channelB) noexcept {
+  return IsValidCounterPair(channelA, channelB);
+}
 
 }  // namespace hal::vmx

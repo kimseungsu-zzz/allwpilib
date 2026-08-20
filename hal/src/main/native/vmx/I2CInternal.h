@@ -13,6 +13,7 @@
 
 #include "hal/I2CTypes.h"
 #include "DigitalChannelRegistry.h"
+#include "VMXChannelCapabilities.h"
 
 namespace hal::vmx {
 
@@ -52,6 +53,7 @@ class I2CBackend {
 };
 
 using I2CBackendFactory = std::function<std::unique_ptr<I2CBackend>()>;
+using CommDIOMapProvider = std::function<VMXCommDIOChannelMap()>;
 
 struct I2CPortState {
   std::mutex mutex;
@@ -72,8 +74,12 @@ class I2CManager final {
  public:
   explicit I2CManager(
       I2CBackendFactory factory = {},
-      DigitalChannelRegistry& registry = GetDigitalChannelRegistry())
-      : m_factory{std::move(factory)}, m_registry{registry} {}
+      DigitalChannelRegistry& registry = GetDigitalChannelRegistry(),
+      CommDIOMapProvider mapProvider =
+          [] { return kDefaultVMXCommDIOChannelMap; })
+      : m_factory{std::move(factory)},
+        m_registry{registry},
+        m_mapProvider{std::move(mapProvider)} {}
 
   ~I2CManager() {
     for (auto& state : m_ports) {
@@ -99,8 +105,18 @@ class I2CManager final {
       // physical 26/27. Reserve it before opening the SDK resource so a
       // generic logical DIO/PWM allocation gets a deterministic conflict
       // rather than an opaque SDK activation failure.
-      int32_t sda = 26;
-      int32_t scl = 27;
+      VMXCommDIOChannelMap map;
+      try {
+        map = m_mapProvider ? m_mapProvider() : kDefaultVMXCommDIOChannelMap;
+      } catch (...) {
+        return I2CResult::kHardwareFailure;
+      }
+      if (!map.valid || !map.i2cValid || !IsPhysicalChannelValid(map.i2cSDA) ||
+          !IsPhysicalChannelValid(map.i2cSCL) || map.i2cSDA == map.i2cSCL) {
+        return I2CResult::kHardwareFailure;
+      }
+      int32_t sda = map.i2cSDA;
+      int32_t scl = map.i2cSCL;
       auto sdaReservation = m_registry.Reserve(
           sda, DigitalChannelOwner::kI2C, "VMX I2C SDA");
       if (!sdaReservation.reserved) {
@@ -278,6 +294,7 @@ class I2CManager final {
 
   I2CBackendFactory m_factory;
   DigitalChannelRegistry& m_registry;
+  CommDIOMapProvider m_mapProvider;
   mutable std::array<I2CPortState, 2> m_ports;
 };
 

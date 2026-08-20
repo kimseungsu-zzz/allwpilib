@@ -440,11 +440,6 @@ class CounterPort final {
         m_downSource == HAL_kInvalidHandle) {
       return CounterResult::kOk;
     }
-    if (m_mode == HAL_Counter_kTwoPulse && m_upSource != m_downSource) {
-      // VMX has one hardware up/down input capture resource; two independent
-      // source handles are not a supported TwoPulse configuration.
-      return CounterResult::kUnsupportedSource;
-    }
     if (m_mode == HAL_Counter_kExternalDirection &&
         m_upSource == m_downSource) {
       return CounterResult::kUnsupportedSource;

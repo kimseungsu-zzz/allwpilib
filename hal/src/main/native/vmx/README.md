@@ -4,6 +4,13 @@ This directory contains the Linux aarch64 VMX implementation of WPILib's
 existing public HAL API. It is selected only by the explicit `-PvmxBuild`
 Gradle flavor.
 
+The `vmxdrivers/` dependency used below is based on the standalone drivers in
+the [Studica Robotics ROS2 repository](https://github.com/Studica-Robotics/ROS2),
+not a new driver stack written for WPILib. This project uses those drivers
+without their ROS2 node layer and keeps their source area unchanged. Changes
+for WPILib HAL status/lifecycle semantics, Gradle/native integration, and
+resource adaptation live in this `hal/src/main/native/vmx` adapter only.
+
 The dependency direction is:
 
 ```text
@@ -180,6 +187,33 @@ the SDK's register-aware `I2C_Write()` call. The SDK documents that a combined
 transaction writes before reading; the exact repeated-start versus
 stop/start wire behavior remains a hardware smoke-test item for register-based
 sensors.
+
+## SPI support
+
+The VMX SPI adapter exposes the one physical CommDIO SPI resource as
+`HAL_SPI_kMXP`. The SDK capability inventory supplies the channel map (with the
+documented fallback of physical CLK/MOSI/MISO/CS `28/29/30/31`), and the shared
+physical registry reserves all four channels for the lifetime of the resource.
+Consequently a generic logical DIO, I2C, or UART reservation on any overlapping
+physical channel makes SPI initialization fail atomically; SPI likewise blocks
+later claims of those channels. No second fake onboard SPI bus is reported.
+
+Basic `HAL_TransactionSPI`, `HAL_WriteSPI`, and `HAL_ReadSPI` operations are
+serialized per bus and use the SDK's `SPI_Transaction`, `SPI_Write`, and
+`SPI_Read` primitives. The adapter validates the SDK-compatible 500 kHz to
+10 MHz clock range, maps all four SPI modes, and applies active-high/active-low
+chip-select polarity by recreating the VMX resource transactionally. A failed
+reconfiguration leaves the previous logical configuration in place. Zero-byte
+operations are valid; nonzero null buffers and lengths above the SDK's 16-bit
+transfer limit are rejected.
+
+The WPILib SPI Auto/accumulator C ABI is present but deliberately returns an
+explicit incompatible-state error. The VMX SDK has a different automatic
+transfer engine contract, so the adapter does not store software-only state or
+claim that AutoSPI works. This distinction is recorded in the sensor matrix:
+ADXL345_SPI and an explicitly-MXP ADXL362 remain `NOT_TESTED`, while
+ADXRS450, ADIS16448, and ADIS16470 remain blocked by AutoSPI and their
+additional DIO/port dependencies.
 
 ## PWM support
 

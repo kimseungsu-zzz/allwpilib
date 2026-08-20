@@ -40,15 +40,15 @@ are available but still awaiting sensor verification are `NOT_TESTED`.
 | DutyCycleEncoder | `NOT_TESTED` | Existing WPILib class + DutyCycle HAL | The standard class now has its required HAL path. Validate frequency threshold, connected/disconnected behavior, offset/scaling, and selected FlexDIO hardware on VMX. |
 | DutyCycleInput | `NOT_TESTED` | Existing WPILib class + DutyCycle HAL | The shared HAL path is present; add a sensor-level test for the WPILib wrapper and source lifetime. |
 | Tachometer | `NOT_TESTED` | Counter single-source InputCapture | Single-source hardware-backed activation is available; sensor-level period validation remains. |
-| Counter | `PARTIAL` | VMX InputCapture Counter + DIO sources | Six official pairs are recognized. TwoPulse accepts one source configured as both Up and Down and rejects independent Up/Down handles; SemiPeriod is hardware-backed; ExternalDirection is limited to pairs 0+1 through 8+9; PulseLength remains unsupported. |
+| Counter | `PARTIAL` | VMX InputCapture Counter + DIO sources | Six official pairs are recognized. TwoPulse supports the shared VMX up/down capture resource for a valid pair (and the same source for both inputs); SemiPeriod is hardware-backed; ExternalDirection is limited to pairs 0+1 through 8+9; PulseLength remains unsupported. |
 | Ultrasonic | `NOT_TESTED` | Output-capable DIO ping + Counter SemiPeriod echo | DIO output capability and single-source SemiPeriod must both be available on the selected physical channels; add a hardware smoke test. |
 | PWM output / PWMVictorSPX | `NOT_TESTED` | PWMGenerator-capable logical PWM | Logical PWM 0–27 maps to physical 0–21 and 26–31; SDK output capability and shared resource ownership are enforced. |
 | ADXL345_I2C | `SUPPORTED` | WPILib `I2C` → VMX MXP I2C HAL | Standard WPILib register transactions now reach the shared VMX I2C resource. The ADXL345 WHO_AM_I and one-register read/write sequence are the first sensor-level I2C smoke test. |
-| ADXL345_SPI | `BLOCKED_BY_HAL` | Required SPI HAL is not present in the VMX backend | Schedule after SPI Core; use the existing WPILib driver unchanged. |
-| ADXL362 | `BLOCKED_BY_HAL` | Required SPI HAL is not present in the VMX backend | Schedule after SPI Core; no VMX-specific ADXL362 wrapper is needed. |
-| ADXRS450_Gyro | `BLOCKED_BY_HAL` | Required SPI HAL is not present in the VMX backend | Schedule after SPI Core; preserve the existing WPILib driver and calibration semantics. |
-| ADIS16448_IMU | `BLOCKED_BY_HAL` | Required SPI HAL is not present in the VMX backend | Schedule after SPI Core; verify reset, initialization, and update timing on hardware. |
-| ADIS16470_IMU | `BLOCKED_BY_HAL` | Required SPI HAL is not present in the VMX backend | Schedule after SPI Core; verify reset, initialization, and update timing on hardware. |
+| ADXL345_SPI | `NOT_TESTED` | Basic SPI transactions on VMX MXP | The WPILib path uses mode 3, active-high CS, and 500 kHz; the VMX basic path can represent these settings, but construction/configuration and WHO_AM_I data have not been tested on hardware. |
+| ADXL362 | `NOT_TESTED` | Basic SPI transactions on VMX MXP | The default WPILib constructor selects onboard CS1, which VMX deliberately rejects; an explicit MXP port uses the basic mode-3, active-low transaction path and still needs sensor-level validation. |
+| ADXRS450_Gyro | `BLOCKED_BY_HAL` | Basic SPI plus WPILib SPI Auto accumulator | The default is onboard CS0 (not a VMX port), and the class calls `SPI::InitAccumulator`; AutoSPI is explicitly unsupported rather than emulated. |
+| ADIS16448_IMU | `BLOCKED_BY_HAL` | MXP basic SPI, SPI Auto, DIO reset/status pins | The default MXP bus is available for register setup, but the class requires `InitAuto`, `ConfigureAutoStall`, an asynchronous acquire loop, and DIO 18/19/10 resources. AutoSPI is the current blocker. |
+| ADIS16470_IMU | `BLOCKED_BY_HAL` | Onboard-CS0 basic SPI, SPI Auto, DIO reset/data-ready/LED pins | The default and standard constructors select onboard CS0 (not a VMX port); the implementation also requires `InitAuto`, `ConfigureAutoStall`, and DIO 27/26/28 resources. |
 | AnalogGyro | `BLOCKED_BY_HAL` | Required AnalogGyro HAL is not present in the VMX backend | AnalogInput and accumulator support the underlying ADC path, but the WPILib class calls the separate AnalogGyro HAL ABI for angle/rate/calibration. Add the compatibility test after that HAL is implemented. |
 | BuiltInAccelerometer | `BLOCKED_BY_HAL` | Required accelerometer HAL is not present in the VMX backend | VMX onboard IMU data may be usable, but range, axis orientation, calibration, and g-vs-m/s² units must be verified before exposing `HAL_GetAccelerometerX/Y/Z`. |
 
@@ -67,7 +67,7 @@ are available but still awaiting sensor verification are `NOT_TESTED`.
 | Timing / Notifier | `SUPPORTED` | VMX monotonic time and one global VMX timer-notification scheduler. |
 | I2C | `SUPPORTED` | One VMX MXP bus, shared and reference-counted; onboard I2C is intentionally unsupported. |
 | DutyCycle | `SUPPORTED` | FlexDIO 0-11 VMX PWMCapture adapter with shared timer-group ownership and DIO handoff. |
-| SPI | `BLOCKED_BY_HAL` | Planned before SPI-based WPILib sensors. |
+| SPI | `NOT_TESTED` | VMX MXP basic SPI transaction HAL | `HAL_InitializeSPI`, transaction/write/read, clock, mode 0-3, and CS polarity are mapped to the four CommDIO SPI pins. AutoSPI/accumulator APIs return an explicit unsupported error; sensor-level integration and physical validation remain. |
 | Serial / UART | `BLOCKED_BY_HAL` | Planned communication core. |
 
 ## Studica / VMX vendor sensors
@@ -96,8 +96,9 @@ separate vendor wrapper module.
    changing their public APIs.
 2. Validate DutyCycle, DutyCycleEncoder, and DutyCycleInput on physical VMX
    hardware.
-3. Implement SPI Core before validating ADXL345_SPI, ADXL362, ADXRS450_Gyro,
-   ADIS16448_IMU, and ADIS16470_IMU.
+3. Validate the basic SPI sensor paths for ADXL345_SPI and explicit-MXP
+   ADXL362; keep AutoSPI-dependent ADXRS450_Gyro, ADIS16448_IMU, and
+   ADIS16470_IMU blocked until an explicit AutoSPI adapter is designed.
 4. Close the Counter single-source/semiperiod gap before validating
    Tachometer and Ultrasonic.
 5. Verify VMX IMU mappings separately before deciding whether any

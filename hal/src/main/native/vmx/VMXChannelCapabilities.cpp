@@ -102,12 +102,31 @@ bool ReadVMXResourceChannels(uint32_t resourceHandle, int32_t& firstChannel,
   return firstChannel >= 0;
 }
 
-bool IsVMXEncoderPair(int32_t channelA, int32_t channelB) noexcept {
-  return IsValidEncoderPair(channelA, channelB);
-}
+VMXCommDIOChannelMap GetVMXCommDIOChannelMap() noexcept {
+  auto map = kDefaultVMXCommDIOChannelMap;
+  auto context = GetRuntimeContext();
+  if (!context || !context->IsOpen()) {
+    return map;
+  }
 
-bool IsVMXCounterPair(int32_t channelA, int32_t channelB) noexcept {
-  return IsValidCounterPair(channelA, channelB);
+  const auto get = [&context](VMXChannelCapability capability,
+                              int32_t& destination) {
+    auto channel = context->io.GetSoleChannelIndex(capability);
+    if (channel == INVALID_VMX_CHANNEL_INDEX) {
+      return false;
+    }
+    destination = static_cast<int32_t>(channel);
+    return true;
+  };
+  map.i2cValid = get(VMXChannelCapability::I2C_SDA, map.i2cSDA) &&
+                 get(VMXChannelCapability::I2C_SCL, map.i2cSCL);
+  map.spiValid = get(VMXChannelCapability::SPI_CLK, map.spiCLK) &&
+                 get(VMXChannelCapability::SPI_MOSI, map.spiMOSI) &&
+                 get(VMXChannelCapability::SPI_MISO, map.spiMISO) &&
+                 get(VMXChannelCapability::SPI_CS, map.spiCS);
+  map.uartValid = get(VMXChannelCapability::UART_TX, map.uartTX) &&
+                  get(VMXChannelCapability::UART_RX, map.uartRX);
+  return map;
 }
 
 }  // namespace hal::vmx

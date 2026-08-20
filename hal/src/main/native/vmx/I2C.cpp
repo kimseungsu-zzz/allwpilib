@@ -129,7 +129,8 @@ std::unique_ptr<I2CBackend> CreateI2CBackend() {
 }
 
 I2CManager& GetI2CManager() {
-  static I2CManager manager{CreateI2CBackend, GetDigitalChannelRegistry()};
+  static I2CManager manager{CreateI2CBackend, GetDigitalChannelRegistry(),
+                            GetVMXCommDIOChannelMap};
   return manager;
 }
 
