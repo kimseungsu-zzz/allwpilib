@@ -7,11 +7,12 @@
 #include <memory>
 #include <string_view>
 
+#include "VMXPi.h"
+
 #include "AnalogInputInternal.h"
 #include "HALInitializer.h"
 #include "HALInternal.h"
 #include "VMXRuntime.h"
-#include "analog_input.hpp"
 #include "hal/Errors.h"
 #include "hal/handles/HandlesInternal.h"
 
@@ -24,18 +25,50 @@ class DriverAnalogInputBackend final : public AnalogInputBackend {
                            int32_t oversampleBits, bool accumulatorEnabled,
                            int32_t center, int32_t deadband,
                            std::shared_ptr<VMXPi> context)
-      : m_driver{std::make_unique<studica_driver::AnalogInput>(
-            physicalChannel, std::move(context), averageBits, oversampleBits,
-            accumulatorEnabled, center, deadband)} {
+      : m_context{std::move(context)} {
+    if (!m_context || !m_context->IsOpen()) {
+      return;
+    }
+    VMXErrorCode error;
+    float fullScale = 0.0f;
+    if (!m_context->io.Accumulator_GetFullScaleVoltage(fullScale, &error) ||
+        fullScale <= 0.0f) {
+      return;
+    }
+    AccumulatorConfig config;
+    config.SetNumAverageBits(static_cast<uint8_t>(averageBits));
+    config.SetNumOversampleBits(static_cast<uint8_t>(oversampleBits));
+    config.SetEnableAccumulationCounter(accumulatorEnabled);
+    config.SetAccumulationCounterCenter(static_cast<int16_t>(center));
+    config.SetAccumulationCounterDeadband(static_cast<int16_t>(deadband));
+    if (!m_context->io.ActivateSinglechannelResource(
+            VMXChannelInfo(physicalChannel,
+                           VMXChannelCapability::AccumulatorInput),
+            &config, m_resourceHandle, &error)) {
+      return;
+    }
+    m_fullScaleVoltage = fullScale;
+    m_accumulatorEnabled = accumulatorEnabled;
+    m_initialized = true;
   }
 
-  bool IsInitialized() const noexcept {
-    return m_driver && m_driver->IsInitialized();
+  ~DriverAnalogInputBackend() override {
+    if (m_initialized) {
+      VMXErrorCode error;
+      m_context->io.DeallocateResource(m_resourceHandle, &error);
+    }
   }
+
+  bool IsInitialized() const noexcept { return m_initialized; }
 
   bool GetValue(uint32_t& value) noexcept override {
     try {
-      return m_driver && m_driver->GetValue(value);
+      if (!m_initialized) {
+        return false;
+      }
+      VMXErrorCode error;
+      return m_context->io.Accumulator_GetInstantaneousValue(
+          m_resourceHandle, value, &error);
     } catch (...) {
       value = 0;
       return false;
@@ -44,7 +77,12 @@ class DriverAnalogInputBackend final : public AnalogInputBackend {
 
   bool GetAverageValue(uint32_t& value) noexcept override {
     try {
-      return m_driver && m_driver->GetAverageValue(value);
+      if (!m_initialized) {
+        return false;
+      }
+      VMXErrorCode error;
+      return m_context->io.Accumulator_GetAverageValue(m_resourceHandle, value,
+                                                       &error);
     } catch (...) {
       value = 0;
       return false;
@@ -53,7 +91,13 @@ class DriverAnalogInputBackend final : public AnalogInputBackend {
 
   bool GetVoltage(double& voltage) noexcept override {
     try {
-      return m_driver && m_driver->GetVoltage(voltage);
+      uint32_t raw = 0;
+      if (!GetValue(raw)) {
+        voltage = 0.0;
+        return false;
+      }
+      voltage = static_cast<double>(raw) * m_fullScaleVoltage / kVMXADCCounts;
+      return true;
     } catch (...) {
       voltage = 0.0;
       return false;
@@ -62,7 +106,19 @@ class DriverAnalogInputBackend final : public AnalogInputBackend {
 
   bool GetAverageVoltage(double& voltage) noexcept override {
     try {
-      return m_driver && m_driver->GetAverageVoltage(voltage);
+      if (!m_initialized) {
+        voltage = 0.0;
+        return false;
+      }
+      float value = 0.0f;
+      VMXErrorCode error;
+      if (!m_context->io.Accumulator_GetAverageVoltage(m_resourceHandle, value,
+                                                        &error)) {
+        voltage = 0.0;
+        return false;
+      }
+      voltage = value;
+      return true;
     } catch (...) {
       voltage = 0.0;
       return false;
@@ -71,7 +127,11 @@ class DriverAnalogInputBackend final : public AnalogInputBackend {
 
   bool ResetAccumulator() noexcept override {
     try {
-      return m_driver && m_driver->ResetAccumulator();
+      if (!m_initialized || !m_accumulatorEnabled) {
+        return false;
+      }
+      VMXErrorCode error;
+      return m_context->io.Accumulator_Counter_Reset(m_resourceHandle, &error);
     } catch (...) {
       return false;
     }
@@ -80,7 +140,12 @@ class DriverAnalogInputBackend final : public AnalogInputBackend {
   bool GetAccumulatorOutput(int64_t& value,
                             uint32_t& count) noexcept override {
     try {
-      return m_driver && m_driver->GetAccumulatorOutput(value, count);
+      if (!m_initialized || !m_accumulatorEnabled) {
+        return false;
+      }
+      VMXErrorCode error;
+      return m_context->io.Accumulator_Counter_GetValueAndCount(
+          m_resourceHandle, value, count, &error);
     } catch (...) {
       value = 0;
       count = 0;
@@ -89,11 +154,15 @@ class DriverAnalogInputBackend final : public AnalogInputBackend {
   }
 
   double GetFullScaleVoltage() const noexcept override {
-    return m_driver ? m_driver->GetFullScaleVoltage() : 0.0;
+    return m_fullScaleVoltage;
   }
 
  private:
-  std::unique_ptr<studica_driver::AnalogInput> m_driver;
+  std::shared_ptr<VMXPi> m_context;
+  VMXResourceHandle m_resourceHandle = 0;
+  double m_fullScaleVoltage = 0.0;
+  bool m_accumulatorEnabled = false;
+  bool m_initialized = false;
 };
 
 std::unique_ptr<AnalogInputBackend> CreateAnalogInputBackend(

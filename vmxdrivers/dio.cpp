@@ -163,24 +163,22 @@ void DIO::interrupt_trampoline(uint32_t /*io_interrupt_num*/,
 // Set / Get / Toggle
 // ---------------------------------------------------------------------------
 
-bool DIO::Set(bool value)
+void DIO::Set(bool value)
 {
     if (!initialized_)
     {
         printf("Attempt to Set on uninitialized DIO port %d ignored.\n", channel_);
-        return false;
+        return;
     }
     VMXErrorCode vmxerr;
     if (!vmx_->io.DIO_Set(dio_res_handle_, value, &vmxerr))
     {
         printf("Error setting DIO on port %d", channel_);
         DisplayVMXError(vmxerr);
-        return false;
     }
-    return true;
 }
 
-bool DIO::Get(bool& value)
+bool DIO::Get()
 {
     if (!initialized_)
     {
@@ -188,37 +186,12 @@ bool DIO::Get(bool& value)
         return false;
     }
     VMXErrorCode vmxerr;
-    value = false;
+    bool value = false;
     if (!vmx_->io.DIO_Get(dio_res_handle_, value, &vmxerr))
     {
         printf("Error getting DIO on port %d", channel_);
         DisplayVMXError(vmxerr);
-        return false;
     }
-    return true;
-}
-
-bool DIO::Pulse(uint32_t microseconds)
-{
-    if (!initialized_ || mode_ != PinMode::OUTPUT || microseconds == 0)
-        return false;
-    VMXErrorCode vmxerr;
-    return vmx_->io.DIO_Pulse(dio_res_handle_, true, microseconds, &vmxerr);
-}
-
-bool DIO::IsPulsing(bool& is_pulsing)
-{
-    is_pulsing = false;
-    if (!initialized_ || mode_ != PinMode::OUTPUT)
-        return false;
-    VMXErrorCode vmxerr;
-    return vmx_->io.DIO_IsPulsing(dio_res_handle_, is_pulsing, &vmxerr);
-}
-
-bool DIO::Get()
-{
-    bool value = false;
-    Get(value);
     return value;
 }
 

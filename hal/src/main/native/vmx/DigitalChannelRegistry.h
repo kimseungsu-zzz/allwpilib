@@ -13,7 +13,7 @@
 
 namespace hal::vmx {
 
-enum class DigitalChannelOwner { kNone, kDIO, kPWM };
+enum class DigitalChannelOwner { kNone, kDIO, kPWM, kEncoder };
 
 struct DigitalChannelReservation {
   bool reserved = false;
@@ -48,6 +48,38 @@ class DigitalChannelRegistry final {
     if (entry.owner == owner) {
       entry = {};
     }
+  }
+
+  bool Transfer(int32_t channel, DigitalChannelOwner expectedOwner,
+                DigitalChannelOwner newOwner,
+                std::string_view allocationLocation) {
+    std::scoped_lock lock{m_mutex};
+    if (channel < 0 || channel >= kNumDigitalChannels) {
+      return false;
+    }
+    auto& entry = m_entries[channel];
+    if (entry.owner != expectedOwner) {
+      return false;
+    }
+    entry.owner = newOwner;
+    entry.allocationLocation = allocationLocation;
+    return true;
+  }
+
+  bool TransferPair(int32_t channelA, int32_t channelB,
+                    DigitalChannelOwner expectedOwner,
+                    DigitalChannelOwner newOwner,
+                    std::string_view allocationLocation) {
+    std::scoped_lock lock{m_mutex};
+    if (channelA < 0 || channelA >= kNumDigitalChannels || channelB < 0 ||
+        channelB >= kNumDigitalChannels || channelA == channelB ||
+        m_entries[channelA].owner != expectedOwner ||
+        m_entries[channelB].owner != expectedOwner) {
+      return false;
+    }
+    m_entries[channelA] = {newOwner, std::string{allocationLocation}};
+    m_entries[channelB] = {newOwner, std::string{allocationLocation}};
+    return true;
   }
 
  private:

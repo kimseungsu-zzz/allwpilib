@@ -285,5 +285,51 @@ TEST(VMXDIOTest, PulseMultipleValidatesEveryAllocatedOutput) {
             DIOResult::kInvalidHandle);
 }
 
+TEST(VMXDIOTest, EncoderClaimSuspendsAndRestoresDIOInputsAtomically) {
+  DIOFixture fixture;
+  auto sourceA = fixture.manager.Allocate(18, true, "encoder source A");
+  auto sourceB = fixture.manager.Allocate(19, true, "encoder source B");
+  ASSERT_EQ(sourceA.result, DIOResult::kOk);
+  ASSERT_EQ(sourceB.result, DIOResult::kOk);
+  EXPECT_EQ(fixture.hardware->creates, 2);
+
+  auto claim = fixture.manager.ClaimEncoderSources(
+      sourceA.handle, sourceB.handle, "encoder allocation");
+  ASSERT_EQ(claim.result, DIOResult::kOk);
+  EXPECT_EQ(claim.channelA, 18);
+  EXPECT_EQ(claim.channelB, 19);
+  EXPECT_EQ(fixture.hardware->destroys, 2);
+  EXPECT_EQ(fixture.manager.GetValue(sourceA.handle).first,
+            DIOResult::kHardwareFailure);
+  EXPECT_FALSE(fixture.registry
+                   .Reserve(18, DigitalChannelOwner::kPWM, "conflicting PWM")
+                   .reserved);
+  EXPECT_EQ(fixture.manager
+                .ClaimEncoderSources(sourceA.handle, sourceB.handle,
+                                     "overlapping encoder")
+                .result,
+            DIOResult::kAlreadyAllocated);
+
+  fixture.manager.ReleaseEncoderSources(sourceA.handle, sourceB.handle,
+                                        claim.channelA, claim.channelB);
+  EXPECT_EQ(fixture.hardware->creates, 4);
+  EXPECT_EQ(fixture.manager.GetValue(sourceA.handle).first, DIOResult::kOk);
+  EXPECT_EQ(fixture.manager.GetValue(sourceB.handle).first, DIOResult::kOk);
+}
+
+TEST(VMXDIOTest, EncoderClaimRejectsOutputsWithoutChangingOwnership) {
+  DIOFixture fixture;
+  auto output = fixture.manager.Allocate(20, false, "output");
+  auto input = fixture.manager.Allocate(21, true, "input");
+  ASSERT_EQ(output.result, DIOResult::kOk);
+  ASSERT_EQ(input.result, DIOResult::kOk);
+
+  auto claim = fixture.manager.ClaimEncoderSources(
+      output.handle, input.handle, "invalid encoder");
+  EXPECT_EQ(claim.result, DIOResult::kOutputChannel);
+  EXPECT_EQ(fixture.manager.Set(output.handle, true), DIOResult::kOk);
+  EXPECT_EQ(fixture.manager.GetValue(input.handle).first, DIOResult::kOk);
+}
+
 }  // namespace
 }  // namespace hal::vmx

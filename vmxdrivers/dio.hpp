@@ -25,10 +25,7 @@ namespace studica_driver
             DIO(VMXChannelIndex channel, PinMode mode, std::shared_ptr<VMXPi> vmx = std::make_shared<VMXPi>(true, 50));
             ~DIO();
 
-            bool Set(bool value);
-            bool Get(bool& value);
-            bool Pulse(uint32_t microseconds);
-            bool IsPulsing(bool& is_pulsing);
+            void Set(bool value);
             bool Get();
             void Toggle();
 

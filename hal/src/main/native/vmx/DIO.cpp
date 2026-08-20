@@ -9,11 +9,12 @@
 #include <memory>
 #include <string_view>
 
+#include "VMXPi.h"
+
 #include "DIOInternal.h"
 #include "HALInitializer.h"
 #include "HALInternal.h"
 #include "VMXRuntime.h"
-#include "dio.hpp"
 #include "hal/Errors.h"
 #include "hal/handles/HandlesInternal.h"
 
@@ -24,19 +25,40 @@ class DriverDIOBackend final : public DIOBackend {
  public:
   DriverDIOBackend(int32_t channel, bool input,
                    std::shared_ptr<VMXPi> context)
-      : m_driver{std::make_unique<studica_driver::DIO>(
-            channel,
-            input ? studica_driver::PinMode::INPUT
-                  : studica_driver::PinMode::OUTPUT,
-            std::move(context))} {}
-
-  bool IsInitialized() const noexcept {
-    return m_driver && m_driver->IsInitialized();
+      : m_context{std::move(context)}, m_input{input} {
+    if (!m_context || !m_context->IsOpen()) {
+      return;
+    }
+    DIOConfig config;
+    VMXChannelCapability capability;
+    if (input) {
+      config.SetInputMode(DIOConfig::InputMode::PULLUP);
+      capability = VMXChannelCapability::DigitalInput;
+    } else {
+      config = DIOConfig{DIOConfig::PUSHPULL};
+      capability = VMXChannelCapability::DigitalOutput;
+    }
+    VMXErrorCode error;
+    m_initialized = m_context->io.ActivateSinglechannelResource(
+        VMXChannelInfo(channel, capability), &config, m_resourceHandle, &error);
   }
+
+  ~DriverDIOBackend() override {
+    if (m_initialized) {
+      VMXErrorCode error;
+      m_context->io.DeallocateResource(m_resourceHandle, &error);
+    }
+  }
+
+  bool IsInitialized() const noexcept { return m_initialized; }
 
   bool Set(bool value) noexcept override {
     try {
-      return m_driver && m_driver->Set(value);
+      if (!m_initialized || m_input) {
+        return false;
+      }
+      VMXErrorCode error;
+      return m_context->io.DIO_Set(m_resourceHandle, value, &error);
     } catch (...) {
       return false;
     }
@@ -44,7 +66,11 @@ class DriverDIOBackend final : public DIOBackend {
 
   bool Get(bool& value) noexcept override {
     try {
-      return m_driver && m_driver->Get(value);
+      if (!m_initialized) {
+        return false;
+      }
+      VMXErrorCode error;
+      return m_context->io.DIO_Get(m_resourceHandle, value, &error);
     } catch (...) {
       value = false;
       return false;
@@ -53,7 +79,12 @@ class DriverDIOBackend final : public DIOBackend {
 
   bool Pulse(uint32_t microseconds) noexcept override {
     try {
-      return m_driver && m_driver->Pulse(microseconds);
+      if (!m_initialized || m_input) {
+        return false;
+      }
+      VMXErrorCode error;
+      return m_context->io.DIO_Pulse(m_resourceHandle, true, microseconds,
+                                     &error);
     } catch (...) {
       return false;
     }
@@ -61,7 +92,11 @@ class DriverDIOBackend final : public DIOBackend {
 
   bool IsPulsing(bool& isPulsing) noexcept override {
     try {
-      return m_driver && m_driver->IsPulsing(isPulsing);
+      if (!m_initialized || m_input) {
+        return false;
+      }
+      VMXErrorCode error;
+      return m_context->io.DIO_IsPulsing(m_resourceHandle, isPulsing, &error);
     } catch (...) {
       isPulsing = false;
       return false;
@@ -69,7 +104,10 @@ class DriverDIOBackend final : public DIOBackend {
   }
 
  private:
-  std::unique_ptr<studica_driver::DIO> m_driver;
+  std::shared_ptr<VMXPi> m_context;
+  VMXResourceHandle m_resourceHandle = 0;
+  bool m_input = true;
+  bool m_initialized = false;
 };
 
 std::unique_ptr<DIOBackend> CreateDIOBackend(int32_t channel, bool input) {
@@ -84,11 +122,6 @@ std::unique_ptr<DIOBackend> CreateDIOBackend(int32_t channel, bool input) {
     return nullptr;
   }
   return backend;
-}
-
-DIOManager& GetDIOManager() {
-  static DIOManager manager{CreateDIOBackend};
-  return manager;
 }
 
 void SetHardwareError(int32_t* status, std::string_view message) {
@@ -118,6 +151,11 @@ bool CheckHandleForUnsupported(HAL_DigitalHandle handle, int32_t* status) {
 }
 
 }  // namespace
+
+DIOManager& GetDIOManager() {
+  static DIOManager manager{CreateDIOBackend};
+  return manager;
+}
 }  // namespace hal::vmx
 
 extern "C" {

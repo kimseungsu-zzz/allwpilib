@@ -1,9 +1,32 @@
 # VMX drivers native component
 
-This directory contains the standalone Studica hardware-driver sources. It is
-intentionally independent of ROS2 and does not depend on WPILib. WPILib's VMX
-HAL backend depends on this component; the dependency must not point
-in the opposite direction.
+This directory is based on the `drivers` code from the
+[Studica Robotics ROS2 repository](https://github.com/Studica-Robotics/ROS2).
+It is not a new driver collection written by this project. The upstream
+copyright and license notices must be preserved, and the `.cpp` and `.hpp`
+driver sources in this directory must remain unmodified so a future Studica
+upstream refresh can replace them cleanly.
+
+The driver sources were audited against Studica ROS2 commit
+`1a52cfbf3c3eab51807b9d2d7fa42dd6143882df`. The upstream Apache License 2.0
+is retained in [`LICENSE`](LICENSE).
+
+This project does not use Studica's ROS2 node layer. It integrates only the
+standalone driver layer needed to access VMX-Pi and VMX2 hardware. WPILib API
+adaptation, HAL status handling, lifecycle correction, and semantic conversion
+belong in `hal/src/main/native/vmx`, never in these driver sources.
+
+The dependency direction is strictly:
+
+```text
+WPILib HAL
+  -> VMX adapter
+  -> vmxdrivers (Studica upstream source, unmodified)
+  -> VMXPi HAL SDK
+```
+
+`vmxdrivers` is independent of WPILib and must not contain WPILib types, HAL
+status values, or WPILib-specific wrappers.
 
 ## SDK layout
 
@@ -20,44 +43,17 @@ VMX_SDK_ROOT/
     # or libvmxpi_hal_cpp.so
 ```
 
-The driver headers use the VMX SDK directly. A final executable or shared HAL
+The upstream driver headers use the VMX SDK directly. A final executable or shared HAL
 backend that consumes `libvmxdrivers.a` must also link `vmxpi_hal_cpp`, `rt`,
 `pthread`, and (for modern GCC aarch64 toolchains) `atomic`. The static driver
 archive itself does not embed those libraries.
 
-`DIO::Set(bool)` and `DIO::Get(bool&)` return operation success separately
-from the pin value. This lets hardware adapters distinguish a valid low input
-from an SDK read failure without introducing any WPILib status types into this
-standalone component. DIO inputs use the VMX SDK pull-up mode; outputs use
-push-pull mode. Output pulse generation and pulse-state queries use the VMX
-hardware `DIO_Pulse()` and `DIO_IsPulsing()` operations.
-
-The generic `PWM` driver exposes pulse widths rather than servo angle or speed:
-
-- `SetPulseTimeMicroseconds()` converts to the configured VMX duty units.
-- `Disable()` deallocates the generator resource and a later set reactivates it.
-- `GetLastPulseTimeMicroseconds()` returns the last successfully applied,
-  quantized pulse.
-- `GetPulseTimeMicroseconds()` reads the current hardware duty cycle and
-  converts it back to the applied pulse width.
-
-The driver retains the established 50 Hz, 5000-step VMX configuration. This is
-a 20,000 us period with 4 us duty resolution; requested microseconds are
-rounded to the nearest 4 us. The public SDK material available to this project
-does not establish that 20,000 duty steps are supported, so the driver does
-not raise the configured limit speculatively. Servo remains a higher-level
-class built on this generic PWM resource.
-
-The generic `AnalogInput` driver now activates one configurable
-`AccumulatorInput` resource and exposes distinct success-returning operations
-for instantaneous raw values, averaged raw values, instantaneous voltage, and
-averaged voltage. Its constructor accepts average and oversample bits rather
-than hard-coding nine average bits. The full-scale voltage is queried from the
-SDK, and destruction explicitly calls `DeactivateResource()` so a channel can
-be allocated again safely. The same constructor can enable the resource's
-hardware accumulation counter and configure its center and deadband. Counter
-reset and atomic value/count reads are exposed as success-returning driver
-operations. No WPILib status or handle types enter the driver.
+The VMX HAL adapter owns the WPILib-specific resource lifecycle and semantics.
+Where the upstream convenience classes do not expose the operation WPILib
+needs, the adapter uses the public VMXPi HAL SDK directly; it does not extend or
+patch a driver class. This includes DIO pulse/readback, PWM readback and
+disable/re-enable behavior, configurable Analog Input/Accumulator operation,
+and Encoder handle/source coordination.
 
 No `/usr/local` path is used by the Gradle build. This keeps host builds and
 cross compilation separate.

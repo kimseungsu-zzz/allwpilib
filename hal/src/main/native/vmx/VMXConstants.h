@@ -13,6 +13,7 @@ constexpr int32_t kNumDIOChannels = kNumDigitalChannels;
 constexpr int32_t kNumPWMChannels = kNumDigitalChannels;
 constexpr int32_t kNumAnalogInputs = 4;
 constexpr int32_t kNumAnalogAccumulators = 2;
+constexpr int32_t kNumVMXEncoders = 5;
 constexpr int32_t kFirstVMXAnalogChannel = 22;
 
 constexpr bool IsDIOChannelValid(int32_t channel) {

@@ -4,9 +4,12 @@
 
 #include "hal/PWM.h"
 
+#include <cmath>
 #include <memory>
 #include <string>
 #include <string_view>
+
+#include "VMXPi.h"
 
 #include "HALInitializer.h"
 #include "HALInternal.h"
@@ -14,7 +17,6 @@
 #include "VMXRuntime.h"
 #include "hal/Errors.h"
 #include "hal/handles/HandlesInternal.h"
-#include "pwm.hpp"
 
 namespace hal::vmx {
 namespace {
@@ -22,19 +24,34 @@ namespace {
 class DriverPWMBackend final : public PWMBackend {
  public:
   DriverPWMBackend(int32_t channel, std::shared_ptr<VMXPi> context)
-      : m_driver{std::make_unique<studica_driver::PWM>(
-            channel, studica_driver::PWMType::Standard, -150, 150,
-            std::move(context))} {}
+      : m_channel{channel}, m_context{std::move(context)} {}
+
+  ~DriverPWMBackend() override { Disable(); }
 
   bool IsInitialized() const noexcept {
-    return m_driver && m_driver->IsInitialized();
+    return m_context && m_context->IsOpen();
   }
 
   bool SetPulseTimeMicroseconds(int32_t requested,
                                 int32_t& applied) noexcept override {
     try {
-      return m_driver && m_driver->SetPulseTimeMicroseconds(requested) &&
-             m_driver->GetLastPulseTimeMicroseconds(applied);
+      if (requested <= 0 || requested > kPeriodMicroseconds || !Activate()) {
+        applied = 0;
+        return false;
+      }
+      auto duty = static_cast<uint16_t>(std::lround(
+          static_cast<double>(requested) * kMaxDutyCycleValue /
+          kPeriodMicroseconds));
+      VMXErrorCode error;
+      if (!m_context->io.PWMGenerator_SetDutyCycle(
+              m_resourceHandle, m_channel, duty, &error)) {
+        applied = 0;
+        return false;
+      }
+      applied = static_cast<int32_t>(std::lround(
+          static_cast<double>(duty) * kPeriodMicroseconds /
+          kMaxDutyCycleValue));
+      return true;
     } catch (...) {
       applied = 0;
       return false;
@@ -43,7 +60,21 @@ class DriverPWMBackend final : public PWMBackend {
 
   bool GetPulseTimeMicroseconds(int32_t& pulse) noexcept override {
     try {
-      return m_driver && m_driver->GetPulseTimeMicroseconds(pulse);
+      if (!m_active) {
+        pulse = 0;
+        return true;
+      }
+      uint16_t duty = 0;
+      VMXErrorCode error;
+      if (!m_context->io.PWMGenerator_GetDutyCycle(
+              m_resourceHandle, m_channel, &duty, &error)) {
+        pulse = 0;
+        return false;
+      }
+      pulse = static_cast<int32_t>(std::lround(
+          static_cast<double>(duty) * kPeriodMicroseconds /
+          kMaxDutyCycleValue));
+      return true;
     } catch (...) {
       pulse = 0;
       return false;
@@ -52,14 +83,47 @@ class DriverPWMBackend final : public PWMBackend {
 
   bool Disable() noexcept override {
     try {
-      return m_driver && m_driver->Disable();
+      if (!m_active) {
+        return true;
+      }
+      VMXErrorCode error;
+      if (!m_context->io.DeallocateResource(m_resourceHandle, &error)) {
+        return false;
+      }
+      m_active = false;
+      return true;
     } catch (...) {
       return false;
     }
   }
 
  private:
-  std::unique_ptr<studica_driver::PWM> m_driver;
+  static constexpr int32_t kFrequencyHz = 50;
+  static constexpr int32_t kPeriodMicroseconds =
+      1'000'000 / kFrequencyHz;
+  static constexpr int32_t kMaxDutyCycleValue = 5000;
+
+  bool Activate() noexcept {
+    if (m_active) {
+      return true;
+    }
+    if (!IsInitialized()) {
+      return false;
+    }
+    PWMGeneratorConfig config{kFrequencyHz};
+    config.SetMaxDutyCycleValue(kMaxDutyCycleValue);
+    VMXErrorCode error;
+    m_active = m_context->io.ActivateSinglechannelResource(
+        VMXChannelInfo(m_channel,
+                       VMXChannelCapability::PWMGeneratorOutput),
+        &config, m_resourceHandle, &error);
+    return m_active;
+  }
+
+  int32_t m_channel;
+  std::shared_ptr<VMXPi> m_context;
+  VMXResourceHandle m_resourceHandle = 0;
+  bool m_active = false;
 };
 
 std::unique_ptr<PWMBackend> CreatePWMBackend(int32_t channel) {
