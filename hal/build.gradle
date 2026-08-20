@@ -1,3 +1,25 @@
+def vmxBuildEnabled = project.hasProperty('vmxBuild')
+
+if (vmxBuildEnabled) {
+    def incompatibleProperty = [
+        'onlylinuxathena',
+        'onlylinuxarm32',
+        'onlywindowsarm64'
+    ].find { project.hasProperty(it) }
+    def incompatibleTask = gradle.startParameter.taskNames.find {
+        it ==~ /(?i).*(windows|osx|linuxx86|linuxarm32|linuxathena|roborio).*/
+    }
+    if (incompatibleProperty || incompatibleTask) {
+        throw new GradleException('VMX HAL is supported only on Linux ARM64.')
+    }
+
+    // Keep normal linuxarm64/sim and linuxarm64/vmx outputs and incremental
+    // object state in separate namespaces. Publishing identity is intentionally
+    // deferred until a dedicated VMX artifact is designed.
+    layout.buildDirectory = layout.projectDirectory.dir('build/vmx')
+    evaluationDependsOn(':vmxdrivers')
+}
+
 ext {
     addHalDependency = { binary, shared->
         binary.lib project: ':hal', library: 'hal', linkage: shared
@@ -23,6 +45,22 @@ ext {
                     exportedHeaders {
                         srcDir 'src/main/native/include'
                         srcDir generatedHeaders
+                    }
+                }
+            }
+        } else if (vmxBuildEnabled &&
+                it.targetPlatform.name == nativeUtils.wpi.platforms.linuxarm64) {
+            it.sources {
+                vmxCpp(CppSourceSet) {
+                    source {
+                        srcDirs 'src/main/native/vmx'
+                        include '**/*.cpp'
+                    }
+                    exportedHeaders {
+                        srcDir 'src/main/native/include'
+                        srcDir generatedHeaders
+                        srcDir project(':vmxdrivers').projectDir
+                        project(':vmxdrivers').vmxSdkIncludeDirs.each { srcDir it }
                     }
                 }
             }
@@ -60,6 +98,12 @@ cppSourcesZip {
     from('src/main/native/sim') {
         into '/sim'
     }
+
+    if (vmxBuildEnabled) {
+        from('src/main/native/vmx') {
+            into '/vmx'
+        }
+    }
 }
 
 cppHeadersZip {
@@ -84,9 +128,29 @@ model {
     binaries {
         all {
             if (!(it instanceof NativeBinarySpec)) return
-                if (it.component.name != 'hal' && it.component.name != 'halBase') return
+                if (vmxBuildEnabled &&
+                        it.component.name == 'hal' &&
+                        it.targetPlatform.name == nativeUtils.wpi.platforms.linuxarm64) {
+                    project(':vmxdrivers').addVmxdriversDependency(it)
+                }
+            if (it.component.name != 'hal' && it.component.name != 'halBase') return
                 if (it.targetPlatform.name != nativeUtils.wpi.platforms.roborio) return
                 nativeUtils.useRequiredLibrary(it, 'ni_link_libraries')
+        }
+    }
+}
+
+tasks.register('printHalBackendSelection') {
+    group = 'help'
+    description = 'Prints the HAL backend selected for each platform family.'
+    doLast {
+        println "VMX build: ${vmxBuildEnabled}"
+        println 'roboRIO: athena'
+        println "linuxarm64: ${vmxBuildEnabled ? 'vmx' : 'sim'}"
+        println 'all other platforms: sim'
+        if (vmxBuildEnabled) {
+            println 'VMX dependency: :hal (linuxarm64 only) -> :vmxdrivers (static)'
+            println "VMX build directory: ${layout.buildDirectory.get().asFile}"
         }
     }
 }

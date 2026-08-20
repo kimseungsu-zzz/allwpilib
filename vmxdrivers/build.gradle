@@ -1,0 +1,118 @@
+plugins {
+    id 'cpp'
+}
+
+apply plugin: 'edu.wpi.first.NativeUtils'
+
+description = 'Standalone Studica VMX hardware drivers for Linux aarch64'
+
+apply from: "${rootDir}/shared/config.gradle"
+
+def configuredSdkRoot = providers.gradleProperty('vmxSdkRoot')
+        .orElse(providers.environmentVariable('VMX_SDK_ROOT'))
+        .orNull
+def sdkRoot = configuredSdkRoot ? file(configuredSdkRoot) : file("${buildDir}/vmx-sdk-not-configured")
+def sdkIncludeDirs = [
+    file("${sdkRoot}/include"),
+    file("${sdkRoot}/include/vmxpi")
+]
+def sdkLibraryDir = file("${sdkRoot}/lib")
+
+ext {
+    vmxSdkRoot = sdkRoot
+    vmxSdkIncludeDirs = sdkIncludeDirs
+    vmxSdkLibraryDir = sdkLibraryDir
+    vmxSdkLibraries = [
+        'vmxpi_hal_cpp',
+        'rt',
+        'pthread',
+        'atomic'
+    ]
+    addVmxdriversDependency = { binary ->
+        binary.lib project: ':vmxdrivers', library: 'vmxdrivers', linkage: 'static'
+
+        // A static archive cannot carry system/SDK link flags. Apply them at
+        // the final VMX consumer without making that consumer resolve the SDK.
+        if (binary instanceof SharedLibraryBinarySpec || binary instanceof NativeExecutableBinarySpec) {
+            binary.linker.args "-L${sdkLibraryDir}", '-lvmxpi_hal_cpp', '-lrt', '-lpthread', '-latomic'
+        }
+    }
+}
+
+def verifyVmxSdk = tasks.register('verifyVmxSdk') {
+    group = 'verification'
+    description = 'Checks the VMX SDK layout used by the Linux aarch64 build.'
+
+    doLast {
+        if (!configuredSdkRoot) {
+            throw new GradleException(
+            'VMX SDK is not configured. Set VMX_SDK_ROOT or pass -PvmxSdkRoot=<path>.')
+        }
+
+        def header = sdkIncludeDirs.collect { new File(it, 'VMXPi.h') }.find { it.isFile() }
+        if (header == null) {
+            throw new GradleException(
+            "VMXPi.h was not found under ${sdkRoot}/include or ${sdkRoot}/include/vmxpi.")
+        }
+        if (!sdkLibraryDir.isDirectory()) {
+            throw new GradleException("VMX SDK library directory does not exist: ${sdkLibraryDir}")
+        }
+
+        def vmxHalLibraries = fileTree(sdkLibraryDir) {
+            include 'libvmxpi_hal_cpp.a', 'libvmxpi_hal_cpp.so', 'libvmxpi_hal_cpp.so.*'
+        }.files
+        if (vmxHalLibraries.empty) {
+            throw new GradleException(
+            "VMX HAL library was not found in ${sdkLibraryDir}; expected libvmxpi_hal_cpp.a or .so.")
+        }
+    }
+}
+
+model {
+    components {
+        vmxdrivers(NativeLibrarySpec) {
+            sources.cpp {
+                source {
+                    srcDir projectDir
+                    include '*.cpp'
+                }
+                exportedHeaders {
+                    srcDir projectDir
+                    sdkIncludeDirs.each { srcDir it }
+                }
+            }
+        }
+    }
+    binaries {
+        all {
+            if (!(it instanceof NativeBinarySpec) || it.component.name != 'vmxdrivers') {
+                return
+            }
+
+            // Linux aarch64 is a CPU/OS target shared by multiple devices. VMX is
+            // selected explicitly by building this component, not inferred from
+            // every linuxarm64 WPILib build.
+            if (it.targetPlatform.name != nativeUtils.wpi.platforms.linuxarm64 ||
+                    it instanceof SharedLibraryBinarySpec) {
+                it.buildable = false
+                return
+            }
+
+            it.cppCompiler.args '-pthread'
+        }
+    }
+}
+
+tasks.withType(CppCompile).configureEach {
+    dependsOn verifyVmxSdk
+}
+
+tasks.register('printVmxSdkConfiguration') {
+    group = 'help'
+    description = 'Prints the resolved VMX SDK include/library contract.'
+    doLast {
+        println "VMX SDK root: ${configuredSdkRoot ?: '<not configured>'}"
+        println "VMX SDK includes: ${sdkIncludeDirs.join(', ')}"
+        println "VMX SDK libraries: ${sdkLibraryDir} (${vmxSdkLibraries.join(', ')})"
+    }
+}
