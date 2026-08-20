@@ -105,25 +105,25 @@ class DIOPort final {
                : std::pair{DIOResult::kHardwareFailure, false};
   }
 
-  DIOResult SuspendForEncoder() noexcept {
+  DIOResult SuspendForResource() noexcept {
     std::scoped_lock lock{m_mutex};
-    if (m_faulted || !m_backend || m_suspendedForEncoder) {
+    if (m_faulted || !m_backend || m_suspendedForResource) {
       return DIOResult::kHardwareFailure;
     }
     if (!m_input) {
       return DIOResult::kOutputChannel;
     }
     m_backend.reset();
-    m_suspendedForEncoder = true;
+    m_suspendedForResource = true;
     return DIOResult::kOk;
   }
 
-  DIOResult ResumeFromEncoder() noexcept {
+  DIOResult ResumeFromResource() noexcept {
     std::scoped_lock lock{m_mutex};
     if (m_faulted) {
       return DIOResult::kHardwareFailure;
     }
-    if (!m_suspendedForEncoder) {
+    if (!m_suspendedForResource) {
       return DIOResult::kOk;
     }
     m_backend = CreateBackend(true);
@@ -131,13 +131,19 @@ class DIOPort final {
       m_faulted = true;
       return DIOResult::kHardwareFailure;
     }
-    m_suspendedForEncoder = false;
+    m_suspendedForResource = false;
     return DIOResult::kOk;
   }
 
-  bool IsSuspendedForEncoder() const noexcept {
+  bool IsSuspendedForResource() const noexcept {
     std::scoped_lock lock{m_mutex};
-    return m_suspendedForEncoder;
+    return m_suspendedForResource;
+  }
+
+  DIOResult SuspendForEncoder() noexcept { return SuspendForResource(); }
+  DIOResult ResumeFromEncoder() noexcept { return ResumeFromResource(); }
+  bool IsSuspendedForEncoder() const noexcept {
+    return IsSuspendedForResource();
   }
 
   DIOResult SetDirection(bool input) noexcept {
@@ -166,7 +172,7 @@ class DIOPort final {
     }
 
     m_faulted = true;
-    m_suspendedForEncoder = false;
+    m_suspendedForResource = false;
     return DIOResult::kRollbackFailure;
   }
 
@@ -204,7 +210,7 @@ class DIOPort final {
   int32_t m_channel = -1;
   bool m_input = true;
   bool m_faulted = true;
-  bool m_suspendedForEncoder = false;
+  bool m_suspendedForResource = false;
   std::string m_previousAllocation;
   DIOBackendFactory m_factory;
   std::unique_ptr<DIOBackend> m_backend;
@@ -216,11 +222,13 @@ struct DIOAllocationResult {
   std::string previousAllocation;
 };
 
-struct DIOEncoderClaimResult {
+struct DIOResourceClaimResult {
   DIOResult result = DIOResult::kHardwareFailure;
   int32_t channelA = -1;
   int32_t channelB = -1;
 };
+
+using DIOEncoderClaimResult = DIOResourceClaimResult;
 
 class DIOHandleResource final
     : public hal::DigitalHandleResource<HAL_DigitalHandle, DIOPort,
@@ -374,6 +382,65 @@ class DIOManager final {
   DIOEncoderClaimResult ClaimEncoderSources(
       HAL_Handle sourceHandleA, HAL_Handle sourceHandleB,
       std::string_view allocationLocation) noexcept {
+    return ClaimResourceSources(sourceHandleA, sourceHandleB,
+                                DigitalChannelOwner::kEncoder,
+                                allocationLocation);
+  }
+
+  DIOResourceClaimResult ClaimResourceSource(
+      HAL_Handle sourceHandle, DigitalChannelOwner owner,
+      std::string_view allocationLocation) noexcept {
+    std::scoped_lock allocationLock{m_allocationMutex};
+    auto port = m_handles.Get(sourceHandle, HAL_HandleEnum::DIO);
+    if (!port) {
+      return {DIOResult::kInvalidHandle, -1, -1};
+    }
+    int32_t channel = port->GetChannel();
+    if (port->IsSuspendedForResource()) {
+      return {DIOResult::kAlreadyAllocated, channel, -1};
+    }
+    auto direction = port->GetDirection();
+    if (direction.first != DIOResult::kOk) {
+      return {DIOResult::kHardwareFailure, channel, -1};
+    }
+    if (!direction.second) {
+      return {DIOResult::kOutputChannel, channel, -1};
+    }
+    if (!m_registry.Transfer(channel, DigitalChannelOwner::kDIO, owner,
+                             allocationLocation)) {
+      return {DIOResult::kAlreadyAllocated, channel, -1};
+    }
+    if (port->SuspendForResource() != DIOResult::kOk) {
+      m_registry.Transfer(channel, owner, DigitalChannelOwner::kDIO,
+                          "restored DIO source");
+      return {DIOResult::kHardwareFailure, channel, -1};
+    }
+    return {DIOResult::kOk, channel, -1};
+  }
+
+  std::pair<DIOResult, int32_t> ValidateInputSource(
+      HAL_Handle sourceHandle) noexcept {
+    std::scoped_lock allocationLock{m_allocationMutex};
+    auto port = m_handles.Get(sourceHandle, HAL_HandleEnum::DIO);
+    if (!port) {
+      return {DIOResult::kInvalidHandle, -1};
+    }
+    int32_t channel = port->GetChannel();
+    if (port->IsSuspendedForResource()) {
+      return {DIOResult::kAlreadyAllocated, channel};
+    }
+    auto direction = port->GetDirection();
+    if (direction.first != DIOResult::kOk) {
+      return {DIOResult::kHardwareFailure, channel};
+    }
+    return direction.second ? std::pair{DIOResult::kOk, channel}
+                            : std::pair{DIOResult::kOutputChannel, channel};
+  }
+
+  DIOResourceClaimResult ClaimResourceSources(
+      HAL_Handle sourceHandleA, HAL_Handle sourceHandleB,
+      DigitalChannelOwner owner,
+      std::string_view allocationLocation) noexcept {
     std::scoped_lock allocationLock{m_allocationMutex};
     auto portA = m_handles.Get(sourceHandleA, HAL_HandleEnum::DIO);
     auto portB = m_handles.Get(sourceHandleB, HAL_HandleEnum::DIO);
@@ -385,7 +452,8 @@ class DIOManager final {
     if (channelA == channelB) {
       return {DIOResult::kOutOfRange, channelA, channelB};
     }
-    if (portA->IsSuspendedForEncoder() || portB->IsSuspendedForEncoder()) {
+    if (portA->IsSuspendedForResource() ||
+        portB->IsSuspendedForResource()) {
       return {DIOResult::kAlreadyAllocated, channelA, channelB};
     }
     auto directionA = portA->GetDirection();
@@ -399,23 +467,23 @@ class DIOManager final {
     }
     if (!m_registry.TransferPair(channelA, channelB,
                                  DigitalChannelOwner::kDIO,
-                                 DigitalChannelOwner::kEncoder,
+                                 owner,
                                  allocationLocation)) {
       return {DIOResult::kAlreadyAllocated, channelA, channelB};
     }
-    auto resultA = portA->SuspendForEncoder();
+    auto resultA = portA->SuspendForResource();
     auto resultB = resultA == DIOResult::kOk
-                       ? portB->SuspendForEncoder()
+                       ? portB->SuspendForResource()
                        : DIOResult::kHardwareFailure;
     if (resultA != DIOResult::kOk || resultB != DIOResult::kOk) {
       if (resultA == DIOResult::kOk) {
-        portA->ResumeFromEncoder();
+        portA->ResumeFromResource();
       }
       if (resultB == DIOResult::kOk) {
-        portB->ResumeFromEncoder();
+        portB->ResumeFromResource();
       }
       m_registry.TransferPair(channelA, channelB,
-                              DigitalChannelOwner::kEncoder,
+                              owner,
                               DigitalChannelOwner::kDIO,
                               "restored DIO source");
       return {DIOResult::kHardwareFailure, channelA, channelB};
@@ -423,26 +491,46 @@ class DIOManager final {
     return {DIOResult::kOk, channelA, channelB};
   }
 
-  void ReleaseEncoderSources(HAL_Handle sourceHandleA,
-                             HAL_Handle sourceHandleB, int32_t channelA,
-                             int32_t channelB) noexcept {
+  void ReleaseResourceSource(HAL_Handle sourceHandle, int32_t channel,
+                             DigitalChannelOwner owner) noexcept {
+    std::scoped_lock allocationLock{m_allocationMutex};
+    auto port = m_handles.Get(sourceHandle, HAL_HandleEnum::DIO);
+    if (port) {
+      m_registry.Transfer(channel, owner,
+                          DigitalChannelOwner::kDIO, "restored DIO source A");
+      port->ResumeFromResource();
+    } else {
+      m_registry.Release(channel, owner);
+    }
+  }
+
+  void ReleaseResourceSources(HAL_Handle sourceHandleA,
+                              HAL_Handle sourceHandleB, int32_t channelA,
+                              int32_t channelB, DigitalChannelOwner owner) noexcept {
     std::scoped_lock allocationLock{m_allocationMutex};
     auto portA = m_handles.Get(sourceHandleA, HAL_HandleEnum::DIO);
     auto portB = m_handles.Get(sourceHandleB, HAL_HandleEnum::DIO);
     if (portA) {
-      m_registry.Transfer(channelA, DigitalChannelOwner::kEncoder,
-                          DigitalChannelOwner::kDIO, "restored DIO source A");
-      portA->ResumeFromEncoder();
+      m_registry.Transfer(channelA, owner, DigitalChannelOwner::kDIO,
+                          "restored DIO source A");
+      portA->ResumeFromResource();
     } else {
-      m_registry.Release(channelA, DigitalChannelOwner::kEncoder);
+      m_registry.Release(channelA, owner);
     }
     if (portB) {
-      m_registry.Transfer(channelB, DigitalChannelOwner::kEncoder,
+      m_registry.Transfer(channelB, owner,
                           DigitalChannelOwner::kDIO, "restored DIO source B");
-      portB->ResumeFromEncoder();
+      portB->ResumeFromResource();
     } else {
-      m_registry.Release(channelB, DigitalChannelOwner::kEncoder);
+      m_registry.Release(channelB, owner);
     }
+  }
+
+  void ReleaseEncoderSources(HAL_Handle sourceHandleA,
+                             HAL_Handle sourceHandleB, int32_t channelA,
+                             int32_t channelB) noexcept {
+    ReleaseResourceSources(sourceHandleA, sourceHandleB, channelA, channelB,
+                           DigitalChannelOwner::kEncoder);
   }
 
  private:

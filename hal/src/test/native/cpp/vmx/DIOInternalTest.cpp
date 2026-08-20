@@ -331,5 +331,28 @@ TEST(VMXDIOTest, EncoderClaimRejectsOutputsWithoutChangingOwnership) {
   EXPECT_EQ(fixture.manager.GetValue(input.handle).first, DIOResult::kOk);
 }
 
+TEST(VMXDIOTest, CounterClaimSharesAtomicSourceOwnershipRegistry) {
+  DIOFixture fixture;
+  auto sourceA = fixture.manager.Allocate(0, true, "counter source A");
+  auto sourceB = fixture.manager.Allocate(1, true, "counter source B");
+  ASSERT_EQ(sourceA.result, DIOResult::kOk);
+  ASSERT_EQ(sourceB.result, DIOResult::kOk);
+
+  auto claim = fixture.manager.ClaimResourceSources(
+      sourceA.handle, sourceB.handle, DigitalChannelOwner::kCounter,
+      "counter allocation");
+  ASSERT_EQ(claim.result, DIOResult::kOk);
+  EXPECT_FALSE(fixture.registry
+                   .Reserve(0, DigitalChannelOwner::kEncoder,
+                            "conflicting encoder")
+                   .reserved);
+
+  fixture.manager.ReleaseResourceSources(
+      sourceA.handle, sourceB.handle, claim.channelA, claim.channelB,
+      DigitalChannelOwner::kCounter);
+  EXPECT_EQ(fixture.manager.GetValue(sourceA.handle).first, DIOResult::kOk);
+  EXPECT_EQ(fixture.manager.GetValue(sourceB.handle).first, DIOResult::kOk);
+}
+
 }  // namespace
 }  // namespace hal::vmx

@@ -13,6 +13,7 @@
 #include "EncoderInternal.h"
 #include "HALInitializer.h"
 #include "HALInternal.h"
+#include "VMXDigitalSource.h"
 #include "VMXRuntime.h"
 #include "hal/Errors.h"
 #include "hal/handles/HandlesInternal.h"
@@ -120,12 +121,14 @@ std::unique_ptr<EncoderBackend> CreateEncoderBackend(int32_t channelA,
 
 EncoderSourceClaim ClaimEncoderSources(HAL_Handle sourceA,
                                        HAL_Handle sourceB) {
-  if (hal::isHandleType(sourceA, HAL_HandleEnum::AnalogTrigger) ||
-      hal::isHandleType(sourceB, HAL_HandleEnum::AnalogTrigger)) {
+  auto sourceAResult = DecodeVMXDigitalSource(sourceA, HAL_Trigger_kInWindow);
+  auto sourceBResult = DecodeVMXDigitalSource(sourceB, HAL_Trigger_kInWindow);
+  if (sourceAResult == VMXDigitalSourceResult::kUnsupportedAnalogTrigger ||
+      sourceBResult == VMXDigitalSourceResult::kUnsupportedAnalogTrigger) {
     return {EncoderResult::kUnsupportedSource, -1, -1};
   }
-  if (!hal::isHandleType(sourceA, HAL_HandleEnum::DIO) ||
-      !hal::isHandleType(sourceB, HAL_HandleEnum::DIO)) {
+  if (sourceAResult != VMXDigitalSourceResult::kOk ||
+      sourceBResult != VMXDigitalSourceResult::kOk) {
     return {EncoderResult::kInvalidSource, -1, -1};
   }
   auto claim = GetDIOManager().ClaimEncoderSources(sourceA, sourceB,

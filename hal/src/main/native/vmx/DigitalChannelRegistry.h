@@ -13,7 +13,7 @@
 
 namespace hal::vmx {
 
-enum class DigitalChannelOwner { kNone, kDIO, kPWM, kEncoder };
+enum class DigitalChannelOwner { kNone, kDIO, kPWM, kEncoder, kCounter };
 
 struct DigitalChannelReservation {
   bool reserved = false;
