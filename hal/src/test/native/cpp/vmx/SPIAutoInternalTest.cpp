@@ -162,8 +162,7 @@ struct AutoFixture {
 struct AutoManagerFixture {
   AutoManagerFixture()
       : spi{
-            [this](HAL_SPIPort, const VMXCommDIOChannelMap&,
-                   const SPIPortConfig&) {
+            [](HAL_SPIPort, const VMXCommDIOChannelMap&, const SPIPortConfig&) {
               return std::unique_ptr<SPIBackend>{
                   std::make_unique<AutoManagerBackend>()};
             },
