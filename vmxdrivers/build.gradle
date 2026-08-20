@@ -18,6 +18,68 @@ def sdkIncludeDirs = [
 ]
 def sdkLibraryDir = file("${sdkRoot}/lib")
 
+// VMX is an AArch64-only deployment target.  Keep this check independent of
+// the host toolchain and of an external `readelf` executable so the same
+// guard runs on Windows, Linux, and macOS Gradle hosts.
+def isElf64Aarch64 = { byte[] bytes ->
+    bytes.length >= 20 &&
+            (bytes[0] & 0xff) == 0x7f &&
+            (bytes[1] & 0xff) == 0x45 && // E
+            (bytes[2] & 0xff) == 0x4c && // L
+            (bytes[3] & 0xff) == 0x46 && // F
+            (bytes[4] & 0xff) == 2 &&    // ELFCLASS64
+            (bytes[5] & 0xff) == 1 &&    // little endian
+            ((bytes[18] & 0xff) | ((bytes[19] & 0xff) << 8)) == 183 // EM_AARCH64
+}
+
+def isVmxHalLibraryElf64Aarch64 = { File library ->
+    byte[] bytes = library.bytes
+    if (isElf64Aarch64(bytes)) {
+        return true
+    }
+
+    // A static SDK may be a GNU ar archive.  Validate every ELF object in the
+    // archive while ignoring the symbol-table members, which are not ELF.
+    byte[] archiveMagic = '!<arch>\n'.getBytes('US-ASCII')
+    if (bytes.length < archiveMagic.length ||
+            !java.util.Arrays.equals(java.util.Arrays.copyOfRange(bytes, 0, archiveMagic.length), archiveMagic)) {
+        return false
+    }
+
+    int offset = archiveMagic.length
+    boolean foundElfMember = false
+    while (offset + 60 <= bytes.length) {
+        String sizeText = new String(bytes, offset + 48, 10, 'US-ASCII').trim()
+        long memberSize
+        try {
+            memberSize = Long.parseLong(sizeText)
+        } catch (NumberFormatException ignored) {
+            return false
+        }
+        if (memberSize < 0 || memberSize > Integer.MAX_VALUE || offset + 60L + memberSize > bytes.length) {
+            return false
+        }
+
+        int memberStart = offset + 60
+        int memberEnd = memberStart + (int) memberSize
+        byte[] member = java.util.Arrays.copyOfRange(bytes, memberStart, memberEnd)
+        boolean memberHasElfMagic = member.length >= 4 &&
+                (member[0] & 0xff) == 0x7f &&
+                (member[1] & 0xff) == 0x45 &&
+                (member[2] & 0xff) == 0x4c &&
+                (member[3] & 0xff) == 0x46
+        if (memberHasElfMagic) {
+            foundElfMember = true
+            if (!isElf64Aarch64(member)) {
+                return false
+            }
+        }
+
+        offset = memberEnd + ((memberSize & 1) as int)
+    }
+    return foundElfMember && offset == bytes.length
+}
+
 ext {
     vmxSdkRoot = sdkRoot
     vmxSdkIncludeDirs = sdkIncludeDirs
@@ -64,6 +126,14 @@ def verifyVmxSdk = tasks.register('verifyVmxSdk') {
         if (vmxHalLibraries.empty) {
             throw new GradleException(
             "VMX HAL library was not found in ${sdkLibraryDir}; expected libvmxpi_hal_cpp.a or .so.")
+        }
+
+        def incompatibleLibraries = vmxHalLibraries.findAll { !isVmxHalLibraryElf64Aarch64(it) }
+        if (!incompatibleLibraries.empty) {
+            throw new GradleException(
+            "VMX SDK library architecture is incompatible: ${incompatibleLibraries.join(', ')} " +
+                    "must be ELF64 AArch64 (ELF class 2, little-endian, e_machine 183). " +
+                    "ELF32/ARMhf artifacts are legacy and rejected; no ARM32 fallback or bridge is supported.")
         }
     }
 }
@@ -114,5 +184,6 @@ tasks.register('printVmxSdkConfiguration') {
         println "VMX SDK root: ${configuredSdkRoot ?: '<not configured>'}"
         println "VMX SDK includes: ${sdkIncludeDirs.join(', ')}"
         println "VMX SDK libraries: ${sdkLibraryDir} (${vmxSdkLibraries.join(', ')})"
+        println 'VMX target architecture: AArch64 (ELF64 only; ARM32/ELF32 rejected)'
     }
 }

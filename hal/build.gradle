@@ -10,7 +10,7 @@ if (vmxBuildEnabled) {
         it ==~ /(?i).*(windows|osx|linuxx86|linuxarm32|linuxathena|roborio).*/
     }
     if (incompatibleProperty || incompatibleTask) {
-        throw new GradleException('VMX HAL is supported only on Linux ARM64.')
+        throw new GradleException('VMX HAL is supported only on Linux AArch64 (ARM64).')
     }
 
     // Keep normal linuxarm64/sim and linuxarm64/vmx outputs and incremental

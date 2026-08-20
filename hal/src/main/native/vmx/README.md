@@ -27,15 +27,28 @@ individual HAL facilities use this adapter boundary.
 
 ## SDK ABI and target decision
 
-The SDK artifact currently available to this checkout is
-`libvmxpi_hal_cpp.so` from `vmxpi-hal-1.1.249-linuxraspbian`; `file` reports
-`ELF 32-bit LSB shared object, ARM, EABI5`. Its headers expose the VMXPi/VMXIO
-ABI used by this adapter, but the library is not link-compatible with an
-AArch64 target. Therefore the VMX-Pi deployment target is the 32-bit ARM/armhf
-SDK ABI. A VMX2 deployment may use a 64-bit ARM target only when a matching
-ELF64 VMX2 SDK library is supplied. The current Linux ARM64 Gradle VMX source
-compile is kept as an ABI/header check (Debug and Release); a full AArch64 link
-is intentionally not claimed with the installed ELF32 library.
+VMX-Pi and VMX2 are Linux **AArch64-only** deployment targets. The
+`libvmxpi_hal_cpp.so` copied from `vmxpi-hal-1.1.249-linuxraspbian` currently
+available in the local SDK is reported by `file` as `ELF 32-bit LSB shared
+object, ARM, EABI5`. It is therefore a legacy/incompatible SDK artifact and
+the Gradle build rejects it before native compilation or linking. No armhf or
+other 32-bit VMX target, helper daemon, IPC bridge, or forced ELF32 link is
+supported.
+
+The official acquisition path is the latest VMX OS/WPILib image published by
+[Studica Robotics](https://learn.studica.com/docs/ws/vmx/os-images), which is
+documented as containing the VMX runtime and WPILib. The download is currently
+behind an authenticated SharePoint link, and the public
+[Studica ROS2 repository](https://github.com/Studica-Robotics/ROS2) does not
+publish an AArch64 `libvmxpi_hal_cpp.so` or a native AArch64 build recipe.
+Until an ELF64 AArch64 SDK is obtained from that image or built from the
+VMX HAL native sources, Linux ARM64 Debug/Release checks are limited to the
+source/header path and a final VMX HAL link is not claimed.
+
+Every accepted SDK library must satisfy both `file` and `readelf -h` checks:
+`ELF 64-bit` and `Machine: AArch64`. The `vmxdrivers` Gradle verification
+performs the equivalent byte-level check on shared libraries and static
+archives, so an ELF32 artifact fails early with an actionable error.
 
 ## Language bindings
 

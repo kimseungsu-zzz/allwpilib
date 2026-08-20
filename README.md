@@ -45,10 +45,13 @@ the SDK UART with baud rates `0..230400`; onboard RS-232 and USB serial
 enumeration remain explicit compatibility boundaries. The basic SPI HAL
 primitive is available but sensor-level status remains `NOT_TESTED`, while
 AutoSPI remains explicitly unsupported. Hardware validation is separate from
-the matrix's HAL/API status. The currently available VMXPi SDK shared
-library is ELF32 ARM EABI5, so VMX-Pi deployment targets armhf; the maintained
-Linux ARM64 VMX Debug/Release checks are source/header checks until a matching
-ELF64 VMX2 SDK is provided.
+the matrix's HAL/API status. VMX-Pi and VMX2 deployment targets are Linux
+AArch64 only. The currently available VMXPi SDK shared library is ELF32 ARM
+EABI5 and is classified as a legacy/incompatible artifact; Gradle rejects it
+before compilation/linking. ARM32/armhf targets, helper bridges, and forced
+ELF32 links are intentionally absent. Linux ARM64 Debug/Release source checks
+remain available, while the final VMX HAL link requires a matching ELF64
+AArch64 SDK.
 
 # Quick Start
 

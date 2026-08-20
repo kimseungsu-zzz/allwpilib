@@ -2,10 +2,12 @@
 
 This matrix records the current compatibility boundary for the existing
 WPILib sensor classes when the VMX HAL backend is selected with `-PvmxBuild`.
-The installed VMXPi SDK library is ELF32 ARM EABI5, so VMX-Pi deployment is an
-armhf/32-bit target; the Linux ARM64 build is currently a source/header check
-until a matching ELF64 SDK (for VMX2) is supplied. It is a HAL/API assessment,
-not a claim that every row has
+VMX-Pi and VMX2 deployment targets are Linux AArch64 only. The locally
+available `libvmxpi_hal_cpp.so` is an ELF32 ARM EABI5 legacy/incompatible SDK
+artifact; the build rejects it and provides no armhf/32-bit fallback, helper
+daemon, IPC bridge, or forced ELF32 link. Linux ARM64 source/header checks can
+run without that artifact, but a final HAL link requires a matching ELF64
+AArch64 SDK. It is a HAL/API assessment, not a claim that every row has
 already been verified on physical VMX hardware.
 
 The same status applies to Java, C++, and Python users of the existing WPILib

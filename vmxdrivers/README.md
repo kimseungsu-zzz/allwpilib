@@ -43,6 +43,15 @@ VMX_SDK_ROOT/
     # or libvmxpi_hal_cpp.so
 ```
 
+The VMX-Pi and VMX2 deployment target is Linux AArch64 only. The shared
+library or every ELF object in the static archive must be ELF64 little-endian
+with `e_machine = AArch64` (183). An ELF32 ARM/EABI5 SDK is a legacy,
+incompatible artifact and is rejected by `verifyVmxSdk` before compilation;
+there is no armhf target, 32-bit fallback, helper daemon, IPC bridge, or forced
+link workaround. Obtain a matching AArch64 SDK from the current VMX OS/WPILib
+image or build the native VMX HAL sources for AArch64 before setting this
+path.
+
 The upstream driver headers use the VMX SDK directly. A final executable or shared HAL
 backend that consumes `libvmxdrivers.a` must also link `vmxpi_hal_cpp`, `rt`,
 `pthread`, and (for modern GCC aarch64 toolchains) `atomic`. The static driver
