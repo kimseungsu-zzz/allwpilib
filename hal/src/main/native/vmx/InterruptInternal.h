@@ -219,11 +219,21 @@ class InterruptBackend {
   virtual bool SetEnabled(bool enabled) noexcept = 0;
   virtual bool GetEnabled(bool& enabled) noexcept = 0;
   virtual bool ReadTimestamp(bool rising, uint64_t& timestampUs) noexcept = 0;
+
+  // Internal VMX resources (for example an Encoder index source) may need to
+  // refer to the underlying interrupt resource without exposing another HAL
+  // interrupt handle.  Test backends do not need to provide a resource handle.
+  virtual uint16_t GetResourceHandle() const noexcept { return 0; }
 };
 
 using InterruptBackendFactory =
     std::function<std::unique_ptr<InterruptBackend>(
         int32_t channel, VMXInterruptEdge edge, InterruptCallbackState* state)>;
+
+// Returns the same backend factory used by the public Interrupt HAL.  VMX
+// adapters can use it to own an internal interrupt resource without consuming
+// a public interrupt handle.
+InterruptBackendFactory GetInterruptBackendFactory();
 
 class InterruptPort final {
  public:

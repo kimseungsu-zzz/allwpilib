@@ -31,11 +31,12 @@ class DriverInterruptBackend final : public InterruptBackend {
       return;
     }
     InterruptConfig config{ToSdkEdge(edge), &OnInterrupt, state, false};
+    VMXChannelInfo channelInfo(
+        static_cast<VMXChannelIndex>(channel),
+        VMXChannelCapability::InterruptInput);
     VMXErrorCode error;
     m_initialized = m_context->io.ActivateSinglechannelResource(
-        static_cast<VMXChannelIndex>(channel),
-        VMXChannelCapability::InterruptInput, m_resourceHandle, &config,
-        &error);
+        channelInfo, &config, m_resourceHandle, &error);
     if (m_initialized &&
         !m_context->io.Interrupt_SetEnabled(m_resourceHandle, true, &error)) {
       m_context->io.DeactivateResource(m_resourceHandle, &error);
@@ -85,6 +86,10 @@ class DriverInterruptBackend final : public InterruptBackend {
                      m_resourceHandle, timestampUs, &error)
                : m_context->io.Interrupt_GetLastFallingEdgeTimestampMicroseconds(
                      m_resourceHandle, timestampUs, &error);
+  }
+
+  VMXResourceHandle GetResourceHandle() const noexcept override {
+    return m_initialized ? m_resourceHandle : 0;
   }
 
   bool IsInitialized() const noexcept { return m_initialized; }
@@ -198,6 +203,10 @@ T ReturnInterruptValue(std::pair<InterruptResult, T> result, int32_t* status,
 }
 
 }  // namespace
+
+InterruptBackendFactory GetInterruptBackendFactory() {
+  return CreateInterruptBackend;
+}
 }  // namespace hal::vmx
 
 extern "C" {

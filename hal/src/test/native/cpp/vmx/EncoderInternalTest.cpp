@@ -6,6 +6,7 @@
 
 #include <chrono>
 #include <memory>
+#include <tuple>
 
 #include "../../../../main/native/vmx/EncoderInternal.h"
 
@@ -20,6 +21,15 @@ struct FakeEncoderHardware {
   bool failReset = false;
   int resets = 0;
   VMXEncoderEdge edge = VMXEncoderEdge::k4X;
+  bool failSetIndex = false;
+  bool failClearIndex = false;
+  uint16_t indexResource = 0;
+  bool indexClearOnLevel = false;
+  bool indexClearLevelHigh = false;
+  int indexSetCalls = 0;
+  int indexClearCalls = 0;
+  int indexResourcesCreated = 0;
+  int indexResourcesDestroyed = 0;
 };
 
 class FakeEncoderBackend final : public EncoderBackend {
@@ -51,8 +61,46 @@ class FakeEncoderBackend final : public EncoderBackend {
     return !m_hardware->failReads;
   }
 
+  bool SetResetSource(uint16_t interruptResource, bool clearOnLevel,
+                      bool clearLevelHigh) noexcept override {
+    if (m_hardware->failSetIndex) {
+      return false;
+    }
+    m_hardware->indexResource = interruptResource;
+    m_hardware->indexClearOnLevel = clearOnLevel;
+    m_hardware->indexClearLevelHigh = clearLevelHigh;
+    ++m_hardware->indexSetCalls;
+    return true;
+  }
+
+  bool ClearResetSource() noexcept override {
+    ++m_hardware->indexClearCalls;
+    return !m_hardware->failClearIndex;
+  }
+
  private:
   std::shared_ptr<FakeEncoderHardware> m_hardware;
+};
+
+class FakeEncoderIndexResource final : public EncoderIndexResource {
+ public:
+  FakeEncoderIndexResource(std::shared_ptr<FakeEncoderHardware> hardware,
+                           uint16_t resource)
+      : m_hardware{std::move(hardware)}, m_resource{resource} {
+    ++m_hardware->indexResourcesCreated;
+  }
+
+  ~FakeEncoderIndexResource() override {
+    ++m_hardware->indexResourcesDestroyed;
+  }
+
+  uint16_t GetResourceHandle() const noexcept override {
+    return m_resource;
+  }
+
+ private:
+  std::shared_ptr<FakeEncoderHardware> m_hardware;
+  uint16_t m_resource;
 };
 
 struct EncoderFixture {
@@ -76,7 +124,15 @@ struct EncoderFixture {
                          : EncoderSourceClaim{claimResult, -1, -1};
             },
             [this](HAL_Handle, HAL_Handle, int32_t, int32_t) { ++releases; },
-            [this] { return now; }} {}
+            [this] { return now; },
+            [this](HAL_Handle, int32_t channel) {
+              if (failIndexFactory) {
+                return std::unique_ptr<EncoderIndexResource>{};
+              }
+              return std::unique_ptr<EncoderIndexResource>{
+                  std::make_unique<FakeEncoderIndexResource>(
+                      hardware, static_cast<uint16_t>(channel + 100))};
+            }} {}
 
   EncoderAllocationResult Allocate(
       HAL_EncoderEncodingType type = HAL_Encoder_k4X,
@@ -89,6 +145,7 @@ struct EncoderFixture {
   std::chrono::steady_clock::time_point now{};
   EncoderResult claimResult = EncoderResult::kOk;
   bool failFactory = false;
+  bool failIndexFactory = false;
   int claims = 0;
   int releases = 0;
   int32_t lastChannelA = -1;
@@ -200,6 +257,107 @@ TEST(VMXEncoderTest, ResetAndHardwareFailuresAreReported) {
             EncoderResult::kHardwareFailure);
 }
 
+TEST(VMXEncoderTest, IndexSourceMapsAllResetSemantics) {
+  for (auto [type, clearOnLevel, clearLevelHigh] : {
+           std::tuple{HAL_kResetWhileHigh, true, true},
+           std::tuple{HAL_kResetWhileLow, true, false},
+           std::tuple{HAL_kResetOnFallingEdge, false, false},
+           std::tuple{HAL_kResetOnRisingEdge, false, true}}) {
+    EncoderFixture fixture;
+    auto allocation = fixture.Allocate();
+    ASSERT_EQ(allocation.result, EncoderResult::kOk);
+    EXPECT_EQ(fixture.manager.SetIndexSource(allocation.handle, 9, 3, type),
+              EncoderResult::kOk);
+    EXPECT_EQ(fixture.hardware->indexResource, 103);
+    EXPECT_EQ(fixture.hardware->indexClearOnLevel, clearOnLevel);
+    EXPECT_EQ(fixture.hardware->indexClearLevelHigh, clearLevelHigh);
+  }
+}
+
+TEST(VMXEncoderTest, IndexSourceReplacementIsTransactional) {
+  EncoderFixture fixture;
+  auto allocation = fixture.Allocate();
+  ASSERT_EQ(allocation.result, EncoderResult::kOk);
+  ASSERT_EQ(fixture.manager.SetIndexSource(allocation.handle, 9, 3,
+                                           HAL_kResetOnRisingEdge),
+            EncoderResult::kOk);
+  EXPECT_EQ(fixture.hardware->indexResource, 103);
+  fixture.hardware->failSetIndex = true;
+  EXPECT_EQ(fixture.manager.SetIndexSource(allocation.handle, 10, 4,
+                                           HAL_kResetOnFallingEdge),
+            EncoderResult::kHardwareFailure);
+  EXPECT_EQ(fixture.hardware->indexResource, 103);
+  EXPECT_EQ(fixture.hardware->indexResourcesCreated, 2);
+  EXPECT_EQ(fixture.hardware->indexResourcesDestroyed, 1);
+}
+
+TEST(VMXEncoderTest, IndexSourceActivationFailurePreservesExistingSource) {
+  EncoderFixture fixture;
+  auto allocation = fixture.Allocate();
+  ASSERT_EQ(allocation.result, EncoderResult::kOk);
+  ASSERT_EQ(fixture.manager.SetIndexSource(allocation.handle, 9, 3,
+                                           HAL_kResetOnRisingEdge),
+            EncoderResult::kOk);
+  fixture.failIndexFactory = true;
+  EXPECT_EQ(fixture.manager.SetIndexSource(allocation.handle, 10, 4,
+                                           HAL_kResetOnFallingEdge),
+            EncoderResult::kHardwareFailure);
+  EXPECT_EQ(fixture.hardware->indexResource, 103);
+  EXPECT_EQ(fixture.hardware->indexResourcesCreated, 1);
+}
+
+TEST(VMXEncoderTest, IndexResetRestartsPublicCountAndStoppedClock) {
+  EncoderFixture fixture;
+  auto allocation = fixture.Allocate();
+  ASSERT_EQ(allocation.result, EncoderResult::kOk);
+  ASSERT_EQ(fixture.manager.SetIndexSource(allocation.handle, 9, 3,
+                                           HAL_kResetOnRisingEdge),
+            EncoderResult::kOk);
+  fixture.hardware->count = 40;
+  EXPECT_EQ(fixture.manager.Get(allocation.handle).second, 10);
+  fixture.hardware->count = 0;
+  EXPECT_EQ(fixture.manager.GetRaw(allocation.handle).second, 0);
+  EXPECT_EQ(fixture.manager.Get(allocation.handle).second, 0);
+  EXPECT_FALSE(fixture.manager.GetStopped(allocation.handle).second);
+  fixture.now += std::chrono::milliseconds{501};
+  EXPECT_TRUE(fixture.manager.GetStopped(allocation.handle).second);
+  fixture.hardware->count = 4;
+  EXPECT_EQ(fixture.manager.Get(allocation.handle).second, 1);
+  EXPECT_EQ(fixture.manager.Reset(allocation.handle), EncoderResult::kOk);
+  EXPECT_EQ(fixture.manager.Get(allocation.handle).second, 0);
+}
+
+TEST(VMXEncoderTest, FreeClearsAndReleasesIndexResource) {
+  EncoderFixture fixture;
+  auto allocation = fixture.Allocate();
+  ASSERT_EQ(allocation.result, EncoderResult::kOk);
+  ASSERT_EQ(fixture.manager.SetIndexSource(allocation.handle, 9, 3,
+                                           HAL_kResetOnRisingEdge),
+            EncoderResult::kOk);
+  fixture.manager.Free(allocation.handle);
+  EXPECT_EQ(fixture.hardware->indexClearCalls, 1);
+  EXPECT_EQ(fixture.hardware->indexResourcesCreated,
+            fixture.hardware->indexResourcesDestroyed);
+}
+
+TEST(VMXEncoderTest, IndexResetSupportsAllEncodingsAndReverseDirection) {
+  for (auto type : {HAL_Encoder_k1X, HAL_Encoder_k2X, HAL_Encoder_k4X}) {
+    for (bool reverse : {false, true}) {
+      EncoderFixture fixture;
+      auto allocation = fixture.Allocate(type, reverse);
+      ASSERT_EQ(allocation.result, EncoderResult::kOk);
+      ASSERT_EQ(fixture.manager.SetIndexSource(allocation.handle, 9, 3,
+                                               HAL_kResetOnRisingEdge),
+                EncoderResult::kOk);
+      fixture.hardware->count = 8;
+      EXPECT_EQ(fixture.manager.Get(allocation.handle).second,
+                (reverse ? -8 : 8) / EncodingScale(type));
+      fixture.hardware->count = 0;
+      EXPECT_EQ(fixture.manager.Get(allocation.handle).second, 0);
+    }
+  }
+}
+
 TEST(VMXEncoderTest, SamplesToAverageIsExplicitlyUnsupported) {
   EncoderFixture fixture;
   auto allocation = fixture.Allocate();
@@ -217,6 +375,18 @@ TEST(VMXEncoderTest, InvalidHandlesAreRejected) {
   EXPECT_EQ(fixture.manager.GetRaw(HAL_kInvalidHandle).first,
             EncoderResult::kInvalidHandle);
   EXPECT_EQ(fixture.manager.Reset(HAL_kInvalidHandle),
+            EncoderResult::kInvalidHandle);
+}
+
+TEST(VMXEncoderTest, AllocationsExposeStableLogicalIndices) {
+  EncoderFixture fixture;
+  auto first = fixture.Allocate();
+  auto second = fixture.Allocate();
+  ASSERT_EQ(first.result, EncoderResult::kOk);
+  ASSERT_EQ(second.result, EncoderResult::kOk);
+  EXPECT_EQ(fixture.manager.GetFPGAIndex(first.handle).second, 0);
+  EXPECT_EQ(fixture.manager.GetFPGAIndex(second.handle).second, 1);
+  EXPECT_EQ(fixture.manager.GetFPGAIndex(HAL_kInvalidHandle).first,
             EncoderResult::kInvalidHandle);
 }
 

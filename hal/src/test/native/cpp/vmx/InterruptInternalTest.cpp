@@ -229,7 +229,7 @@ TEST(VMXInterruptTest, IndexEightBitLayoutIsPreserved) {
   auto* state = port.GetCallbackStateForTesting();
   state->OnHardwareEvent(true, 1);
   state->OnHardwareEvent(false, 2);
-  EXPECT_EQ(port.Wait(0.0, false, ~uint64_t{0}).mask,
+  EXPECT_EQ(static_cast<uint64_t>(port.Wait(0.0, false, ~uint64_t{0}).mask),
             (uint64_t{1} << 3) | (uint64_t{1} << 11));
 }
 

@@ -42,12 +42,35 @@ class EncoderBackend {
   virtual bool GetDirection(bool& forward) noexcept = 0;
   virtual bool Reset() noexcept = 0;
   virtual bool GetPeriodMicroseconds(uint16_t& period) noexcept = 0;
+  virtual bool SetResetSource(uint16_t interruptResource,
+                              bool clearOnLevel,
+                              bool clearLevelHigh) noexcept {
+    static_cast<void>(interruptResource);
+    static_cast<void>(clearOnLevel);
+    static_cast<void>(clearLevelHigh);
+    return false;
+  }
+  virtual bool ClearResetSource() noexcept { return false; }
 };
 
 using EncoderBackendFactory =
     std::function<std::unique_ptr<EncoderBackend>(int32_t channelA,
                                                   int32_t channelB,
                                                   VMXEncoderEdge edge)>;
+
+// An encoder index source owns an internal VMX interrupt resource, but does
+// not consume a public HAL interrupt handle.  The resource is deliberately
+// abstract so unit tests can exercise replacement and rollback without a VMX
+// device.
+class EncoderIndexResource {
+ public:
+  virtual ~EncoderIndexResource() = default;
+  virtual uint16_t GetResourceHandle() const noexcept = 0;
+};
+
+using EncoderIndexResourceFactory =
+    std::function<std::unique_ptr<EncoderIndexResource>(HAL_Handle source,
+                                                         int32_t channel)>;
 using EncoderClock =
     std::function<std::chrono::steady_clock::time_point(void)>;
 
@@ -97,7 +120,8 @@ class EncoderPort final {
   bool Initialize(HAL_Handle sourceA, HAL_Handle sourceB, int32_t channelA,
                   int32_t channelB, bool reverseDirection,
                   HAL_EncoderEncodingType encodingType,
-                  EncoderBackendFactory factory, EncoderClock clock) noexcept {
+                  EncoderBackendFactory factory, EncoderClock clock,
+                  EncoderIndexResourceFactory indexFactory = {}) noexcept {
     std::scoped_lock lock{m_mutex};
     m_sourceA = sourceA;
     m_sourceB = sourceB;
@@ -106,6 +130,7 @@ class EncoderPort final {
     m_reverseDirection = reverseDirection;
     m_encodingType = encodingType;
     m_clock = std::move(clock);
+    m_indexFactory = std::move(indexFactory);
     try {
       m_backend = factory ? factory(channelA, channelB,
                                     ToVMXEncoderEdge(encodingType))
@@ -125,18 +150,22 @@ class EncoderPort final {
 
   std::pair<EncoderResult, int32_t> GetRaw() noexcept {
     std::scoped_lock lock{m_mutex};
-    int32_t raw = 0;
-    auto result = RefreshCountLocked(raw);
-    return {result, result == EncoderResult::kOk ? raw : 0};
+    int32_t hardwareCount = 0;
+    auto result = RefreshCountLocked(hardwareCount);
+    return {result, result == EncoderResult::kOk
+                        ? (m_reverseDirection ? -hardwareCount : hardwareCount)
+                        : 0};
   }
 
   std::pair<EncoderResult, int32_t> Get() noexcept {
     std::scoped_lock lock{m_mutex};
-    int32_t raw = 0;
-    auto result = RefreshCountLocked(raw);
-    return {result,
-            result == EncoderResult::kOk ? raw / EncodingScale(m_encodingType)
-                                         : 0};
+    int32_t hardwareCount = 0;
+    auto result = RefreshCountLocked(hardwareCount);
+    if (result != EncoderResult::kOk) {
+      return {result, 0};
+    }
+    return {result, (m_reverseDirection ? -hardwareCount : hardwareCount) /
+                        EncodingScale(m_encodingType)};
   }
 
   std::pair<EncoderResult, int32_t> GetEncodingScale() const noexcept {
@@ -219,10 +248,12 @@ class EncoderPort final {
 
   std::pair<EncoderResult, double> GetDistance() noexcept {
     std::scoped_lock lock{m_mutex};
-    int32_t raw = 0;
-    auto result = RefreshCountLocked(raw);
+    int32_t hardwareCount = 0;
+    auto result = RefreshCountLocked(hardwareCount);
     return {result, result == EncoderResult::kOk
-                        ? static_cast<double>(raw) *
+                        ? static_cast<double>(m_reverseDirection
+                                                  ? -hardwareCount
+                                                  : hardwareCount) *
                               DecodingScale(m_encodingType) * m_distancePerPulse
                         : 0.0};
   }
@@ -276,6 +307,121 @@ class EncoderPort final {
     return EncoderResult::kUnsupported;
   }
 
+  EncoderResult SetIndexSource(HAL_Handle source, int32_t channel,
+                               HAL_EncoderIndexingType type) noexcept {
+    std::scoped_lock lock{m_mutex};
+    if (!IsUsable()) {
+      return EncoderResult::kHardwareFailure;
+    }
+    bool clearOnLevel = false;
+    bool clearLevelHigh = false;
+    switch (type) {
+      case HAL_kResetWhileHigh:
+        clearOnLevel = true;
+        clearLevelHigh = true;
+        break;
+      case HAL_kResetWhileLow:
+        clearOnLevel = true;
+        clearLevelHigh = false;
+        break;
+      case HAL_kResetOnFallingEdge:
+        clearOnLevel = false;
+        clearLevelHigh = false;
+        break;
+      case HAL_kResetOnRisingEdge:
+        clearOnLevel = false;
+        clearLevelHigh = true;
+        break;
+      default:
+        return EncoderResult::kOutOfRange;
+    }
+    auto apply = [&](uint16_t resource,
+                     HAL_EncoderIndexingType indexingType) noexcept {
+      bool clearOnLevelForType = false;
+      bool clearLevelHighForType = false;
+      switch (indexingType) {
+        case HAL_kResetWhileHigh:
+          clearOnLevelForType = true;
+          clearLevelHighForType = true;
+          break;
+        case HAL_kResetWhileLow:
+          clearOnLevelForType = true;
+          clearLevelHighForType = false;
+          break;
+        case HAL_kResetOnFallingEdge:
+          clearOnLevelForType = false;
+          clearLevelHighForType = false;
+          break;
+        case HAL_kResetOnRisingEdge:
+          clearOnLevelForType = false;
+          clearLevelHighForType = true;
+          break;
+        default:
+          return false;
+      }
+      return m_backend->SetResetSource(resource, clearOnLevelForType,
+                                        clearLevelHighForType);
+    };
+    if (m_indexResource && m_indexSource == source &&
+        m_indexChannel == channel) {
+      if (!m_backend->SetResetSource(m_indexResource->GetResourceHandle(),
+                                     clearOnLevel, clearLevelHigh)) {
+        return EncoderResult::kHardwareFailure;
+      }
+      m_indexingType = type;
+      return EncoderResult::kOk;
+    }
+    if (!m_indexFactory) {
+      return EncoderResult::kHardwareFailure;
+    }
+    std::unique_ptr<EncoderIndexResource> candidate;
+    try {
+      candidate = m_indexFactory(source, channel);
+    } catch (...) {
+      candidate.reset();
+    }
+    if (!candidate ||
+        !m_backend->SetResetSource(candidate->GetResourceHandle(),
+                                    clearOnLevel, clearLevelHigh)) {
+      if (candidate && m_indexResource && m_backend->ClearResetSource()) {
+        // Some SDK revisions require the previous reset source to be cleared
+        // before accepting a new one.  Restore the old configuration if the
+        // replacement still fails.
+        if (apply(candidate->GetResourceHandle(), type)) {
+          m_indexResource = std::move(candidate);
+          m_indexSource = source;
+          m_indexChannel = channel;
+          m_indexingType = type;
+          return EncoderResult::kOk;
+        }
+        apply(m_indexResource->GetResourceHandle(), m_indexingType);
+      }
+      return EncoderResult::kHardwareFailure;
+    }
+    m_indexResource = std::move(candidate);
+    m_indexSource = source;
+    m_indexChannel = channel;
+    m_indexingType = type;
+    return EncoderResult::kOk;
+  }
+
+  EncoderResult ClearIndexSource() noexcept {
+    std::scoped_lock lock{m_mutex};
+    if (!IsUsable()) {
+      return EncoderResult::kHardwareFailure;
+    }
+    if (!m_indexResource) {
+      return EncoderResult::kOk;
+    }
+    if (!m_backend->ClearResetSource()) {
+      return EncoderResult::kHardwareFailure;
+    }
+    m_indexResource.reset();
+    m_indexSource = HAL_kInvalidHandle;
+    m_indexChannel = -1;
+    return EncoderResult::kOk;
+  }
+
   std::pair<EncoderResult, int32_t> GetSamplesToAverage() const noexcept {
     std::scoped_lock lock{m_mutex};
     return IsUsable() ? std::pair{EncoderResult::kUnsupported, 0}
@@ -304,29 +450,53 @@ class EncoderPort final {
   int32_t GetChannelA() const noexcept { return m_channelA; }
   int32_t GetChannelB() const noexcept { return m_channelB; }
 
+  std::pair<EncoderResult, HAL_EncoderIndexingType> GetIndexingType()
+      const noexcept {
+    std::scoped_lock lock{m_mutex};
+    return IsUsable()
+               ? std::pair{EncoderResult::kOk, m_indexingType}
+               : std::pair{EncoderResult::kHardwareFailure,
+                           HAL_kResetOnRisingEdge};
+  }
+
   void Close() noexcept {
     std::scoped_lock lock{m_mutex};
+    if (m_indexResource) {
+      // Free must not leak an SDK resource even if a clear operation fails.
+      m_backend->ClearResetSource();
+      m_indexResource.reset();
+      m_indexSource = HAL_kInvalidHandle;
+      m_indexChannel = -1;
+    }
     m_backend.reset();
   }
 
  private:
   bool IsUsable() const noexcept { return m_backend != nullptr; }
 
-  EncoderResult RefreshCountLocked(int32_t& adjustedCount) noexcept {
-    adjustedCount = 0;
+  EncoderResult RefreshCountLocked(int32_t& hardwareCount) noexcept {
+    hardwareCount = 0;
     if (!IsUsable()) {
       return EncoderResult::kHardwareFailure;
     }
-    int32_t hardwareCount = 0;
     if (!m_backend->GetCount(hardwareCount)) {
       return EncoderResult::kHardwareFailure;
+    }
+    if (m_indexResource && m_hasObservedCount && hardwareCount == 0 &&
+        m_lastObservedHardwareCount != 0) {
+      // VMX resets the hardware counter on an index pulse.  An index reset is
+      // an intentional public count reset (unlike resource reconfiguration),
+      // so discard any stale software state and restart stopped tracking.
+      m_lastObservedHardwareCount = 0;
+      m_lastChange = m_clock();
+      m_hasObservedCount = true;
+      return EncoderResult::kOk;
     }
     if (!m_hasObservedCount || hardwareCount != m_lastObservedHardwareCount) {
       m_lastObservedHardwareCount = hardwareCount;
       m_hasObservedCount = true;
       m_lastChange = m_clock();
     }
-    adjustedCount = m_reverseDirection ? -hardwareCount : hardwareCount;
     return EncoderResult::kOk;
   }
 
@@ -356,6 +526,11 @@ class EncoderPort final {
   std::chrono::steady_clock::time_point m_lastChange;
   EncoderClock m_clock;
   std::unique_ptr<EncoderBackend> m_backend;
+  EncoderIndexResourceFactory m_indexFactory;
+  std::unique_ptr<EncoderIndexResource> m_indexResource;
+  HAL_Handle m_indexSource = HAL_kInvalidHandle;
+  int32_t m_indexChannel = -1;
+  HAL_EncoderIndexingType m_indexingType = HAL_kResetOnRisingEdge;
 };
 
 struct EncoderAllocationResult {
@@ -375,11 +550,13 @@ class EncoderManager final {
  public:
   EncoderManager(EncoderBackendFactory factory, EncoderSourceClaimer claimer,
                  EncoderSourceReleaser releaser,
-                 EncoderClock clock = std::chrono::steady_clock::now)
+                 EncoderClock clock = std::chrono::steady_clock::now,
+                 EncoderIndexResourceFactory indexFactory = {})
       : m_factory{std::move(factory)},
         m_claimer{std::move(claimer)},
         m_releaser{std::move(releaser)},
-        m_clock{std::move(clock)} {}
+        m_clock{std::move(clock)},
+        m_indexFactory{std::move(indexFactory)} {}
 
   EncoderAllocationResult Allocate(
       HAL_Handle sourceA, HAL_Handle sourceB, bool reverseDirection,
@@ -404,7 +581,8 @@ class EncoderManager final {
       return {HAL_kInvalidHandle, claim.result};
     }
     if (!port->Initialize(sourceA, sourceB, claim.channelA, claim.channelB,
-                          reverseDirection, encodingType, m_factory, m_clock)) {
+                          reverseDirection, encodingType, m_factory, m_clock,
+                          m_indexFactory)) {
       try {
         m_releaser(sourceA, sourceB, claim.channelA, claim.channelB);
       } catch (...) {
@@ -480,6 +658,23 @@ class EncoderManager final {
     return port ? port->Reset() : EncoderResult::kInvalidHandle;
   }
 
+  EncoderResult SetIndexSource(HAL_EncoderHandle handle, HAL_Handle source,
+                               int32_t channel,
+                               HAL_EncoderIndexingType type) {
+    auto port = GetPort(handle);
+    return port ? port->SetIndexSource(source, channel, type)
+                : EncoderResult::kInvalidHandle;
+  }
+
+  std::pair<EncoderResult, int32_t> GetFPGAIndex(
+      HAL_EncoderHandle handle) {
+    auto port = GetPort(handle);
+    if (!port) {
+      return {EncoderResult::kInvalidHandle, -1};
+    }
+    return {EncoderResult::kOk, m_handles.GetIndex(handle)};
+  }
+
  private:
   std::shared_ptr<EncoderPort> GetPort(HAL_EncoderHandle handle) {
     return m_handles.Get(handle);
@@ -489,6 +684,7 @@ class EncoderManager final {
   EncoderSourceClaimer m_claimer;
   EncoderSourceReleaser m_releaser;
   EncoderClock m_clock;
+  EncoderIndexResourceFactory m_indexFactory;
   std::mutex m_allocationMutex;
   EncoderHandleResource m_handles;
 };
