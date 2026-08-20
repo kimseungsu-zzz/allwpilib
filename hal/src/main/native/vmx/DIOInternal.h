@@ -433,6 +433,11 @@ class DIOManager final {
     if (!direction.second) {
       return {DIOResult::kOutputChannel, channel, -1};
     }
+    if (m_capabilities && owner == DigitalChannelOwner::kCounter &&
+        !m_capabilities->SupportsPhysical(physicalChannel,
+                                           VMXCapability::kCounterInput)) {
+      return {DIOResult::kUnsupportedCapability, channel, -1};
+    }
     if (!m_registry.Transfer(physicalChannel, DigitalChannelOwner::kDIO,
                              owner,
                              allocationLocation)) {
@@ -495,6 +500,20 @@ class DIOManager final {
     }
     if (!directionA.second || !directionB.second) {
       return {DIOResult::kOutputChannel, channelA, channelB};
+    }
+    if (m_capabilities && owner == DigitalChannelOwner::kEncoder &&
+        (!m_capabilities->SupportsPhysical(physicalChannelA,
+                                            VMXCapability::kEncoderA) ||
+         !m_capabilities->SupportsPhysical(physicalChannelB,
+                                            VMXCapability::kEncoderB))) {
+      return {DIOResult::kUnsupportedCapability, channelA, channelB};
+    }
+    if (m_capabilities && owner == DigitalChannelOwner::kCounter &&
+        (!m_capabilities->SupportsPhysical(physicalChannelA,
+                                            VMXCapability::kCounterInput) ||
+         !m_capabilities->SupportsPhysical(physicalChannelB,
+                                            VMXCapability::kCounterInput))) {
+      return {DIOResult::kUnsupportedCapability, channelA, channelB};
     }
     if (!m_registry.TransferPair(physicalChannelA, physicalChannelB,
                                  DigitalChannelOwner::kDIO,
