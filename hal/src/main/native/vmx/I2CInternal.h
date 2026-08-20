@@ -95,29 +95,56 @@ class I2CManager final {
     auto& state = m_ports[static_cast<size_t>(port)];
     std::scoped_lock lock{state.mutex};
     if (state.referenceCount == 0) {
-      try {
-        state.backend = m_factory ? m_factory() : nullptr;
-      } catch (...) {
-        state.backend.reset();
-      }
-      if (!state.backend) {
-        return I2CResult::kHardwareFailure;
-      }
+      // The official VMX map places the MXP I2C SDA/SCL pair at CommDIO
+      // physical 26/27. Reserve it before opening the SDK resource so a
+      // generic logical DIO/PWM allocation gets a deterministic conflict
+      // rather than an opaque SDK activation failure.
       int32_t sda = 26;
       int32_t scl = 27;
-      state.backend->GetPhysicalChannels(sda, scl);
       auto sdaReservation = m_registry.Reserve(
           sda, DigitalChannelOwner::kI2C, "VMX I2C SDA");
       if (!sdaReservation.reserved) {
-        state.backend.reset();
         return I2CResult::kResourceConflict;
       }
       auto sclReservation = m_registry.Reserve(
           scl, DigitalChannelOwner::kI2C, "VMX I2C SCL");
       if (!sclReservation.reserved) {
         m_registry.Release(sda, DigitalChannelOwner::kI2C);
-        state.backend.reset();
         return I2CResult::kResourceConflict;
+      }
+      try {
+        state.backend = m_factory ? m_factory() : nullptr;
+      } catch (...) {
+        state.backend.reset();
+      }
+      if (!state.backend) {
+        m_registry.Release(sda, DigitalChannelOwner::kI2C);
+        m_registry.Release(scl, DigitalChannelOwner::kI2C);
+        return I2CResult::kHardwareFailure;
+      }
+      int32_t actualSda = sda;
+      int32_t actualScl = scl;
+      if (state.backend->GetPhysicalChannels(actualSda, actualScl) &&
+          (actualSda != sda || actualScl != scl)) {
+        m_registry.Release(sda, DigitalChannelOwner::kI2C);
+        m_registry.Release(scl, DigitalChannelOwner::kI2C);
+        auto actualSdaReservation = m_registry.Reserve(
+            actualSda, DigitalChannelOwner::kI2C, "VMX I2C SDA");
+        auto actualSclReservation = m_registry.Reserve(
+            actualScl, DigitalChannelOwner::kI2C, "VMX I2C SCL");
+        if (!actualSdaReservation.reserved ||
+            !actualSclReservation.reserved) {
+          if (actualSdaReservation.reserved) {
+            m_registry.Release(actualSda, DigitalChannelOwner::kI2C);
+          }
+          if (actualSclReservation.reserved) {
+            m_registry.Release(actualScl, DigitalChannelOwner::kI2C);
+          }
+          state.backend.reset();
+          return I2CResult::kResourceConflict;
+        }
+        sda = actualSda;
+        scl = actualScl;
       }
       state.sdaChannel = sda;
       state.sclChannel = scl;
