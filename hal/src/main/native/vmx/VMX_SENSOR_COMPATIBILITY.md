@@ -36,9 +36,9 @@ are available but still awaiting sensor verification are `NOT_TESTED`.
 | AnalogEncoder | `NOT_TESTED` | Existing WPILib class → AnalogInput voltage | No additional HAL is required. Add a compatibility test for 5 V normalization, range mapping, and inversion. |
 | SharpIR (WPILib) | `NOT_TESTED` | Existing WPILib class → AnalogInput voltage | No additional HAL is required. Add a compatibility test for the published voltage-to-distance curves and clamping. |
 | Encoder | `NOT_TESTED` | VMX Encoder + valid DIO pair | Only FRC pairs 0+1, 2+3, 4+5, 6+7, and 8+9 are accepted; invalid pairs are rejected before activation. |
-| DutyCycle | `BLOCKED_BY_HAL` | Required DutyCycle HAL is not present in the VMX backend | Implement the shared `DutyCycle` HAL core before validating absolute PWM inputs. Do not modify `vmxdrivers` for this. |
-| DutyCycleEncoder | `BLOCKED_BY_HAL` | PWMCapture-capable DIO input + DutyCycle HAL | The standard class can be used once DutyCycle is implemented; the selected physical input must advertise PWMCapture. |
-| DutyCycleInput | `BLOCKED_BY_HAL` | Depends on DutyCycle HAL | Same dependency as DutyCycleEncoder; defer compatibility testing until the shared core exists. |
+| DutyCycle | `SUPPORTED` | FlexDIO 0-11 + VMX PWMCapture | Existing `hal/DutyCycle.h` ABI is implemented with period/high-time conversion, DIO ownership handoff, shared FlexTimer groups, and stable logical FPGA indices. AnalogTrigger, HighCurrent, and CommDIO sources are explicitly rejected. Hardware smoke test remains. |
+| DutyCycleEncoder | `NOT_TESTED` | Existing WPILib class + DutyCycle HAL | The standard class now has its required HAL path. Validate frequency threshold, connected/disconnected behavior, offset/scaling, and selected FlexDIO hardware on VMX. |
+| DutyCycleInput | `NOT_TESTED` | Existing WPILib class + DutyCycle HAL | The shared HAL path is present; add a sensor-level test for the WPILib wrapper and source lifetime. |
 | Tachometer | `NOT_TESTED` | Counter single-source InputCapture | Single-source hardware-backed activation is available; sensor-level period validation remains. |
 | Counter | `PARTIAL` | VMX InputCapture Counter + DIO sources | Six official pairs are recognized. TwoPulse accepts one source configured as both Up and Down and rejects independent Up/Down handles; SemiPeriod is hardware-backed; ExternalDirection is limited to pairs 0+1 through 8+9; PulseLength remains unsupported. |
 | Ultrasonic | `NOT_TESTED` | Output-capable DIO ping + Counter SemiPeriod echo | DIO output capability and single-source SemiPeriod must both be available on the selected physical channels; add a hardware smoke test. |
@@ -66,7 +66,7 @@ are available but still awaiting sensor verification are `NOT_TESTED`.
 | AnalogTrigger | `PARTIAL` | AnalogInput-backed raw/voltage trigger state and window semantics are available; filtered mode, pulse outputs, and DutyCycle sources are blocked. |
 | Timing / Notifier | `SUPPORTED` | VMX monotonic time and one global VMX timer-notification scheduler. |
 | I2C | `SUPPORTED` | One VMX MXP bus, shared and reference-counted; onboard I2C is intentionally unsupported. |
-| DutyCycle | `BLOCKED_BY_HAL` | Next hardware-input core. |
+| DutyCycle | `SUPPORTED` | FlexDIO 0-11 VMX PWMCapture adapter with shared timer-group ownership and DIO handoff. |
 | SPI | `BLOCKED_BY_HAL` | Planned before SPI-based WPILib sensors. |
 | Serial / UART | `BLOCKED_BY_HAL` | Planned communication core. |
 
@@ -94,9 +94,9 @@ separate vendor wrapper module.
 1. Add the AnalogPotentiometer, AnalogAccelerometer, AnalogEncoder, SharpIR,
    AnalogGyro, Ultrasonic, and ADXL345_I2C compatibility tests without
    changing their public APIs.
-2. Implement the shared DutyCycle HAL core, then validate DutyCycle,
-   DutyCycleEncoder, and DutyCycleInput.
-3. Implement SPI Core, then validate ADXL345_SPI, ADXL362, ADXRS450_Gyro,
+2. Validate DutyCycle, DutyCycleEncoder, and DutyCycleInput on physical VMX
+   hardware.
+3. Implement SPI Core before validating ADXL345_SPI, ADXL362, ADXRS450_Gyro,
    ADIS16448_IMU, and ADIS16470_IMU.
 4. Close the Counter single-source/semiperiod gap before validating
    Tachometer and Ultrasonic.

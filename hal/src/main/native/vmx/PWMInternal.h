@@ -368,6 +368,13 @@ class PWMManager final {
       return {HAL_kInvalidHandle, PWMResult::kAlreadyAllocated,
               std::move(reservation.previousAllocation)};
     }
+    auto timerReservation = m_registry.ReserveFlexTimerGroup(
+        physicalChannel, DigitalChannelOwner::kPWM, location);
+    if (!timerReservation.reserved && physicalChannel < 12) {
+      m_registry.Release(physicalChannel, DigitalChannelOwner::kPWM);
+      return {HAL_kInvalidHandle, PWMResult::kAlreadyAllocated,
+              std::move(timerReservation.previousAllocation)};
+    }
 
     HAL_DigitalHandle handle = HAL_kInvalidHandle;
     int32_t status = 0;
@@ -375,11 +382,15 @@ class PWMManager final {
         m_handles.Allocate(channel, HAL_HandleEnum::PWM, &handle, &status);
     if (status != 0) {
       m_registry.Release(physicalChannel, DigitalChannelOwner::kPWM);
+      m_registry.ReleaseFlexTimerGroup(physicalChannel,
+                                       DigitalChannelOwner::kPWM);
       return {HAL_kInvalidHandle, PWMResult::kHardwareFailure, {}};
     }
     if (!port->Initialize(channel, m_factory, physicalChannel)) {
       m_handles.Free(handle, HAL_HandleEnum::PWM);
       m_registry.Release(physicalChannel, DigitalChannelOwner::kPWM);
+      m_registry.ReleaseFlexTimerGroup(physicalChannel,
+                                       DigitalChannelOwner::kPWM);
       return {HAL_kInvalidHandle, PWMResult::kHardwareFailure, {}};
     }
     return {handle, PWMResult::kOk, {}};
@@ -394,6 +405,8 @@ class PWMManager final {
     port->Close();
     m_handles.Free(handle, HAL_HandleEnum::PWM);
     m_registry.Release(port->GetPhysicalChannel(), DigitalChannelOwner::kPWM);
+    m_registry.ReleaseFlexTimerGroup(port->GetPhysicalChannel(),
+                                     DigitalChannelOwner::kPWM);
   }
 
   PWMResult SetConfig(HAL_DigitalHandle handle, PWMConfig config) noexcept {

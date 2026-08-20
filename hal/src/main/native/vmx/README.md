@@ -218,6 +218,37 @@ Current PWM feature status:
 - Always-high mode: not implemented (explicit incompatible-state error)
 - Loop timing and cycle start time: not implemented (explicit incompatible-state error)
 
+PWM generators and PWM captures share the VMX FlexDIO timer group registry.
+Physical FlexDIO channels `(0,1)`, `(2,3)`, `(4,5)`, `(6,7)`, `(8,9)`, and
+`(10,11)` each consume one timer group. A PWM, Encoder, Counter, or DutyCycle
+claim blocks another timer-backed claim in the same pair, while claims in
+different groups remain independent. Allocation and rollback release both the
+channel reservation and the timer-group reservation together.
+
+## DutyCycle support
+
+The VMX DutyCycle adapter implements the existing `hal/DutyCycle.h` ABI using
+the SDK's `PWMCaptureConfig` and `VMXIO::PWMCapture_GetCount()` resource. It
+accepts only WPILib DIO sources that map to FlexDIO physical channels 0
+through 11. HighCurrent, CommDIO, and AnalogTrigger sources return an explicit
+incompatible-state/unsupported-source error; no fake instantaneous DIO value
+is returned while a capture owns the input.
+
+Initialization transfers the existing DIO input ownership to the DutyCycle
+capture, suspends the DIO backend, and restores that same DIO resource when the
+DutyCycle is freed. A capture allocation failure rolls the transfer back. The
+shared FlexDIO timer-group registry prevents conflicts with PWM, Encoder, and
+Counter resources and makes `DutyCycle(0)` plus `DutyCycle(2)` valid while
+`DutyCycle(0)` plus `PWM(1)` is rejected.
+
+The SDK reports period and high time in microseconds. HAL frequency is the
+rounded `1,000,000 / periodUs`, output is `highUs / periodUs`, and high time
+is returned in nanoseconds with signed-32-bit overflow checked. A stalled
+capture reports period/high time zero (frequency and output zero); a backend
+read failure or `highUs > periodUs` reports a HAL hardware error. The output
+scale factor remains the WPILib compatibility value `39,999,999`, and FPGA
+indices are stable logical DutyCycle handle slots.
+
 ## Analog input support
 
 WPILib logical analog channels 0 through 3 map internally to VMX physical
@@ -332,8 +363,8 @@ Instantaneous mode reads the existing raw or voltage AnalogInput value;
 averaged voltage path. Filtered mode is deliberately explicit: enabling it
 returns `INCOMPATIBLE_STATE`, while disabling it succeeds. Rising and falling
 pulse outputs return `ANALOG_TRIGGER_PULSE_OUTPUT_ERROR`, and DutyCycle-based
-AnalogTrigger initialization/limits return `INCOMPATIBLE_STATE` until a future
-DutyCycle Core exists.
+AnalogTrigger initialization/limits return `INCOMPATIBLE_STATE` because the
+DutyCycle HAL accepts only direct FlexDIO sources.
 
 AnalogTrigger handles use stable logical WPILib indices (0 through 7), not
 physical VMX or FPGA numbers. `HAL_GetAnalogTriggerFPGAIndex()` returns that

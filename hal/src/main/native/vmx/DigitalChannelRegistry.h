@@ -22,9 +22,16 @@ enum class DigitalChannelOwner {
   kI2C,
   kSPI,
   kUART,
+  kDutyCycle,
 };
 
 struct DigitalChannelReservation {
+  bool reserved = false;
+  DigitalChannelOwner previousOwner = DigitalChannelOwner::kNone;
+  std::string previousAllocation;
+};
+
+struct FlexTimerReservation {
   bool reserved = false;
   DigitalChannelOwner previousOwner = DigitalChannelOwner::kNone;
   std::string previousAllocation;
@@ -91,14 +98,56 @@ class DigitalChannelRegistry final {
     return true;
   }
 
+  FlexTimerReservation ReserveFlexTimerGroup(
+      int32_t physicalChannel, DigitalChannelOwner owner,
+      std::string_view allocationLocation) {
+    std::scoped_lock lock{m_mutex};
+    int32_t group = FlexTimerGroup(physicalChannel);
+    if (group < 0) {
+      return {false, DigitalChannelOwner::kNone, {}};
+    }
+    auto& entry = m_timerEntries[group];
+    if (entry.owner != DigitalChannelOwner::kNone) {
+      return {false, entry.owner, entry.allocationLocation};
+    }
+    entry.owner = owner;
+    entry.allocationLocation = allocationLocation;
+    return {true, DigitalChannelOwner::kNone, {}};
+  }
+
+  void ReleaseFlexTimerGroup(int32_t physicalChannel,
+                             DigitalChannelOwner owner) noexcept {
+    std::scoped_lock lock{m_mutex};
+    int32_t group = FlexTimerGroup(physicalChannel);
+    if (group < 0) {
+      return;
+    }
+    auto& entry = m_timerEntries[group];
+    if (entry.owner == owner) {
+      entry = {};
+    }
+  }
+
  private:
   struct Entry {
     DigitalChannelOwner owner = DigitalChannelOwner::kNone;
     std::string allocationLocation;
   };
 
+  struct TimerEntry {
+    DigitalChannelOwner owner = DigitalChannelOwner::kNone;
+    std::string allocationLocation;
+  };
+
+  static constexpr int32_t FlexTimerGroup(int32_t physicalChannel) noexcept {
+    return physicalChannel >= 0 && physicalChannel < 12
+               ? physicalChannel / 2
+               : -1;
+  }
+
   std::mutex m_mutex;
   std::array<Entry, kNumPhysicalChannels> m_entries;
+  std::array<TimerEntry, 6> m_timerEntries;
 };
 
 inline DigitalChannelRegistry& GetDigitalChannelRegistry() {

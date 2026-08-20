@@ -321,8 +321,8 @@ TEST(VMXDIOTest, PulseMultipleValidatesEveryAllocatedOutput) {
 
 TEST(VMXDIOTest, EncoderClaimSuspendsAndRestoresDIOInputsAtomically) {
   DIOFixture fixture;
-  auto sourceA = fixture.manager.Allocate(18, true, "encoder source A");
-  auto sourceB = fixture.manager.Allocate(19, true, "encoder source B");
+  auto sourceA = fixture.manager.Allocate(0, true, "encoder source A");
+  auto sourceB = fixture.manager.Allocate(1, true, "encoder source B");
   ASSERT_EQ(sourceA.result, DIOResult::kOk);
   ASSERT_EQ(sourceB.result, DIOResult::kOk);
   EXPECT_EQ(fixture.hardware->creates, 2);
@@ -330,13 +330,13 @@ TEST(VMXDIOTest, EncoderClaimSuspendsAndRestoresDIOInputsAtomically) {
   auto claim = fixture.manager.ClaimEncoderSources(
       sourceA.handle, sourceB.handle, "encoder allocation");
   ASSERT_EQ(claim.result, DIOResult::kOk);
-  EXPECT_EQ(claim.channelA, 18);
-  EXPECT_EQ(claim.channelB, 19);
+  EXPECT_EQ(claim.channelA, 0);
+  EXPECT_EQ(claim.channelB, 1);
   EXPECT_EQ(fixture.hardware->destroys, 2);
   EXPECT_EQ(fixture.manager.GetValue(sourceA.handle).first,
             DIOResult::kHardwareFailure);
   EXPECT_FALSE(fixture.registry
-                   .Reserve(18, DigitalChannelOwner::kPWM, "conflicting PWM")
+                   .Reserve(0, DigitalChannelOwner::kPWM, "conflicting PWM")
                    .reserved);
   EXPECT_EQ(fixture.manager
                 .ClaimEncoderSources(sourceA.handle, sourceB.handle,
@@ -353,8 +353,8 @@ TEST(VMXDIOTest, EncoderClaimSuspendsAndRestoresDIOInputsAtomically) {
 
 TEST(VMXDIOTest, EncoderClaimRejectsOutputsWithoutChangingOwnership) {
   DIOFixture fixture;
-  auto output = fixture.manager.Allocate(20, false, "output");
-  auto input = fixture.manager.Allocate(21, true, "input");
+  auto output = fixture.manager.Allocate(2, false, "output");
+  auto input = fixture.manager.Allocate(3, true, "input");
   ASSERT_EQ(output.result, DIOResult::kOk);
   ASSERT_EQ(input.result, DIOResult::kOk);
 

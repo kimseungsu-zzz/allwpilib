@@ -438,6 +438,16 @@ class DIOManager final {
                                            VMXCapability::kCounterInput)) {
       return {DIOResult::kUnsupportedCapability, channel, -1};
     }
+    if (m_capabilities && owner == DigitalChannelOwner::kDutyCycle &&
+        !m_capabilities->SupportsPhysical(physicalChannel,
+                                           VMXCapability::kPWMCapture)) {
+      return {DIOResult::kUnsupportedCapability, channel, -1};
+    }
+    if ((owner == DigitalChannelOwner::kCounter ||
+         owner == DigitalChannelOwner::kDutyCycle) &&
+        physicalChannel >= 12) {
+      return {DIOResult::kUnsupportedCapability, channel, -1};
+    }
     if (!m_registry.Transfer(physicalChannel, DigitalChannelOwner::kDIO,
                              owner,
                              allocationLocation)) {
@@ -447,6 +457,21 @@ class DIOManager final {
       m_registry.Transfer(physicalChannel, owner, DigitalChannelOwner::kDIO,
                           "restored DIO source");
       return {DIOResult::kHardwareFailure, channel, -1};
+    }
+    if (owner == DigitalChannelOwner::kCounter ||
+        owner == DigitalChannelOwner::kDutyCycle) {
+      auto timerReservation = m_registry.ReserveFlexTimerGroup(
+          physicalChannel, owner, allocationLocation);
+      if (!timerReservation.reserved) {
+        auto resumeResult = port->ResumeFromResource();
+        m_registry.Transfer(physicalChannel, owner,
+                            DigitalChannelOwner::kDIO,
+                            "restored DIO source");
+        return {resumeResult == DIOResult::kOk
+                    ? DIOResult::kAlreadyAllocated
+                    : DIOResult::kHardwareFailure,
+                channel, -1};
+      }
     }
     return {DIOResult::kOk, physicalChannel, -1};
   }
@@ -515,6 +540,12 @@ class DIOManager final {
                                             VMXCapability::kCounterInput))) {
       return {DIOResult::kUnsupportedCapability, channelA, channelB};
     }
+    if ((owner == DigitalChannelOwner::kEncoder ||
+         owner == DigitalChannelOwner::kCounter) &&
+        (physicalChannelA >= 12 || physicalChannelB >= 12 ||
+         physicalChannelA / 2 != physicalChannelB / 2)) {
+      return {DIOResult::kUnsupportedCapability, channelA, channelB};
+    }
     if (!m_registry.TransferPair(physicalChannelA, physicalChannelB,
                                  DigitalChannelOwner::kDIO,
                                  owner,
@@ -538,6 +569,22 @@ class DIOManager final {
                               "restored DIO source");
       return {DIOResult::kHardwareFailure, channelA, channelB};
     }
+    if (owner == DigitalChannelOwner::kEncoder ||
+        owner == DigitalChannelOwner::kCounter) {
+      auto timerReservation = m_registry.ReserveFlexTimerGroup(
+          physicalChannelA, owner, allocationLocation);
+      if (!timerReservation.reserved) {
+        auto resumeA = portA->ResumeFromResource();
+        auto resumeB = portB->ResumeFromResource();
+        m_registry.TransferPair(physicalChannelA, physicalChannelB, owner,
+                                DigitalChannelOwner::kDIO,
+                                "restored DIO source");
+        return {resumeA == DIOResult::kOk && resumeB == DIOResult::kOk
+                    ? DIOResult::kAlreadyAllocated
+                    : DIOResult::kHardwareFailure,
+                channelA, channelB};
+      }
+    }
     return {DIOResult::kOk, physicalChannelA, physicalChannelB};
   }
 
@@ -546,10 +593,18 @@ class DIOManager final {
     std::scoped_lock allocationLock{m_allocationMutex};
     auto port = m_handles.Get(sourceHandle, HAL_HandleEnum::DIO);
     if (port) {
+      if (owner == DigitalChannelOwner::kCounter ||
+          owner == DigitalChannelOwner::kDutyCycle) {
+        m_registry.ReleaseFlexTimerGroup(port->GetPhysicalChannel(), owner);
+      }
       m_registry.Transfer(port->GetPhysicalChannel(), owner,
                           DigitalChannelOwner::kDIO, "restored DIO source A");
       port->ResumeFromResource();
     } else {
+      if (owner == DigitalChannelOwner::kCounter ||
+          owner == DigitalChannelOwner::kDutyCycle) {
+        m_registry.ReleaseFlexTimerGroup(channel, owner);
+      }
       m_registry.Release(channel, owner);
     }
   }
@@ -561,18 +616,36 @@ class DIOManager final {
     auto portA = m_handles.Get(sourceHandleA, HAL_HandleEnum::DIO);
     auto portB = m_handles.Get(sourceHandleB, HAL_HandleEnum::DIO);
     if (portA) {
+      if (owner == DigitalChannelOwner::kEncoder ||
+          owner == DigitalChannelOwner::kCounter) {
+        m_registry.ReleaseFlexTimerGroup(portA->GetPhysicalChannel(), owner);
+      }
       m_registry.Transfer(portA->GetPhysicalChannel(), owner,
                           DigitalChannelOwner::kDIO,
                           "restored DIO source A");
       portA->ResumeFromResource();
     } else {
+      if (owner == DigitalChannelOwner::kEncoder ||
+          owner == DigitalChannelOwner::kCounter) {
+        m_registry.ReleaseFlexTimerGroup(channelA, owner);
+      }
       m_registry.Release(channelA, owner);
     }
     if (portB) {
+      if ((owner == DigitalChannelOwner::kEncoder ||
+           owner == DigitalChannelOwner::kCounter) &&
+          (!portA || portA->GetPhysicalChannel() / 2 !=
+                           portB->GetPhysicalChannel() / 2)) {
+        m_registry.ReleaseFlexTimerGroup(portB->GetPhysicalChannel(), owner);
+      }
       m_registry.Transfer(portB->GetPhysicalChannel(), owner,
                           DigitalChannelOwner::kDIO, "restored DIO source B");
       portB->ResumeFromResource();
     } else {
+      if (owner == DigitalChannelOwner::kEncoder ||
+          owner == DigitalChannelOwner::kCounter) {
+        m_registry.ReleaseFlexTimerGroup(channelB, owner);
+      }
       m_registry.Release(channelB, owner);
     }
   }
