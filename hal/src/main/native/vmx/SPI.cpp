@@ -9,6 +9,7 @@
 
 #include "HALInitializer.h"
 #include "HALInternal.h"
+#include "SPIAutoInternal.h"
 #include "SPIInternal.h"
 #include "VMXPi.h"
 #include "VMXRuntime.h"
@@ -162,12 +163,6 @@ std::unique_ptr<SPIBackend> CreateSPIBackend(
   return backend->GetHandle() != 0 ? std::move(backend) : nullptr;
 }
 
-SPIManager& GetSPIManager() {
-  static SPIManager manager{CreateSPIBackend, GetDigitalChannelRegistry(),
-                            GetVMXCommDIOChannelMap};
-  return manager;
-}
-
 void SetSPIResult(SPIResult result, int32_t* status, std::string_view message,
                   int32_t port = -1) {
   int32_t localStatus = HAL_SUCCESS;
@@ -204,7 +199,6 @@ void SetSPIResult(SPIResult result, int32_t* status, std::string_view message,
       *status = NO_AVAILABLE_RESOURCES;
       hal::SetLastError(status, message);
       return;
-    case SPIResult::kAutoUnsupported:
     case SPIResult::kNotInitialized:
     case SPIResult::kUnsupportedConfig:
     case SPIResult::kHardwareFailure:
@@ -227,13 +221,53 @@ int32_t ReturnSPIResult(SPIResult result, int32_t transferred,
   return result == SPIResult::kOk ? transferred : -1;
 }
 
-void SetAutoUnsupported(HAL_SPIPort port, int32_t* status) {
-  SetSPIResult(GetSPIManager().AutoUnsupported(port), status,
-               "VMX SPI Auto is not supported; use basic SPI transactions",
-               static_cast<int32_t>(port));
+void SetSPIAutoResult(SPIAutoResult result, int32_t* status,
+                      std::string_view message, int32_t port = -1) {
+  if (status == nullptr) {
+    return;
+  }
+  switch (result) {
+    case SPIAutoResult::kOk:
+      *status = HAL_SUCCESS;
+      return;
+    case SPIAutoResult::kPortOutOfRange:
+      *status = RESOURCE_OUT_OF_RANGE;
+      hal::SetLastErrorIndexOutOfRange(status, message, 0, 4, port);
+      return;
+    case SPIAutoResult::kAlreadyAllocated:
+    case SPIAutoResult::kResourceConflict:
+      *status = RESOURCE_IS_ALLOCATED;
+      hal::SetLastError(status, message);
+      return;
+    case SPIAutoResult::kInvalidSize:
+    case SPIAutoResult::kInvalidPeriod:
+    case SPIAutoResult::kInvalidTrigger:
+      *status = PARAMETER_OUT_OF_RANGE;
+      hal::SetLastError(status, message);
+      return;
+    case SPIAutoResult::kNullPointer:
+      *status = NULL_PARAMETER;
+      hal::SetLastError(status, message);
+      return;
+    case SPIAutoResult::kUnsupportedSource:
+    case SPIAutoResult::kNotInitialized:
+    case SPIAutoResult::kUnsupportedStall:
+    case SPIAutoResult::kHardwareFailure:
+    default:
+      *status = INCOMPATIBLE_STATE;
+      hal::SetLastError(status, message);
+      return;
+  }
 }
 
 }  // namespace
+
+SPIManager& GetSPIManager() {
+  static SPIManager manager{CreateSPIBackend, GetDigitalChannelRegistry(),
+                            GetVMXCommDIOChannelMap};
+  return manager;
+}
+
 }  // namespace hal::vmx
 
 extern "C" {
@@ -315,60 +349,76 @@ void HAL_SetSPIHandle(HAL_SPIPort port, int32_t handle) {
 }
 
 void HAL_InitSPIAuto(HAL_SPIPort port, int32_t bufferSize, int32_t* status) {
-  static_cast<void>(bufferSize);
-  hal::vmx::SetAutoUnsupported(port, status);
+  hal::vmx::SetSPIAutoResult(
+      hal::vmx::GetSPIAutoManager().Initialize(port, bufferSize), status,
+      "VMX SPI Auto initialization failed", static_cast<int32_t>(port));
 }
 
 void HAL_FreeSPIAuto(HAL_SPIPort port, int32_t* status) {
-  hal::vmx::SetAutoUnsupported(port, status);
+  hal::vmx::SetSPIAutoResult(
+      hal::vmx::GetSPIAutoManager().Free(port), status,
+      "VMX SPI Auto free failed", static_cast<int32_t>(port));
 }
 
 void HAL_StartSPIAutoRate(HAL_SPIPort port, double period, int32_t* status) {
-  static_cast<void>(period);
-  hal::vmx::SetAutoUnsupported(port, status);
+  hal::vmx::SetSPIAutoResult(
+      hal::vmx::GetSPIAutoManager().StartRate(port, period), status,
+      "VMX SPI Auto rate start failed", static_cast<int32_t>(port));
 }
 
 void HAL_StartSPIAutoTrigger(HAL_SPIPort port, HAL_Handle digitalSourceHandle,
                              HAL_AnalogTriggerType analogTriggerType,
                              HAL_Bool triggerRising, HAL_Bool triggerFalling,
                              int32_t* status) {
-  static_cast<void>(digitalSourceHandle);
-  static_cast<void>(analogTriggerType);
-  static_cast<void>(triggerRising);
-  static_cast<void>(triggerFalling);
-  hal::vmx::SetAutoUnsupported(port, status);
+  hal::vmx::SetSPIAutoResult(
+      hal::vmx::GetSPIAutoManager().StartTrigger(
+          port, digitalSourceHandle, analogTriggerType, triggerRising != 0,
+          triggerFalling != 0),
+      status, "VMX SPI Auto DIO trigger start failed",
+      static_cast<int32_t>(port));
 }
 
 void HAL_StopSPIAuto(HAL_SPIPort port, int32_t* status) {
-  hal::vmx::SetAutoUnsupported(port, status);
+  hal::vmx::SetSPIAutoResult(
+      hal::vmx::GetSPIAutoManager().Stop(port), status,
+      "VMX SPI Auto stop failed", static_cast<int32_t>(port));
 }
 
 void HAL_SetSPIAutoTransmitData(HAL_SPIPort port, const uint8_t* dataToSend,
                                 int32_t dataSize, int32_t zeroSize,
                                 int32_t* status) {
-  static_cast<void>(dataToSend);
-  static_cast<void>(dataSize);
-  static_cast<void>(zeroSize);
-  hal::vmx::SetAutoUnsupported(port, status);
+  hal::vmx::SetSPIAutoResult(
+      hal::vmx::GetSPIAutoManager().SetTransmitData(
+          port, dataToSend, dataSize, zeroSize),
+      status, "VMX SPI Auto transmit data is invalid",
+      static_cast<int32_t>(port));
 }
 
 void HAL_ForceSPIAutoRead(HAL_SPIPort port, int32_t* status) {
-  hal::vmx::SetAutoUnsupported(port, status);
+  hal::vmx::SetSPIAutoResult(
+      hal::vmx::GetSPIAutoManager().SetForceRead(port), status,
+      "VMX SPI Auto force read failed", static_cast<int32_t>(port));
 }
 
 int32_t HAL_ReadSPIAutoReceivedData(HAL_SPIPort port, uint32_t* buffer,
                                     int32_t numToRead, double timeout,
                                     int32_t* status) {
-  static_cast<void>(buffer);
-  static_cast<void>(numToRead);
-  static_cast<void>(timeout);
-  hal::vmx::SetAutoUnsupported(port, status);
-  return 0;
+  hal::vmx::SPIAutoResult result = hal::vmx::SPIAutoResult::kHardwareFailure;
+  const auto count = hal::vmx::GetSPIAutoManager().Read(
+      port, buffer, numToRead, timeout, result);
+  hal::vmx::SetSPIAutoResult(result, status,
+                             "VMX SPI Auto receive read failed",
+                             static_cast<int32_t>(port));
+  return count;
 }
 
 int32_t HAL_GetSPIAutoDroppedCount(HAL_SPIPort port, int32_t* status) {
-  hal::vmx::SetAutoUnsupported(port, status);
-  return 0;
+  hal::vmx::SPIAutoResult result = hal::vmx::SPIAutoResult::kHardwareFailure;
+  const auto count = hal::vmx::GetSPIAutoManager().GetDropped(port, result);
+  hal::vmx::SetSPIAutoResult(result, status,
+                             "VMX SPI Auto dropped-count read failed",
+                             static_cast<int32_t>(port));
+  return count;
 }
 
 void HAL_ConfigureSPIAutoStall(HAL_SPIPort port, int32_t csToSclkTicks,
@@ -377,7 +427,10 @@ void HAL_ConfigureSPIAutoStall(HAL_SPIPort port, int32_t csToSclkTicks,
   static_cast<void>(csToSclkTicks);
   static_cast<void>(stallTicks);
   static_cast<void>(pow2BytesPerRead);
-  hal::vmx::SetAutoUnsupported(port, status);
+  hal::vmx::SetSPIAutoResult(
+      hal::vmx::GetSPIAutoManager().ConfigureStall(port), status,
+      "VMX SPI Auto stall timing is unsupported by the SDK",
+      static_cast<int32_t>(port));
 }
 
 }  // extern "C"

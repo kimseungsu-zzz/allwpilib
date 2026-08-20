@@ -234,13 +234,33 @@ reconfiguration leaves the previous logical configuration in place. Zero-byte
 operations are valid; nonzero null buffers and lengths above the SDK's 16-bit
 transfer limit are rejected.
 
-The WPILib SPI Auto/accumulator C ABI is present but deliberately returns an
-explicit incompatible-state error. The VMX SDK has a different automatic
-transfer engine contract, so the adapter does not store software-only state or
-claim that AutoSPI works. This distinction is recorded in the sensor matrix:
-ADXL345_SPI and an explicitly-MXP ADXL362 remain `NOT_TESTED`, while
-ADXRS450, ADIS16448, and ADIS16470 remain blocked by AutoSPI and their
-additional DIO/port dependencies.
+The WPILib SPI Auto/accumulator C ABI is implemented as a HAL-owned software
+engine because the VMX SDK does not expose the roboRIO FPGA DMA AutoSPI
+engine. Periodic rate transfers are scheduled with absolute VMX monotonic
+deadlines through the existing global Notifier manager. DIO rising, falling,
+or both-edge triggers use the existing interrupt backend; the callback only
+records an event and wakes the worker, so SPI transactions never run in the
+hardware callback. AnalogTrigger sources are explicitly unsupported.
+
+AutoSPI holds a reference to the same physical SPI resource as standard SPI,
+and all transfers serialize through the SPI manager. The receive ring has
+fixed capacity and never overwrites unread words: an entire sample is dropped
+and the dropped count is incremented when it will not fit. A sample is encoded
+as the low 32 bits of `VMXTime::GetCurrentTotalMicroseconds()` followed by one
+`uint32_t` word for each received byte. Query reads (`numToRead == 0`), partial
+reads, finite/infinite timeouts, force-read, stop, repeated free, and shutdown
+are handled by the same lifecycle. `HAL_ConfigureSPIAutoStall` returns an
+explicit incompatible-state error because the SDK cannot represent the
+roboRIO CS-to-SCLK, inter-read stall, and power-of-two byte semantics; no
+software sleep is used to fake that timing.
+
+ADXL345_SPI and ADXL362 remain `NOT_TESTED` pending sensor-level validation.
+ADXRS450 now has its standard-SPI plus AutoSPI accumulator dependency path,
+with its integration test still pending. ADIS16448 and ADIS16470 remain
+`BLOCKED_BY_HAL`: both require precise AutoStall semantics, and ADIS16470 also
+uses roboRIO-fixed DIO routing that conflicts with VMX CommDIO resources.
+The synchronized [sensor compatibility matrix](VMX_SENSOR_COMPATIBILITY.md)
+is the status source for these distinctions.
 
 ## Serial / UART support
 

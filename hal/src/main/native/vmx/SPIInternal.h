@@ -31,7 +31,6 @@ enum class SPIResult {
   kNoResources,
   kResourceConflict,
   kHardwareFailure,
-  kAutoUnsupported,
 };
 
 struct SPIPortConfig {
@@ -342,12 +341,6 @@ class SPIManager final {
     }
   }
 
-  SPIResult AutoUnsupported(HAL_SPIPort port) const noexcept {
-    auto validation = ValidateSPIPort(port);
-    return validation == SPIResult::kOk ? SPIResult::kAutoUnsupported
-                                        : validation;
-  }
-
  private:
   static bool IsValidChannelMap(const VMXCommDIOChannelMap& map) noexcept {
     if (!map.valid || !map.spiValid) {
@@ -464,5 +457,7 @@ class SPIManager final {
   // One physical VMX SPI bus shared by all five WPILib port aliases.
   mutable SPIPortState m_port;
 };
+
+SPIManager& GetSPIManager();
 
 }  // namespace hal::vmx

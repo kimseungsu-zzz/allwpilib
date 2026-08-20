@@ -51,9 +51,9 @@ are available but still awaiting sensor verification are `NOT_TESTED`.
 | ADXL345_I2C | `SUPPORTED` | WPILib `I2C` → VMX MXP I2C HAL | Standard WPILib register transactions now reach the shared VMX I2C resource. The ADXL345 WHO_AM_I and one-register read/write sequence are the first sensor-level I2C smoke test. |
 | ADXL345_SPI | `NOT_TESTED` | Basic SPI transactions on VMX MXP | The WPILib path uses mode 3, active-high CS, and 500 kHz; the VMX basic path can represent these settings, but construction/configuration and WHO_AM_I data have not been tested on hardware. |
 | ADXL362 | `NOT_TESTED` | Basic SPI transactions on VMX SPI connector | The default WPILib constructor selects onboard CS1, which aliases the VMX SPI connector; the basic mode-3, active-low transaction path still needs sensor-level validation. |
-| ADXRS450_Gyro | `BLOCKED_BY_HAL` | Basic SPI plus WPILib SPI Auto accumulator | Onboard CS0 aliases the VMX SPI connector, but the class calls `SPI::InitAccumulator`; AutoSPI is explicitly unsupported rather than emulated. |
-| ADIS16448_IMU | `BLOCKED_BY_HAL` | MXP basic SPI, SPI Auto, DIO reset/status pins | The default MXP bus is available for register setup, but the class requires `InitAuto`, `ConfigureAutoStall`, an asynchronous acquire loop, and DIO 18/19/10 resources. AutoSPI is the current blocker. |
-| ADIS16470_IMU | `BLOCKED_BY_HAL` | Onboard-CS0 basic SPI, SPI Auto, DIO reset/data-ready/LED pins | Onboard CS0 aliases the VMX SPI connector, so the port mapping is no longer a blocker; the implementation still requires `InitAuto`, `ConfigureAutoStall`, and DIO 27/26/28 resources. |
+| ADXRS450_Gyro | `NOT_TESTED` | Basic SPI plus HAL-owned AutoSPI accumulator | Onboard CS0 aliases the VMX SPI connector and the standard transaction plus `SPI::InitAccumulator` path is now available. Sensor-level construction/device-ID and accumulator integration testing remains. |
+| ADIS16448_IMU | `BLOCKED_BY_HAL` | MXP basic SPI, SPI Auto, DIO reset/status pins | The default MXP bus is available for register setup and rate/trigger AutoSPI exists, but the class requires precise `ConfigureAutoStall` semantics, an asynchronous acquire loop, and DIO 18/19/10 resources. Stall timing is the HAL blocker. |
+| ADIS16470_IMU | `BLOCKED_BY_HAL` | Onboard-CS0 basic SPI, SPI Auto, DIO reset/data-ready/LED pins | Rate/trigger AutoSPI exists, but the class requires precise `ConfigureAutoStall`; its roboRIO-fixed DIO 27 reset, 28 status LED, and 26 data-ready routing also conflicts with VMX CommDIO/SPI physical resources. |
 | AnalogGyro | `BLOCKED_BY_HAL` | Required AnalogGyro HAL is not present in the VMX backend | AnalogInput and accumulator support the underlying ADC path, but the WPILib class calls the separate AnalogGyro HAL ABI for angle/rate/calibration. Add the compatibility test after that HAL is implemented. |
 | BuiltInAccelerometer | `BLOCKED_BY_HAL` | Required accelerometer HAL is not present in the VMX backend | VMX onboard IMU data may be usable, but range, axis orientation, calibration, and g-vs-m/s² units must be verified before exposing `HAL_GetAccelerometerX/Y/Z`. |
 
@@ -72,7 +72,7 @@ are available but still awaiting sensor verification are `NOT_TESTED`.
 | Timing / Notifier | `SUPPORTED` | VMX monotonic time and one global VMX timer-notification scheduler. |
 | I2C | `SUPPORTED` | One VMX physical bus at 26/27, shared and reference-counted by the kOnboard/kMXP aliases. |
 | DutyCycle | `SUPPORTED` | FlexDIO 0-11 VMX PWMCapture adapter with shared timer-group ownership and DIO handoff. |
-| SPI | `NOT_TESTED` | One physical CommDIO SPI bus at 30/31/32/33 | `HAL_InitializeSPI`, transaction/write/read, clock, mode 0-3, and CS polarity are mapped to one shared resource; all five WPILib port names alias it. AutoSPI/accumulator APIs return an explicit unsupported error; sensor-level integration and physical validation remain. |
+| SPI | `NOT_TESTED` | One physical CommDIO SPI bus at 30/31/32/33; `HAL_InitializeSPI`, transaction/write/read, clock, mode 0-3, and CS polarity use one shared resource. All five WPILib port names alias it. HAL-owned AutoSPI rate and DIO trigger (rising/falling/both) use timestamped fixed-capacity buffering; AnalogTrigger sources and exact AutoStall timing are unsupported. Sensor-level integration and physical validation remain. |
 | Serial / UART | `PARTIAL` | WPILib `kMXP` → VMX TTL UART at 28/29 | Baud 0..230400, blocking read/write, default 8-N-1/no-flow configuration, software chunk limits for read/write buffers, timeout, termination, blocking flush, and receive clear are adapter-backed. Non-default data/parity/stop/flow settings, raw FD, onboard RS-232, and USB ports are explicit incompatible-state results. |
 
 ## Studica / VMX vendor sensors
@@ -101,9 +101,10 @@ separate vendor wrapper module.
    changing their public APIs.
 2. Validate DutyCycle, DutyCycleEncoder, and DutyCycleInput on physical VMX
    hardware.
-3. Validate the basic SPI sensor paths for ADXL345_SPI and ADXL362; keep
-   AutoSPI-dependent ADXRS450_Gyro, ADIS16448_IMU, and
-   ADIS16470_IMU blocked until an explicit AutoSPI adapter is designed.
+3. Validate the basic SPI sensor paths for ADXL345_SPI and ADXL362, then run
+   the ADXRS450_Gyro standard-SPI plus AutoSPI accumulator integration path.
+   ADIS16448_IMU and ADIS16470_IMU remain blocked until precise AutoStall and
+   their additional DIO routing requirements are resolved.
 4. Close the Counter single-source/semiperiod gap before validating
    Tachometer and Ultrasonic.
 5. Verify VMX IMU mappings separately before deciding whether any

@@ -10,6 +10,7 @@
 
 #include "HALInitializer.h"
 #include "NotifierInternal.h"
+#include "SPIAutoInternal.h"
 #include "VMXRuntime.h"
 #include "hal/handles/HandlesInternal.h"
 
@@ -60,6 +61,7 @@ HAL_Bool HAL_Initialize(int32_t timeout, int32_t mode) {
 void HAL_Shutdown(void) {
   std::scoped_lock lock{gHalLifecycleMutex};
   hal::init::HAL_IsInitialized.store(false, std::memory_order_release);
+  hal::vmx::ShutdownSPIAuto();
   hal::vmx::ShutdownNotifiers();
   hal::vmx::ShutdownRuntime();
 }

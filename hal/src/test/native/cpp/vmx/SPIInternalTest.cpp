@@ -171,14 +171,6 @@ TEST(VMXSPIInternalTest, MapsClockModesAndChipSelectPolarity) {
   EXPECT_EQ(fixture.state->reconfigures, 6);
 }
 
-TEST(VMXSPIInternalTest, AutoSPIIsExplicitlyUnsupported) {
-  SPIFixture fixture;
-  EXPECT_EQ(fixture.manager.AutoUnsupported(HAL_SPI_kMXP),
-            SPIResult::kAutoUnsupported);
-  EXPECT_EQ(fixture.manager.AutoUnsupported(HAL_SPI_kOnboardCS0),
-            SPIResult::kAutoUnsupported);
-}
-
 TEST(VMXSPIInternalTest, CommDIOReservationsPreventPhysicalConflicts) {
   {
     SPIFixture fixture;

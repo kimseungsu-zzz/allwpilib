@@ -43,9 +43,12 @@ WPILib I2C onboard/MXP names and SPI onboard CS0-3/MXP names are aliases for
 the same physical resources and share the registry. Serial `kMXP` is backed by
 the SDK UART with baud rates `0..230400`; onboard RS-232 and USB serial
 enumeration remain explicit compatibility boundaries. The basic SPI HAL
-primitive is available but sensor-level status remains `NOT_TESTED`, while
-AutoSPI remains explicitly unsupported. Hardware validation is separate from
-the matrix's HAL/API status. VMX-Pi and VMX2 deployment targets are Linux
+primitive is available, and the HAL-owned AutoSPI engine supports periodic
+rate transfers plus DIO rising, falling, and both-edge triggers. AnalogTrigger
+sources and exact FPGA AutoSPI stall timing remain explicitly unsupported;
+sensor-level status is still separate from the matrix's HAL/API status.
+ADXRS450 now has its required standard-SPI plus AutoSPI HAL path, with sensor
+integration testing pending. VMX-Pi and VMX2 deployment targets are Linux
 AArch64 only. The currently available VMXPi SDK shared library is ELF32 ARM
 EABI5 and is classified as a legacy/incompatible artifact; Gradle rejects it
 before compilation/linking. ARM32/armhf targets, helper bridges, and forced
