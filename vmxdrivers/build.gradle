@@ -134,8 +134,8 @@ def verifyVmxSdk = tasks.register('verifyVmxSdk') {
         if (!incompatibleLibraries.empty) {
             throw new GradleException(
             "VMX SDK library architecture is incompatible: ${incompatibleLibraries.join(', ')} " +
-                    "must be ELF64 AArch64 (ELF class 2, little-endian, e_machine 183). " +
-                    "ELF32/ARMhf artifacts are legacy and rejected; no ARM32 fallback or bridge is supported.")
+            "must be ELF64 AArch64 (ELF class 2, little-endian, e_machine 183). " +
+            "ELF32/ARMhf artifacts are legacy and rejected; no ARM32 fallback or bridge is supported.")
         }
     }
 }
