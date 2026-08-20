@@ -2,15 +2,16 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/simulation/PowerDistributionSim.hpp"
+#include "frc/simulation/PowerDistributionSim.h"
 
 #include <memory>
 
-#include "wpi/hal/simulation/PowerDistributionData.h"
-#include "wpi/hardware/power/PowerDistribution.hpp"
+#include <hal/simulation/PowerDistributionData.h>
 
-using namespace wpi;
-using namespace wpi::sim;
+#include "frc/PowerDistribution.h"
+
+using namespace frc;
+using namespace frc::sim;
 
 PowerDistributionSim::PowerDistributionSim(int module) : m_index{module} {}
 

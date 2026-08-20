@@ -6,12 +6,12 @@ apriltag/bin
 cameraserver/bin
 cameraserver/multiCameraServer/bin
 cscore/bin
-fields/bin
+fieldImages/bin
 hal/bin
 developerRobot/bin
 ntcore/bin
 romiVendordep/bin
-commandsv2/bin
+wpilibNewCommands/bin
 wpilibj/bin
 wpimath/bin
 wpinet/bin

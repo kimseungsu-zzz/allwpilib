@@ -2,25 +2,24 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "RawSinkImpl.hpp"
+#include "RawSinkImpl.h"
 
 #include <algorithm>
 #include <memory>
 
-#include "Instance.hpp"
-#include "wpi/cs/cscore_raw.h"
-#include "wpi/util/string.hpp"
+#include "Instance.h"
+#include "cscore_raw.h"
 
-using namespace wpi::cs;
+using namespace cs;
 
-RawSinkImpl::RawSinkImpl(std::string_view name, wpi::util::Logger& logger,
+RawSinkImpl::RawSinkImpl(std::string_view name, wpi::Logger& logger,
                          Notifier& notifier, Telemetry& telemetry)
     : SinkImpl{name, logger, notifier, telemetry} {
   m_active = true;
   // m_thread = std::thread(&RawSinkImpl::ThreadMain, this);
 }
 
-RawSinkImpl::RawSinkImpl(std::string_view name, wpi::util::Logger& logger,
+RawSinkImpl::RawSinkImpl(std::string_view name, wpi::Logger& logger,
                          Notifier& notifier, Telemetry& telemetry,
                          std::function<void(uint64_t time)> processFrame)
     : SinkImpl{name, logger, notifier, telemetry} {}
@@ -100,7 +99,7 @@ uint64_t RawSinkImpl::GrabFrameImpl(WPI_RawFrame& rawFrame,
     auto width = rawFrame.width;
     auto height = rawFrame.height;
     auto pixelFormat =
-        static_cast<wpi::util::PixelFormat>(rawFrame.pixelFormat);
+        static_cast<VideoMode::PixelFormat>(rawFrame.pixelFormat);
     if (width <= 0 || height <= 0) {
       width = incomingFrame.GetOriginalWidth();
       height = incomingFrame.GetOriginalHeight();
@@ -118,7 +117,7 @@ uint64_t RawSinkImpl::GrabFrameImpl(WPI_RawFrame& rawFrame,
   rawFrame.height = newImage->height;
   rawFrame.width = newImage->width;
   rawFrame.stride = newImage->GetStride();
-  rawFrame.pixelFormat = static_cast<int>(newImage->pixelFormat);
+  rawFrame.pixelFormat = newImage->pixelFormat;
   rawFrame.size = newImage->size();
   std::copy(newImage->data(), newImage->data() + rawFrame.size, rawFrame.data);
   rawFrame.timestamp = incomingFrame.GetTime();
@@ -152,7 +151,7 @@ void RawSinkImpl::ThreadMain() {
   Disable();
 }
 
-namespace wpi::cs {
+namespace cs {
 static constexpr unsigned SinkMask = CS_SINK_CV | CS_SINK_RAW;
 
 CS_Sink CreateRawSink(std::string_view name, bool isCv, CS_Status* status) {
@@ -203,30 +202,30 @@ uint64_t GrabSinkFrameTimeoutLastTime(CS_Sink sink, WPI_RawFrame& image,
       .GrabFrame(image, timeout, lastFrameTime);
 }
 
-}  // namespace wpi::cs
+}  // namespace cs
 
 extern "C" {
 CS_Sink CS_CreateRawSink(const struct WPI_String* name, CS_Bool isCv,
                          CS_Status* status) {
-  return wpi::cs::CreateRawSink(wpi::util::to_string_view(name), isCv, status);
+  return cs::CreateRawSink(wpi::to_string_view(name), isCv, status);
 }
 
 CS_Sink CS_CreateRawSinkCallback(
     const struct WPI_String* name, CS_Bool isCv, void* data,
     void (*processFrame)(void* data, uint64_t time), CS_Status* status) {
-  return wpi::cs::CreateRawSinkCallback(
-      wpi::util::to_string_view(name), isCv,
+  return cs::CreateRawSinkCallback(
+      wpi::to_string_view(name), isCv,
       [=](uint64_t time) { processFrame(data, time); }, status);
 }
 
 uint64_t CS_GrabRawSinkFrame(CS_Sink sink, struct WPI_RawFrame* image,
                              CS_Status* status) {
-  return wpi::cs::GrabSinkFrame(sink, *image, status);
+  return cs::GrabSinkFrame(sink, *image, status);
 }
 
 uint64_t CS_GrabRawSinkFrameTimeout(CS_Sink sink, struct WPI_RawFrame* image,
                                     double timeout, CS_Status* status) {
-  return wpi::cs::GrabSinkFrameTimeout(sink, *image, timeout, status);
+  return cs::GrabSinkFrameTimeout(sink, *image, timeout, status);
 }
 
 uint64_t CS_GrabRawSinkFrameTimeoutWithFrameTime(CS_Sink sink,
@@ -234,8 +233,8 @@ uint64_t CS_GrabRawSinkFrameTimeoutWithFrameTime(CS_Sink sink,
                                                  double timeout,
                                                  uint64_t lastFrameTime,
                                                  CS_Status* status) {
-  return wpi::cs::GrabSinkFrameTimeoutLastTime(sink, *image, timeout,
-                                               lastFrameTime, status);
+  return cs::GrabSinkFrameTimeoutLastTime(sink, *image, timeout, lastFrameTime,
+                                          status);
 }
 
 }  // extern "C"

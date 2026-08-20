@@ -10,25 +10,20 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "wpi/util/StringMap.hpp"
+#include "wpi/StringMap.h"  // NOLINT(build/include_order)
 
 #include <string>
-#include <string_view>
 #include <tuple>
 #include <utility>
 
-#include <catch2/catch_template_test_macros.hpp>
-#include <catch2/catch_test_macros.hpp>
-#include <catch2/matchers/catch_matchers_floating_point.hpp>
-#include <catch2/matchers/catch_matchers_range_equals.hpp>
-#include <catch2/matchers/catch_matchers_vector.hpp>
+#include <gtest/gtest.h>
 
-using namespace wpi::util;
+using namespace wpi;
 
 namespace {
 
 // Test fixture
-class StringMapTest {
+class StringMapTest : public testing::Test {
  protected:
   StringMap<uint32_t> testMap;
 
@@ -40,45 +35,45 @@ class StringMapTest {
 
   void assertEmptyMap() {
     // Size tests
-    CHECK(0u == testMap.size());
-    CHECK(testMap.empty());
+    EXPECT_EQ(0u, testMap.size());
+    EXPECT_TRUE(testMap.empty());
 
     // Iterator tests
-    CHECK(testMap.begin() == testMap.end());
+    EXPECT_TRUE(testMap.begin() == testMap.end());
 
     // Lookup tests
-    CHECK_FALSE(testMap.contains(testKey));
-    CHECK(0u == testMap.count(testKey));
-    CHECK(0u == testMap.count(std::string_view(testKeyFirst, testKeyLength)));
-    CHECK(0u == testMap.count(testKeyStr));
-    CHECK(testMap.find(testKey) == testMap.end());
-    CHECK(testMap.find(std::string_view(testKeyFirst, testKeyLength)) ==
-          testMap.end());
-    CHECK(testMap.find(testKeyStr) == testMap.end());
+    EXPECT_FALSE(testMap.contains(testKey));
+    EXPECT_EQ(0u, testMap.count(testKey));
+    EXPECT_EQ(0u, testMap.count(std::string_view(testKeyFirst, testKeyLength)));
+    EXPECT_EQ(0u, testMap.count(testKeyStr));
+    EXPECT_TRUE(testMap.find(testKey) == testMap.end());
+    EXPECT_TRUE(testMap.find(std::string_view(testKeyFirst, testKeyLength)) ==
+                testMap.end());
+    EXPECT_TRUE(testMap.find(testKeyStr) == testMap.end());
   }
 
   void assertSingleItemMap() {
     // Size tests
-    CHECK(1u == testMap.size());
-    CHECK_FALSE(testMap.begin() == testMap.end());
-    CHECK_FALSE(testMap.empty());
+    EXPECT_EQ(1u, testMap.size());
+    EXPECT_FALSE(testMap.begin() == testMap.end());
+    EXPECT_FALSE(testMap.empty());
 
     // Iterator tests
     StringMap<uint32_t>::iterator it = testMap.begin();
-    CHECK(std::string_view{testKey} == std::string_view{it->first.data()});
-    CHECK(testValue == it->second);
+    EXPECT_STREQ(testKey, it->first.data());
+    EXPECT_EQ(testValue, it->second);
     ++it;
-    CHECK(it == testMap.end());
+    EXPECT_TRUE(it == testMap.end());
 
     // Lookup tests
-    CHECK(testMap.contains(testKey));
-    CHECK(1u == testMap.count(testKey));
-    CHECK(1u == testMap.count(std::string_view(testKeyFirst, testKeyLength)));
-    CHECK(1u == testMap.count(testKeyStr));
-    CHECK(testMap.find(testKey) == testMap.begin());
-    CHECK(testMap.find(std::string_view(testKeyFirst, testKeyLength)) ==
-          testMap.begin());
-    CHECK(testMap.find(testKeyStr) == testMap.begin());
+    EXPECT_TRUE(testMap.contains(testKey));
+    EXPECT_EQ(1u, testMap.count(testKey));
+    EXPECT_EQ(1u, testMap.count(std::string_view(testKeyFirst, testKeyLength)));
+    EXPECT_EQ(1u, testMap.count(testKeyStr));
+    EXPECT_TRUE(testMap.find(testKey) == testMap.begin());
+    EXPECT_TRUE(testMap.find(std::string_view(testKeyFirst, testKeyLength)) ==
+                testMap.begin());
+    EXPECT_TRUE(testMap.find(testKeyStr) == testMap.begin());
   }
 };
 
@@ -99,77 +94,76 @@ struct CountCopyAndMove {
 };
 
 // Empty map tests.
-TEST_CASE_METHOD(StringMapTest, "StringMapTest EmptyMap", "[wpiutil]") {
+TEST_F(StringMapTest, EmptyMap) {
   assertEmptyMap();
 }
 
 // Constant map tests.
-TEST_CASE_METHOD(StringMapTest, "StringMapTest ConstEmptyMap", "[wpiutil]") {
+TEST_F(StringMapTest, ConstEmptyMap) {
   const StringMap<uint32_t>& constTestMap = testMap;
 
   // Size tests
-  CHECK(0u == constTestMap.size());
-  CHECK(constTestMap.empty());
+  EXPECT_EQ(0u, constTestMap.size());
+  EXPECT_TRUE(constTestMap.empty());
 
   // Iterator tests
-  CHECK(constTestMap.begin() == constTestMap.end());
+  EXPECT_TRUE(constTestMap.begin() == constTestMap.end());
 
   // Lookup tests
-  CHECK(0u == constTestMap.count(testKey));
-  CHECK(0u ==
-        constTestMap.count(std::string_view(testKeyFirst, testKeyLength)));
-  CHECK(0u == constTestMap.count(testKeyStr));
-  CHECK(constTestMap.find(testKey) == constTestMap.end());
-  CHECK(constTestMap.find(std::string_view(testKeyFirst, testKeyLength)) ==
-        constTestMap.end());
-  CHECK(constTestMap.find(testKeyStr) == constTestMap.end());
+  EXPECT_EQ(0u, constTestMap.count(testKey));
+  EXPECT_EQ(0u,
+            constTestMap.count(std::string_view(testKeyFirst, testKeyLength)));
+  EXPECT_EQ(0u, constTestMap.count(testKeyStr));
+  EXPECT_TRUE(constTestMap.find(testKey) == constTestMap.end());
+  EXPECT_TRUE(constTestMap.find(std::string_view(
+                  testKeyFirst, testKeyLength)) == constTestMap.end());
+  EXPECT_TRUE(constTestMap.find(testKeyStr) == constTestMap.end());
 }
 
 // initializer_list ctor test; also implicitly tests initializer_list and
 // iterator overloads of insert().
-TEST_CASE_METHOD(StringMapTest, "StringMapTest InitializerListCtor",
-                 "[wpiutil]") {
+TEST_F(StringMapTest, InitializerListCtor) {
   testMap = StringMap<uint32_t>({{"key", 1}});
   assertSingleItemMap();
 }
 
 // A map with a single entry.
-TEST_CASE_METHOD(StringMapTest, "StringMapTest SingleEntryMap", "[wpiutil]") {
+TEST_F(StringMapTest, SingleEntryMap) {
   testMap[testKey] = testValue;
   assertSingleItemMap();
 }
 
 // Test clear() method.
-TEST_CASE_METHOD(StringMapTest, "StringMapTest Clear", "[wpiutil]") {
+TEST_F(StringMapTest, Clear) {
   testMap[testKey] = testValue;
   testMap.clear();
   assertEmptyMap();
 }
 
 // Test erase(iterator) method.
-TEST_CASE_METHOD(StringMapTest, "StringMapTest EraseIterator", "[wpiutil]") {
+TEST_F(StringMapTest, EraseIterator) {
   testMap[testKey] = testValue;
   testMap.erase(testMap.begin());
   assertEmptyMap();
 }
 
 // Test erase(value) method.
-TEST_CASE_METHOD(StringMapTest, "StringMapTest EraseValue", "[wpiutil]") {
+TEST_F(StringMapTest, EraseValue) {
   testMap[testKey] = testValue;
   testMap.erase(testKey);
   assertEmptyMap();
 }
 
 // Test inserting two values and erasing one.
-TEST_CASE_METHOD(StringMapTest, "StringMapTest InsertAndErase", "[wpiutil]") {
+TEST_F(StringMapTest, InsertAndErase) {
   testMap[testKey] = testValue;
   testMap["otherKey"] = 2;
   testMap.erase("otherKey");
   assertSingleItemMap();
 }
 
-TEST_CASE_METHOD(StringMapTest, "StringMapTest SmallFullMap", "[wpiutil]") {
-  wpi::util::StringMap<int> Map;
+TEST_F(StringMapTest, SmallFullMap) {
+  wpi::StringMap<int> Map;
 
   Map["eins"] = 1;
   Map["zwei"] = 2;
@@ -179,16 +173,16 @@ TEST_CASE_METHOD(StringMapTest, "StringMapTest SmallFullMap", "[wpiutil]") {
   Map["veir"] = 4;
   Map["funf"] = 5;
 
-  CHECK(3u == Map.size());
-  CHECK_FALSE(Map.contains("eins"));
-  CHECK(2 == Map["zwei"]);
-  CHECK_FALSE(Map.contains("drei"));
-  CHECK(4 == Map["veir"]);
-  CHECK(5 == Map["funf"]);
+  EXPECT_EQ(3u, Map.size());
+  EXPECT_FALSE(Map.contains("eins"));
+  EXPECT_EQ(2, Map["zwei"]);
+  EXPECT_FALSE(Map.contains("drei"));
+  EXPECT_EQ(4, Map["veir"]);
+  EXPECT_EQ(5, Map["funf"]);
 }
 
-TEST_CASE_METHOD(StringMapTest, "StringMapTest CopyCtor", "[wpiutil]") {
-  wpi::util::StringMap<int> Map;
+TEST_F(StringMapTest, CopyCtor) {
+  wpi::StringMap<int> Map;
 
   Map["eins"] = 1;
   Map["zwei"] = 2;
@@ -198,36 +192,36 @@ TEST_CASE_METHOD(StringMapTest, "StringMapTest CopyCtor", "[wpiutil]") {
   Map["veir"] = 4;
   Map["funf"] = 5;
 
-  CHECK(3u == Map.size());
-  CHECK_FALSE(Map.contains("eins"));
-  CHECK(2 == Map["zwei"]);
-  CHECK_FALSE(Map.contains("drei"));
-  CHECK(4 == Map["veir"]);
-  CHECK(5 == Map["funf"]);
+  EXPECT_EQ(3u, Map.size());
+  EXPECT_FALSE(Map.contains("eins"));
+  EXPECT_EQ(2, Map["zwei"]);
+  EXPECT_FALSE(Map.contains("drei"));
+  EXPECT_EQ(4, Map["veir"]);
+  EXPECT_EQ(5, Map["funf"]);
 
-  wpi::util::StringMap<int> Map2(Map);
-  CHECK(3u == Map2.size());
-  CHECK_FALSE(Map2.contains("eins"));
-  CHECK(2 == Map2["zwei"]);
-  CHECK_FALSE(Map2.contains("drei"));
-  CHECK(4 == Map2["veir"]);
-  CHECK(5 == Map2["funf"]);
+  wpi::StringMap<int> Map2(Map);
+  EXPECT_EQ(3u, Map2.size());
+  EXPECT_FALSE(Map2.contains("eins"));
+  EXPECT_EQ(2, Map2["zwei"]);
+  EXPECT_FALSE(Map2.contains("drei"));
+  EXPECT_EQ(4, Map2["veir"]);
+  EXPECT_EQ(5, Map2["funf"]);
 }
 
-TEST_CASE_METHOD(StringMapTest, "StringMapTest At", "[wpiutil]") {
-  wpi::util::StringMap<int> Map;
+TEST_F(StringMapTest, At) {
+  wpi::StringMap<int> Map;
 
   // keys both found and not found on non-empty map
   Map["a"] = 1;
   Map["b"] = 2;
   Map["c"] = 3;
-  CHECK(1 == Map.at("a"));
-  CHECK(2 == Map.at("b"));
-  CHECK(3 == Map.at("c"));
+  EXPECT_EQ(1, Map.at("a"));
+  EXPECT_EQ(2, Map.at("b"));
+  EXPECT_EQ(3, Map.at("c"));
 }
 
 // A more complex iteration test.
-TEST_CASE_METHOD(StringMapTest, "StringMapTest Iteration", "[wpiutil]") {
+TEST_F(StringMapTest, Iteration) {
   bool visited[100];
 
   // Insert 100 numbers into the map
@@ -243,47 +237,45 @@ TEST_CASE_METHOD(StringMapTest, "StringMapTest Iteration", "[wpiutil]") {
        ++it) {
     std::stringstream ss;
     ss << "key_" << it->second;
-    REQUIRE(std::string_view{ss.str().c_str()} ==
-            std::string_view{it->first.data()});
+    ASSERT_STREQ(ss.str().c_str(), it->first.data());
     visited[it->second] = true;
   }
 
   // Ensure every number was visited.
   for (int i = 0; i < 100; ++i) {
-    UNSCOPED_INFO("Entry #" << i << " was never visited");
-    REQUIRE(visited[i]);
+    ASSERT_TRUE(visited[i]) << "Entry #" << i << " was never visited";
   }
 }
 
 // Test insert() method.
-TEST_CASE_METHOD(StringMapTest, "StringMapTest Insert", "[wpiutil]") {
-  UNSCOPED_INFO("InsertTest");
+TEST_F(StringMapTest, Insert) {
+  SCOPED_TRACE("InsertTest");
   testMap.insert(std::pair{std::string_view(testKeyFirst, testKeyLength), 1u});
   assertSingleItemMap();
 }
 
 // Test insert(pair<K, V>) method
-TEST_CASE_METHOD(StringMapTest, "StringMapTest InsertPair", "[wpiutil]") {
+TEST_F(StringMapTest, InsertPair) {
   bool Inserted;
   StringMap<uint32_t>::iterator NewIt;
   std::tie(NewIt, Inserted) =
       testMap.insert(std::pair{testKeyFirst, testValue});
-  CHECK(1u == testMap.size());
-  CHECK(testValue == testMap[testKeyFirst]);
-  CHECK(testKeyFirst == NewIt->first);
-  CHECK(testValue == NewIt->second);
-  CHECK(Inserted);
+  EXPECT_EQ(1u, testMap.size());
+  EXPECT_EQ(testValue, testMap[testKeyFirst]);
+  EXPECT_EQ(testKeyFirst, NewIt->first);
+  EXPECT_EQ(testValue, NewIt->second);
+  EXPECT_TRUE(Inserted);
 
   StringMap<uint32_t>::iterator ExistingIt;
   std::tie(ExistingIt, Inserted) =
       testMap.insert(std::pair{testKeyFirst, testValue + 1});
-  CHECK(1u == testMap.size());
-  CHECK(testValue == testMap[testKeyFirst]);
-  CHECK_FALSE(Inserted);
-  CHECK(NewIt == ExistingIt);
+  EXPECT_EQ(1u, testMap.size());
+  EXPECT_EQ(testValue, testMap[testKeyFirst]);
+  EXPECT_FALSE(Inserted);
+  EXPECT_EQ(NewIt, ExistingIt);
 }
 
-TEST_CASE_METHOD(StringMapTest, "StringMapTest InsertOrAssign", "[wpiutil]") {
+TEST_F(StringMapTest, InsertOrAssign) {
   struct A : CountCopyAndMove {
     explicit A(int v) : v(v) {}
     int v;
@@ -291,17 +283,17 @@ TEST_CASE_METHOD(StringMapTest, "StringMapTest InsertOrAssign", "[wpiutil]") {
   StringMap<A> t;
 
   auto try1 = t.insert_or_assign("A", A(1));
-  CHECK(try1.second);
-  CHECK(1 == try1.first->second.v);
-  CHECK(1 == try1.first->second.move);
+  EXPECT_TRUE(try1.second);
+  EXPECT_EQ(1, try1.first->second.v);
+  EXPECT_EQ(1, try1.first->second.move);
 
   auto try2 = t.insert_or_assign("A", A(2));
-  CHECK_FALSE(try2.second);
-  CHECK(2 == try2.first->second.v);
-  CHECK(2 == try1.first->second.move);
+  EXPECT_FALSE(try2.second);
+  EXPECT_EQ(2, try2.first->second.v);
+  EXPECT_EQ(2, try1.first->second.move);
 
-  CHECK(try1.first == try2.first);
-  CHECK(0 == try1.first->second.copy);
+  EXPECT_EQ(try1.first, try2.first);
+  EXPECT_EQ(0, try1.first->second.copy);
 }
 
 // Create a non-default constructable value
@@ -311,13 +303,12 @@ struct StringMapTestStruct {
   int i;
 };
 
-TEST_CASE_METHOD(StringMapTest, "StringMapTest NonDefaultConstructable",
-                 "[wpiutil]") {
+TEST_F(StringMapTest, NonDefaultConstructable) {
   StringMap<StringMapTestStruct> t;
   t.insert(std::pair{"Test", StringMapTestStruct(123)});
   StringMap<StringMapTestStruct>::iterator iter = t.find("Test");
-  REQUIRE(iter != t.end());
-  REQUIRE(iter->second.i == 123);
+  ASSERT_NE(iter, t.end());
+  ASSERT_EQ(iter->second.i, 123);
 }
 
 struct Immovable {
@@ -340,40 +331,40 @@ struct MoveOnly {
   MoveOnly& operator=(const MoveOnly&) = delete;
 };
 
-TEST_CASE_METHOD(StringMapTest, "StringMapTest MoveConstruct", "[wpiutil]") {
+TEST_F(StringMapTest, MoveConstruct) {
   StringMap<int> A;
   A["x"] = 42;
   StringMap<int> B = std::move(A);
   // NOLINTNEXTLINE(clang-analyzer-cplusplus.Move)
-  REQUIRE(A.size() == 0u);
-  REQUIRE(B.size() == 1u);
-  REQUIRE(B["x"] == 42);
-  REQUIRE(B.count("y") == 0u);
+  ASSERT_EQ(A.size(), 0u);
+  ASSERT_EQ(B.size(), 1u);
+  ASSERT_EQ(B["x"], 42);
+  ASSERT_EQ(B.count("y"), 0u);
 }
 
-TEST_CASE_METHOD(StringMapTest, "StringMapTest MoveAssignment", "[wpiutil]") {
+TEST_F(StringMapTest, MoveAssignment) {
   StringMap<int> A;
   A["x"] = 42;
   StringMap<int> B;
   B["y"] = 117;
   A = std::move(B);
-  REQUIRE(A.size() == 1u);
+  ASSERT_EQ(A.size(), 1u);
   // NOLINTNEXTLINE(clang-analyzer-cplusplus.Move)
-  REQUIRE(B.size() == 0u);
-  REQUIRE(A["y"] == 117);
+  ASSERT_EQ(B.size(), 0u);
+  ASSERT_EQ(A["y"], 117);
   // NOLINTNEXTLINE(clang-analyzer-cplusplus.Move)
-  REQUIRE(B.count("x") == 0u);
+  ASSERT_EQ(B.count("x"), 0u);
 }
 
-TEST_CASE_METHOD(StringMapTest, "StringMapTest EqualEmpty", "[wpiutil]") {
+TEST_F(StringMapTest, EqualEmpty) {
   StringMap<int> A;
   StringMap<int> B;
-  REQUIRE(A == B);
-  REQUIRE_FALSE(A != B);
-  REQUIRE(A == A);  // self check
+  ASSERT_TRUE(A == B);
+  ASSERT_FALSE(A != B);
+  ASSERT_TRUE(A == A);  // self check
 }
 
-TEST_CASE_METHOD(StringMapTest, "StringMapTest EqualWithValues", "[wpiutil]") {
+TEST_F(StringMapTest, EqualWithValues) {
   StringMap<int> A;
   A["A"] = 1;
   A["B"] = 2;
@@ -386,15 +377,14 @@ TEST_CASE_METHOD(StringMapTest, "StringMapTest EqualWithValues", "[wpiutil]") {
   B["C"] = 3;
   B["D"] = 3;
 
-  REQUIRE(A == B);
-  REQUIRE(B == A);
-  REQUIRE_FALSE(A != B);
-  REQUIRE_FALSE(B != A);
-  REQUIRE(A == A);  // self check
+  ASSERT_TRUE(A == B);
+  ASSERT_TRUE(B == A);
+  ASSERT_FALSE(A != B);
+  ASSERT_FALSE(B != A);
+  ASSERT_TRUE(A == A);  // self check
 }
 
-TEST_CASE_METHOD(StringMapTest, "StringMapTest NotEqualMissingKeys",
-                 "[wpiutil]") {
+TEST_F(StringMapTest, NotEqualMissingKeys) {
   StringMap<int> A;
   A["A"] = 1;
   A["B"] = 2;
@@ -405,14 +395,13 @@ TEST_CASE_METHOD(StringMapTest, "StringMapTest NotEqualMissingKeys",
   B["C"] = 3;
   B["D"] = 3;
 
-  REQUIRE_FALSE(A == B);
-  REQUIRE_FALSE(B == A);
-  REQUIRE(A != B);
-  REQUIRE(B != A);
+  ASSERT_FALSE(A == B);
+  ASSERT_FALSE(B == A);
+  ASSERT_TRUE(A != B);
+  ASSERT_TRUE(B != A);
 }
 
-TEST_CASE_METHOD(StringMapTest, "StringMapTest NotEqualWithDifferentValues",
-                 "[wpiutil]") {
+TEST_F(StringMapTest, NotEqualWithDifferentValues) {
   StringMap<int> A;
   A["A"] = 1;
   A["B"] = 2;
@@ -425,10 +414,10 @@ TEST_CASE_METHOD(StringMapTest, "StringMapTest NotEqualWithDifferentValues",
   B["C"] = 3;
   B["D"] = 3;
 
-  REQUIRE_FALSE(A == B);
-  REQUIRE_FALSE(B == A);
-  REQUIRE(A != B);
-  REQUIRE(B != A);
+  ASSERT_FALSE(A == B);
+  ASSERT_FALSE(B == A);
+  ASSERT_TRUE(A != B);
+  ASSERT_TRUE(B != A);
 }
 
 struct Countable {
@@ -453,47 +442,45 @@ struct Countable {
   ~Countable() { --InstanceCount; }
 };
 
-TEST_CASE_METHOD(StringMapTest, "StringMapTest MoveDtor", "[wpiutil]") {
+TEST_F(StringMapTest, MoveDtor) {
   int InstanceCount = 0;
   StringMap<Countable> A;
   A.insert(std::pair{"x", Countable(42, InstanceCount)});
-  REQUIRE(InstanceCount == 1);
+  ASSERT_EQ(InstanceCount, 1);
   auto I = A.find("x");
-  REQUIRE(I != A.end());
-  REQUIRE(I->second.Number == 42);
+  ASSERT_NE(I, A.end());
+  ASSERT_EQ(I->second.Number, 42);
 
   StringMap<Countable> B;
   B = std::move(A);
-  REQUIRE(InstanceCount == 1);
-  REQUIRE(A.empty());
+  ASSERT_EQ(InstanceCount, 1);
+  ASSERT_TRUE(A.empty());
   I = B.find("x");
-  REQUIRE(I != B.end());
-  REQUIRE(I->second.Number == 42);
+  ASSERT_NE(I, B.end());
+  ASSERT_EQ(I->second.Number, 42);
 
   B = StringMap<Countable>();
-  REQUIRE(InstanceCount == 0);
-  REQUIRE(B.empty());
+  ASSERT_EQ(InstanceCount, 0);
+  ASSERT_TRUE(B.empty());
 }
 
-TEST_CASE_METHOD(StringMapTest, "StringMapTest StructuredBindings",
-                 "[wpiutil]") {
+TEST_F(StringMapTest, StructuredBindings) {
   StringMap<int> A;
   A["a"] = 42;
 
   for (auto& [Key, Value] : A) {
-    CHECK("a" == Key);
-    CHECK(42 == Value);
+    EXPECT_EQ("a", Key);
+    EXPECT_EQ(42, Value);
   }
 }
 
-TEST_CASE_METHOD(StringMapTest, "StringMapTest StructuredBindingsMoveOnly",
-                 "[wpiutil]") {
+TEST_F(StringMapTest, StructuredBindingsMoveOnly) {
   StringMap<MoveOnly> A;
   A.insert(std::pair{"a", MoveOnly(42)});
 
   for (auto&& [Key, Value] : A) {
-    CHECK("a" == Key);
-    CHECK(42 == Value.i);
+    EXPECT_EQ("a", Key);
+    EXPECT_EQ(42, Value.i);
   }
 }
 
@@ -524,15 +511,15 @@ unsigned CountCtorCopyAndMove::Ctor = 0;
 
 }  // namespace
 
-TEST_CASE("StringMapCustomTest BracketOperatorCtor", "[wpiutil]") {
+TEST(StringMapCustomTest, BracketOperatorCtor) {
   StringMap<CountCtorCopyAndMove> Map;
   CountCtorCopyAndMove::Ctor = 0;
   Map["abcd"];
-  CHECK(1u == CountCtorCopyAndMove::Ctor);
+  EXPECT_EQ(1u, CountCtorCopyAndMove::Ctor);
   // Test that operator[] does not create a value when it is already in the map
   CountCtorCopyAndMove::Ctor = 0;
   Map["abcd"];
-  CHECK(0u == CountCtorCopyAndMove::Ctor);
+  EXPECT_EQ(0u, CountCtorCopyAndMove::Ctor);
 }
 
 namespace {
@@ -546,11 +533,11 @@ struct NonMoveableNonCopyableType {
 }  // namespace
 
 // Test that we can "emplace" an element in the map without involving map/move
-TEST_CASE("StringMapCustomTest Emplace", "[wpiutil]") {
+TEST(StringMapCustomTest, Emplace) {
   StringMap<NonMoveableNonCopyableType> Map;
   Map.try_emplace("abcd", 42);
-  CHECK(1u == Map.count("abcd"));
-  CHECK(42 == Map["abcd"].Data);
+  EXPECT_EQ(1u, Map.count("abcd"));
+  EXPECT_EQ(42, Map["abcd"].Data);
 }
 
 }  // namespace

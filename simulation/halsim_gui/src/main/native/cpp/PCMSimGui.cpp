@@ -2,20 +2,21 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "PCMSimGui.hpp"
+#include "PCMSimGui.h"
 
 #include <cstdio>
 #include <memory>
 #include <vector>
 
-#include "wpi/glass/hardware/Pneumatic.hpp"
-#include "wpi/glass/other/DeviceTree.hpp"
-#include "wpi/hal/Ports.h"
-#include "wpi/hal/Value.h"
-#include "wpi/hal/simulation/CTREPCMData.h"
-#include "wpi/halsim/gui/HALDataSource.hpp"
-#include "wpi/halsim/gui/HALSimGui.hpp"
-#include "wpi/halsim/gui/SimDeviceGui.hpp"
+#include <glass/hardware/Pneumatic.h>
+#include <glass/other/DeviceTree.h>
+#include <hal/Ports.h>
+#include <hal/Value.h>
+#include <hal/simulation/CTREPCMData.h>
+
+#include "HALDataSource.h"
+#include "HALSimGui.h"
+#include "SimDeviceGui.h"
 
 using namespace halsimgui;
 
@@ -27,7 +28,7 @@ HALSIMGUI_DATASOURCE_DOUBLE_INDEXED(CTREPCMCompressorCurrent,
                                     "Compressor Current");
 HALSIMGUI_DATASOURCE_BOOLEAN_INDEXED2(CTREPCMSolenoidOutput, "Solenoid");
 
-class CompressorSimModel : public wpi::glass::CompressorModel {
+class CompressorSimModel : public glass::CompressorModel {
  public:
   explicit CompressorSimModel(int32_t index)
       : m_index{index},
@@ -40,12 +41,12 @@ class CompressorSimModel : public wpi::glass::CompressorModel {
 
   bool Exists() override { return HALSIM_GetCTREPCMInitialized(m_index); }
 
-  wpi::glass::BooleanSource* GetRunningData() override { return &m_running; }
-  wpi::glass::BooleanSource* GetEnabledData() override { return &m_enabled; }
-  wpi::glass::BooleanSource* GetPressureSwitchData() override {
+  glass::DataSource* GetRunningData() override { return &m_running; }
+  glass::DataSource* GetEnabledData() override { return &m_enabled; }
+  glass::DataSource* GetPressureSwitchData() override {
     return &m_pressureSwitch;
   }
-  wpi::glass::DoubleSource* GetCurrentData() override { return &m_current; }
+  glass::DataSource* GetCurrentData() override { return &m_current; }
 
   void SetRunning(bool val) override {
     HALSIM_SetCTREPCMCompressorOn(m_index, val);
@@ -68,7 +69,7 @@ class CompressorSimModel : public wpi::glass::CompressorModel {
   CTREPCMCompressorCurrentSource m_current;
 };
 
-class SolenoidSimModel : public wpi::glass::SolenoidModel {
+class SolenoidSimModel : public glass::SolenoidModel {
  public:
   SolenoidSimModel(int32_t index, int32_t channel)
       : m_index{index}, m_channel{channel}, m_output{index, channel} {}
@@ -77,7 +78,7 @@ class SolenoidSimModel : public wpi::glass::SolenoidModel {
 
   bool Exists() override { return HALSIM_GetCTREPCMInitialized(m_index); }
 
-  wpi::glass::BooleanSource* GetOutputData() override { return &m_output; }
+  glass::DataSource* GetOutputData() override { return &m_output; }
 
   void SetOutput(bool val) override {
     HALSIM_SetCTREPCMSolenoidOutput(m_index, m_channel, val);
@@ -89,7 +90,7 @@ class SolenoidSimModel : public wpi::glass::SolenoidModel {
   CTREPCMSolenoidOutputSource m_output;
 };
 
-class PCMSimModel : public wpi::glass::PneumaticControlModel {
+class PCMSimModel : public glass::PneumaticControlModel {
  public:
   explicit PCMSimModel(int32_t index)
       : m_index{index},
@@ -103,8 +104,8 @@ class PCMSimModel : public wpi::glass::PneumaticControlModel {
   CompressorSimModel* GetCompressor() override { return &m_compressor; }
 
   void ForEachSolenoid(
-      wpi::util::function_ref<void(wpi::glass::SolenoidModel& model, int index)>
-          func) override;
+      wpi::function_ref<void(glass::SolenoidModel& model, int index)> func)
+      override;
 
   std::string_view GetName() override { return "PCM"; }
 
@@ -117,7 +118,7 @@ class PCMSimModel : public wpi::glass::PneumaticControlModel {
   int m_solenoidInitCount = 0;
 };
 
-class PCMsSimModel : public wpi::glass::PneumaticControlsModel {
+class PCMsSimModel : public glass::PneumaticControlsModel {
  public:
   PCMsSimModel() : m_models(HAL_GetNumCTREPCMModules()) {}
 
@@ -126,8 +127,7 @@ class PCMsSimModel : public wpi::glass::PneumaticControlsModel {
   bool Exists() override { return true; }
 
   void ForEachPneumaticControl(
-      wpi::util::function_ref<void(wpi::glass::PneumaticControlModel& model,
-                                   int index)>
+      wpi::function_ref<void(glass::PneumaticControlModel& model, int index)>
           func) override;
 
  private:
@@ -152,8 +152,7 @@ void PCMSimModel::Update() {
 }
 
 void PCMSimModel::ForEachSolenoid(
-    wpi::util::function_ref<void(wpi::glass::SolenoidModel& model, int index)>
-        func) {
+    wpi::function_ref<void(glass::SolenoidModel& model, int index)> func) {
   if (m_solenoidInitCount == 0) {
     return;
   }
@@ -181,8 +180,7 @@ void PCMsSimModel::Update() {
 }
 
 void PCMsSimModel::ForEachPneumaticControl(
-    wpi::util::function_ref<void(wpi::glass::PneumaticControlModel& model,
-                                 int index)>
+    wpi::function_ref<void(glass::PneumaticControlModel& model, int index)>
         func) {
   int32_t numCTREPCMs = m_models.size();
   for (int32_t i = 0; i < numCTREPCMs; ++i) {
@@ -202,10 +200,10 @@ bool PCMSimGui::PCMsAnyInitialized() {
   return false;
 }
 
-bool PCMSimGui::PCMsAnySolenoids(wpi::glass::PneumaticControlsModel* model) {
+bool PCMSimGui::PCMsAnySolenoids(glass::PneumaticControlsModel* model) {
   bool any = false;
   static_cast<PCMsSimModel*>(model)->ForEachPneumaticControl(
-      [&](wpi::glass::PneumaticControlModel& CTREPCM, int) {
+      [&](glass::PneumaticControlModel& CTREPCM, int) {
         if (static_cast<PCMSimModel*>(&CTREPCM)->GetNumSolenoids() > 0) {
           any = true;
         }
@@ -213,7 +211,7 @@ bool PCMSimGui::PCMsAnySolenoids(wpi::glass::PneumaticControlsModel* model) {
   return any;
 }
 
-std::unique_ptr<wpi::glass::PneumaticControlsModel> PCMSimGui::GetPCMsModel() {
+std::unique_ptr<glass::PneumaticControlsModel> PCMSimGui::GetPCMsModel() {
   return std::make_unique<PCMsSimModel>();
 }
 
@@ -223,9 +221,8 @@ void PCMSimGui::Initialize() {
       [] { return std::make_unique<PCMsSimModel>(); });
 
   SimDeviceGui::GetDeviceTree().Add(
-      HALSimGui::halProvider->GetModel("CTREPCMs"),
-      [](wpi::glass::Model* model) {
-        wpi::glass::DisplayCompressorsDevice(
+      HALSimGui::halProvider->GetModel("CTREPCMs"), [](glass::Model* model) {
+        glass::DisplayCompressorsDevice(
             static_cast<PCMsSimModel*>(model),
             HALSimGui::halProvider->AreOutputsEnabled());
       });

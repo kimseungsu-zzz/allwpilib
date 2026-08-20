@@ -2,143 +2,150 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include <cmath>
-#include <optional>
+#include <string>
 #include <thread>
 
-#include <catch2/catch_test_macros.hpp>
-#include <catch2/generators/catch_generators.hpp>
-#include <catch2/matchers/catch_matchers_floating_point.hpp>
+#include <frc/Preferences.h>
+#include <frc/simulation/DriverStationSim.h>
+#include <frc/simulation/JoystickSim.h>
+#include <frc/simulation/PWMSim.h>
+#include <frc/simulation/SimHooks.h>
+#include <gtest/gtest.h>
+#include <hal/simulation/MockHooks.h>
+#include <units/length.h>
+#include <units/time.h>
 
-#include "Constants.hpp"
-#include "Robot.hpp"
-#include "wpi/hal/DriverStationTypes.h"
-#include "wpi/simulation/DriverStationSim.hpp"
-#include "wpi/simulation/JoystickSim.hpp"
-#include "wpi/simulation/PWMMotorControllerSim.hpp"
-#include "wpi/simulation/SimHooks.hpp"
-#include "wpi/units/time.hpp"
-#include "wpi/util/Preferences.hpp"
+#include "Constants.h"
+#include "Robot.h"
 
-class ArmSimulationTest {
-  Robot robot;
-  std::optional<std::thread> thread;
+class ArmSimulationTest : public testing::TestWithParam<units::degree_t> {
+  Robot m_robot;
+  std::optional<std::thread> m_thread;
+
+ protected:
+  frc::sim::PWMSim m_motorSim{kMotorPort};
+  frc::sim::EncoderSim m_encoderSim =
+      frc::sim::EncoderSim::CreateForChannel(kEncoderAChannel);
+  frc::sim::JoystickSim m_joystickSim{kJoystickPort};
 
  public:
-  wpi::sim::PWMMotorControllerSim motorSim{kMotorPort};
-  wpi::sim::EncoderSim encoderSim =
-      wpi::sim::EncoderSim::CreateForChannel(kEncoderAChannel);
-  wpi::sim::JoystickSim joystickSim{kJoystickPort};
+  void SetUp() override {
+    frc::sim::PauseTiming();
 
-  ArmSimulationTest() {
-    wpi::sim::PauseTiming();
-    wpi::sim::SetProgramStarted(false);
-
-    thread = std::thread([&] { robot.StartCompetition(); });
-    wpi::sim::WaitForProgramStart();
+    m_thread = std::thread([&] { m_robot.StartCompetition(); });
+    frc::sim::StepTiming(0.0_ms);  // Wait for Notifiers
   }
 
-  ~ArmSimulationTest() {
-    robot.EndCompetition();
-    thread->join();
+  void TearDown() override {
+    m_robot.EndCompetition();
+    m_thread->join();
 
-    encoderSim.ResetData();
-    wpi::sim::DriverStationSim::ResetData();
-    wpi::Preferences::RemoveAll();
+    m_encoderSim.ResetData();
+    m_motorSim.ResetData();
+    frc::sim::DriverStationSim::ResetData();
+    frc::Preferences::RemoveAll();
   }
 };
 
-TEST_CASE_METHOD(ArmSimulationTest, "ArmSimulationTest teleop",
-                 "[wpilibcExamples][examples][simulation][arm]") {
-  wpi::units::degree_t setpoint =
-      GENERATE(kDefaultArmSetpoint, 25.0_deg, 50.0_deg);
-
-  CHECK(wpi::Preferences::ContainsKey(kArmPositionKey));
-  CHECK(wpi::Preferences::ContainsKey(kArmPKey));
-  wpi::Preferences::SetDouble(kArmPositionKey, setpoint.value());
-  CHECK_THAT(wpi::Preferences::GetDouble(kArmPositionKey, NAN),
-             Catch::Matchers::WithinULP(setpoint.value(), 4));
+TEST_P(ArmSimulationTest, Teleop) {
+  EXPECT_TRUE(frc::Preferences::ContainsKey(kArmPositionKey));
+  EXPECT_TRUE(frc::Preferences::ContainsKey(kArmPKey));
+  frc::Preferences::SetDouble(kArmPositionKey, GetParam().value());
+  units::degree_t setpoint = GetParam();
+  EXPECT_DOUBLE_EQ(setpoint.value(),
+                   frc::Preferences::GetDouble(kArmPositionKey, NAN));
 
   // teleop init
   {
-    wpi::sim::DriverStationSim::SetRobotMode(wpi::hal::RobotMode::TELEOPERATED);
-    wpi::sim::DriverStationSim::SetEnabled(true);
-    wpi::sim::DriverStationSim::NotifyNewData();
+    frc::sim::DriverStationSim::SetAutonomous(false);
+    frc::sim::DriverStationSim::SetEnabled(true);
+    frc::sim::DriverStationSim::NotifyNewData();
 
-    CHECK(encoderSim.GetInitialized());
+    EXPECT_TRUE(m_motorSim.GetInitialized());
+    EXPECT_TRUE(m_encoderSim.GetInitialized());
   }
 
   {
-    wpi::sim::StepTiming(3_s);
+    frc::sim::StepTiming(3_s);
 
     // Ensure arm is still at minimum angle.
-    CHECK_THAT(encoderSim.GetDistance(),
-               Catch::Matchers::WithinAbs(kMinAngle.value(), 2.0));
+    EXPECT_NEAR(kMinAngle.value(), m_encoderSim.GetDistance(), 2.0);
   }
 
   {
     // Press button to reach setpoint
-    joystickSim.SetTrigger(true);
-    joystickSim.NotifyNewData();
+    m_joystickSim.SetTrigger(true);
+    m_joystickSim.NotifyNewData();
 
-    wpi::sim::StepTiming(1.5_s);
+    frc::sim::StepTiming(1.5_s);
 
-    CHECK_THAT(wpi::units::radian_t{encoderSim.GetDistance()}
-                   .convert<wpi::units::degree>()
-                   .value(),
-               Catch::Matchers::WithinAbs(setpoint.value(), 2.0));
+    EXPECT_NEAR(setpoint.value(),
+                units::radian_t(m_encoderSim.GetDistance())
+                    .convert<units::degree>()
+                    .value(),
+                2.0);
 
     // see setpoint is held.
-    wpi::sim::StepTiming(0.5_s);
+    frc::sim::StepTiming(0.5_s);
 
-    CHECK_THAT(wpi::units::radian_t{encoderSim.GetDistance()}
-                   .convert<wpi::units::degree>()
-                   .value(),
-               Catch::Matchers::WithinAbs(setpoint.value(), 2.0));
+    EXPECT_NEAR(setpoint.value(),
+                units::radian_t(m_encoderSim.GetDistance())
+                    .convert<units::degree>()
+                    .value(),
+                2.0);
   }
 
   {
     // Unpress the button to go back down
-    joystickSim.SetTrigger(false);
-    joystickSim.NotifyNewData();
+    m_joystickSim.SetTrigger(false);
+    m_joystickSim.NotifyNewData();
 
-    wpi::sim::StepTiming(3_s);
+    frc::sim::StepTiming(3_s);
 
-    CHECK_THAT(encoderSim.GetDistance(),
-               Catch::Matchers::WithinAbs(kMinAngle.value(), 2.0));
+    EXPECT_NEAR(kMinAngle.value(), m_encoderSim.GetDistance(), 2.0);
   }
 
   {
     // Press button to go back up
-    joystickSim.SetTrigger(true);
-    joystickSim.NotifyNewData();
+    m_joystickSim.SetTrigger(true);
+    m_joystickSim.NotifyNewData();
 
     // advance 75 timesteps
-    wpi::sim::StepTiming(1.5_s);
+    frc::sim::StepTiming(1.5_s);
 
-    CHECK_THAT(wpi::units::radian_t{encoderSim.GetDistance()}
-                   .convert<wpi::units::degree>()
-                   .value(),
-               Catch::Matchers::WithinAbs(setpoint.value(), 2.0));
+    EXPECT_NEAR(setpoint.value(),
+                units::radian_t(m_encoderSim.GetDistance())
+                    .convert<units::degree>()
+                    .value(),
+                2.0);
 
     // advance 25 timesteps to see setpoint is held.
-    wpi::sim::StepTiming(0.5_s);
+    frc::sim::StepTiming(0.5_s);
 
-    CHECK_THAT(wpi::units::radian_t{encoderSim.GetDistance()}
-                   .convert<wpi::units::degree>()
-                   .value(),
-               Catch::Matchers::WithinAbs(setpoint.value(), 2.0));
+    EXPECT_NEAR(setpoint.value(),
+                units::radian_t(m_encoderSim.GetDistance())
+                    .convert<units::degree>()
+                    .value(),
+                2.0);
   }
 
   {
     // Disable
-    wpi::sim::DriverStationSim::SetEnabled(false);
-    wpi::sim::DriverStationSim::NotifyNewData();
+    frc::sim::DriverStationSim::SetAutonomous(false);
+    frc::sim::DriverStationSim::SetEnabled(false);
+    frc::sim::DriverStationSim::NotifyNewData();
 
-    wpi::sim::StepTiming(3_s);
+    frc::sim::StepTiming(3_s);
 
-    REQUIRE_THAT(motorSim.GetThrottle(), Catch::Matchers::WithinAbs(0.0, 0.05));
-    CHECK_THAT(encoderSim.GetDistance(),
-               Catch::Matchers::WithinAbs(kMinAngle.value(), 2.0));
+    ASSERT_NEAR(0.0, m_motorSim.GetSpeed(), 0.05);
+    EXPECT_NEAR(kMinAngle.value(), m_encoderSim.GetDistance(), 2.0);
   }
 }
+
+INSTANTIATE_TEST_SUITE_P(
+    ArmSimulationTests, ArmSimulationTest,
+    testing::Values(kDefaultArmSetpoint, 25.0_deg, 50.0_deg),
+    [](const testing::TestParamInfo<units::degree_t>& info) {
+      return testing::PrintToString(info.param.value())
+          .append(std::string(info.param.abbreviation()));
+    });

@@ -2,11 +2,11 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "Robot.hpp"
+#include "Robot.h"
 
 Robot::Robot() {
   // Configure default commands and condition bindings on robot startup
-  robot.ConfigureBindings();
+  m_robot.ConfigureBindings();
 }
 
 void Robot::RobotPeriodic() {
@@ -15,7 +15,7 @@ void Robot::RobotPeriodic() {
   // finished or interrupted commands, and running subsystem Periodic() methods.
   // This must be called from the robot's periodic block in order for anything
   // in the Command-based framework to work.
-  wpi::cmd::CommandScheduler::GetInstance().Run();
+  frc2::CommandScheduler::GetInstance().Run();
 }
 
 void Robot::DisabledInit() {}
@@ -23,39 +23,36 @@ void Robot::DisabledInit() {}
 void Robot::DisabledPeriodic() {}
 
 void Robot::AutonomousInit() {
-  autonomousCommand = robot.GetAutonomousCommand();
+  m_autonomousCommand = m_robot.GetAutonomousCommand();
 
-  if (autonomousCommand) {
-    wpi::cmd::CommandScheduler::GetInstance().Schedule(
-        autonomousCommand.value());
+  if (m_autonomousCommand) {
+    frc2::CommandScheduler::GetInstance().Schedule(m_autonomousCommand.value());
   }
 }
 
 void Robot::AutonomousPeriodic() {}
 
-void Robot::AutonomousExit() {
+void Robot::TeleopInit() {
   // This makes sure that the autonomous stops running when
-  // autonomous mode ends. If you want the autonomous to
+  // teleop starts running. If you want the autonomous to
   // continue until interrupted by another command, remove
   // this line or comment it out.
-  if (autonomousCommand) {
-    autonomousCommand->Cancel();
+  if (m_autonomousCommand) {
+    m_autonomousCommand->Cancel();
   }
 }
 
-void Robot::TeleopInit() {}
-
 void Robot::TeleopPeriodic() {}
 
-void Robot::UtilityInit() {
-  // Cancels all running commands at the start of utility mode.
-  wpi::cmd::CommandScheduler::GetInstance().CancelAll();
+void Robot::TestInit() {
+  // Cancels all running commands at the start of test mode.
+  frc2::CommandScheduler::GetInstance().CancelAll();
 }
 
-void Robot::UtilityPeriodic() {}
+void Robot::TestPeriodic() {}
 
-#ifndef RUNNING_WPILIB_TESTS
+#ifndef RUNNING_FRC_TESTS
 int main() {
-  return wpi::StartRobot<Robot>();
+  return frc::StartRobot<Robot>();
 }
 #endif

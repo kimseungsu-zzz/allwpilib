@@ -2,32 +2,31 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/cameraserver/CameraServer.hpp"
+#include "cameraserver/CameraServer.h"
 
 #include <atomic>
-#include <format>
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
 
-#include "wpi/cameraserver/CameraServerShared.hpp"
-#include "wpi/cs/VideoEvent.hpp"
-#include "wpi/cs/VideoListener.hpp"
-#include "wpi/nt/BooleanTopic.hpp"
-#include "wpi/nt/IntegerTopic.hpp"
-#include "wpi/nt/NetworkTable.hpp"
-#include "wpi/nt/NetworkTableInstance.hpp"
-#include "wpi/nt/StringArrayTopic.hpp"
-#include "wpi/nt/StringTopic.hpp"
-#include "wpi/nt/ntcore_cpp.hpp"
-#include "wpi/util/DenseMap.hpp"
-#include "wpi/util/SmallString.hpp"
-#include "wpi/util/StringExtras.hpp"
-#include "wpi/util/StringMap.hpp"
-#include "wpi/util/mutex.hpp"
+#include <fmt/format.h>
+#include <networktables/BooleanTopic.h>
+#include <networktables/IntegerTopic.h>
+#include <networktables/NetworkTable.h>
+#include <networktables/NetworkTableInstance.h>
+#include <networktables/StringArrayTopic.h>
+#include <networktables/StringTopic.h>
+#include <wpi/DenseMap.h>
+#include <wpi/SmallString.h>
+#include <wpi/StringExtras.h>
+#include <wpi/StringMap.h>
+#include <wpi/mutex.h>
 
-using namespace wpi;
+#include "cameraserver/CameraServerShared.h"
+#include "ntcore_cpp.h"
+
+using namespace frc;
 
 static constexpr char const* kPublishName = "/CameraPublisher";
 
@@ -62,7 +61,7 @@ struct SourcePublisher {
   nt::StringArrayPublisher streamsPublisher;
   nt::StringEntry modeEntry;
   nt::StringArrayPublisher modesPublisher;
-  wpi::util::DenseMap<CS_Property, PropertyPublisher> properties;
+  wpi::DenseMap<CS_Property, PropertyPublisher> properties;
 };
 
 struct Instance {
@@ -72,13 +71,13 @@ struct Instance {
   std::vector<std::string> GetSourceStreamValues(CS_Source source);
   void UpdateStreamValues();
 
-  wpi::util::mutex m_mutex;
+  wpi::mutex m_mutex;
   std::atomic<int> m_defaultUsbDevice{0};
   std::string m_primarySourceName;
-  wpi::util::StringMap<cs::VideoSource> m_sources;
-  wpi::util::StringMap<cs::VideoSink> m_sinks;
-  wpi::util::DenseMap<CS_Sink, CS_Source> m_fixedSources;
-  wpi::util::DenseMap<CS_Source, SourcePublisher> m_publishers;
+  wpi::StringMap<cs::VideoSource> m_sources;
+  wpi::StringMap<cs::VideoSink> m_sinks;
+  wpi::DenseMap<CS_Sink, CS_Source> m_fixedSources;
+  wpi::DenseMap<CS_Source, SourcePublisher> m_publishers;
   std::shared_ptr<nt::NetworkTable> m_publishTable{
       nt::NetworkTableInstance::GetDefault().GetTable(kPublishName)};
   cs::VideoListener m_videoListener;
@@ -95,7 +94,7 @@ static Instance& GetInstance() {
 }
 
 static std::string_view MakeSourceValue(CS_Source source,
-                                        wpi::util::SmallVectorImpl<char>& buf) {
+                                        wpi::SmallVectorImpl<char>& buf) {
   CS_Status status = 0;
   buf.clear();
   switch (cs::GetSourceKind(source, &status)) {
@@ -127,7 +126,7 @@ static std::string_view MakeSourceValue(CS_Source source,
 }
 
 static std::string MakeStreamValue(std::string_view address, int port) {
-  return std::format("mjpg:http://{}:{}/?action=stream", address, port);
+  return fmt::format("mjpg:http://{}:{}/?action=stream", address, port);
 }
 
 SourcePublisher* Instance::GetPublisher(CS_Source source) {
@@ -185,9 +184,9 @@ std::vector<std::string> Instance::GetSourceStreamValues(CS_Source source) {
     value = "mjpg:" + value;
   }
 
-#ifdef __FIRST_SYSTEMCORE__
+#ifdef __FRC_ROBORIO__
   // Look to see if we have a passthrough server for this source
-  // Only do this on the systemcore
+  // Only do this on the roboRIO
   for (const auto& i : m_sinks) {
     CS_Sink sink = i.second.GetHandle();
     CS_Source sinkSource = cs::GetSinkSource(sink, &status);
@@ -248,17 +247,17 @@ void Instance::UpdateStreamValues() {
   }
 }
 
-static std::string PixelFormatToString(wpi::util::PixelFormat pixelFormat) {
+static std::string PixelFormatToString(int pixelFormat) {
   switch (pixelFormat) {
-    case wpi::util::PixelFormat::MJPEG:
+    case cs::VideoMode::PixelFormat::kMJPEG:
       return "MJPEG";
-    case wpi::util::PixelFormat::YUYV:
+    case cs::VideoMode::PixelFormat::kYUYV:
       return "YUYV";
-    case wpi::util::PixelFormat::RGB565:
+    case cs::VideoMode::PixelFormat::kRGB565:
       return "RGB565";
-    case wpi::util::PixelFormat::BGR:
+    case cs::VideoMode::PixelFormat::kBGR:
       return "BGR";
-    case wpi::util::PixelFormat::GRAY:
+    case cs::VideoMode::PixelFormat::kGray:
       return "Gray";
     default:
       return "Unknown";
@@ -266,7 +265,7 @@ static std::string PixelFormatToString(wpi::util::PixelFormat pixelFormat) {
 }
 
 static std::string VideoModeToString(const cs::VideoMode& mode) {
-  return std::format("{}x{} {} {} fps", mode.width, mode.height,
+  return fmt::format("{}x{} {} {} fps", mode.width, mode.height,
                      PixelFormatToString(mode.pixelFormat), mode.fps);
 }
 
@@ -283,12 +282,12 @@ PropertyPublisher::PropertyPublisher(nt::NetworkTable& table,
                                      const cs::VideoEvent& event) {
   std::string name;
   std::string infoName;
-  if (wpi::util::starts_with(event.name, "raw_")) {
-    name = std::format("RawProperty/{}", event.name);
-    infoName = std::format("RawPropertyInfo/{}", event.name);
+  if (wpi::starts_with(event.name, "raw_")) {
+    name = fmt::format("RawProperty/{}", event.name);
+    infoName = fmt::format("RawPropertyInfo/{}", event.name);
   } else {
-    name = std::format("Property/{}", event.name);
-    infoName = std::format("PropertyInfo/{}", event.name);
+    name = fmt::format("Property/{}", event.name);
+    infoName = fmt::format("PropertyInfo/{}", event.name);
   }
 
   CS_Status status = 0;
@@ -299,18 +298,18 @@ PropertyPublisher::PropertyPublisher(nt::NetworkTable& table,
       break;
     case CS_PROP_ENUM:
       choicesTopic =
-          table.GetStringArrayTopic(std::format("{}/choices", infoName));
+          table.GetStringArrayTopic(fmt::format("{}/choices", infoName));
       [[fallthrough]];
     case CS_PROP_INTEGER:
       integerValueEntry = table.GetIntegerTopic(name).GetEntry(0);
       minPublisher =
-          table.GetIntegerTopic(std::format("{}/min", infoName)).Publish();
+          table.GetIntegerTopic(fmt::format("{}/min", infoName)).Publish();
       maxPublisher =
-          table.GetIntegerTopic(std::format("{}/max", infoName)).Publish();
+          table.GetIntegerTopic(fmt::format("{}/max", infoName)).Publish();
       stepPublisher =
-          table.GetIntegerTopic(std::format("{}/step", infoName)).Publish();
+          table.GetIntegerTopic(fmt::format("{}/step", infoName)).Publish();
       defaultPublisher =
-          table.GetIntegerTopic(std::format("{}/default", infoName)).Publish();
+          table.GetIntegerTopic(fmt::format("{}/default", infoName)).Publish();
 
       integerValueEntry.SetDefault(event.value);
       minPublisher.Set(cs::GetPropertyMin(event.propertyHandle, &status));
@@ -362,9 +361,9 @@ SourcePublisher::SourcePublisher(Instance& inst,
       modeEntry{table->GetStringTopic("mode").GetEntry("")},
       modesPublisher{table->GetStringArrayTopic("modes").Publish()} {
   CS_Status status = 0;
-  wpi::util::SmallString<64> buf;
+  wpi::SmallString<64> buf;
   sourcePublisher.Set(MakeSourceValue(source, buf));
-  wpi::util::SmallString<64> descBuf;
+  wpi::SmallString<64> descBuf;
   descriptionPublisher.Set(cs::GetSourceDescription(source, descBuf, &status));
   connectedPublisher.Set(cs::IsSourceConnected(source, &status));
   streamsPublisher.Set(inst.GetSourceStreamValues(source));
@@ -405,7 +404,7 @@ Instance::Instance() {
           case cs::VideoEvent::kSourceConnected:
             if (auto publisher = GetPublisher(event.sourceHandle)) {
               // update the description too (as it may have changed)
-              wpi::util::SmallString<64> descBuf;
+              wpi::SmallString<64> descBuf;
               publisher->descriptionPublisher.Set(cs::GetSourceDescription(
                   event.sourceHandle, descBuf, &status));
               publisher->connectedPublisher.Set(true);
@@ -472,15 +471,19 @@ Instance::Instance() {
 }
 
 cs::UsbCamera CameraServer::StartAutomaticCapture() {
-  return StartAutomaticCapture(::GetInstance().m_defaultUsbDevice++);
+  cs::UsbCamera camera =
+      StartAutomaticCapture(::GetInstance().m_defaultUsbDevice++);
+  auto csShared = GetCameraServerShared();
+  csShared->ReportUsbCamera(camera.GetHandle());
+  return camera;
 }
 
 cs::UsbCamera CameraServer::StartAutomaticCapture(int dev) {
   ::GetInstance();
-  cs::UsbCamera camera{std::format("USB Camera {}", dev), dev};
+  cs::UsbCamera camera{fmt::format("USB Camera {}", dev), dev};
   StartAutomaticCapture(camera);
   auto csShared = GetCameraServerShared();
-  csShared->ReportUsage(std::format("UsbCamera[{}]", dev), "auto");
+  csShared->ReportUsbCamera(camera.GetHandle());
   return camera;
 }
 
@@ -490,7 +493,7 @@ cs::UsbCamera CameraServer::StartAutomaticCapture(std::string_view name,
   cs::UsbCamera camera{name, dev};
   StartAutomaticCapture(camera);
   auto csShared = GetCameraServerShared();
-  csShared->ReportUsage(std::format("UsbCamera[{}]", dev), "name");
+  csShared->ReportUsbCamera(camera.GetHandle());
   return camera;
 }
 
@@ -500,14 +503,71 @@ cs::UsbCamera CameraServer::StartAutomaticCapture(std::string_view name,
   cs::UsbCamera camera{name, path};
   StartAutomaticCapture(camera);
   auto csShared = GetCameraServerShared();
-  csShared->ReportUsage(std::format("UsbCamera[{}]", path), "path");
+  csShared->ReportUsbCamera(camera.GetHandle());
   return camera;
 }
 
+WPI_IGNORE_DEPRECATED
+cs::AxisCamera CameraServer::AddAxisCamera(std::string_view host) {
+  return AddAxisCamera("Axis Camera", host);
+}
+
+cs::AxisCamera CameraServer::AddAxisCamera(const char* host) {
+  return AddAxisCamera("Axis Camera", host);
+}
+
+cs::AxisCamera CameraServer::AddAxisCamera(const std::string& host) {
+  return AddAxisCamera("Axis Camera", host);
+}
+
+cs::AxisCamera CameraServer::AddAxisCamera(std::span<const std::string> hosts) {
+  return AddAxisCamera("Axis Camera", hosts);
+}
+
+cs::AxisCamera CameraServer::AddAxisCamera(std::string_view name,
+                                           std::string_view host) {
+  ::GetInstance();
+  cs::AxisCamera camera{name, host};
+  StartAutomaticCapture(camera);
+  auto csShared = GetCameraServerShared();
+  csShared->ReportAxisCamera(camera.GetHandle());
+  return camera;
+}
+
+cs::AxisCamera CameraServer::AddAxisCamera(std::string_view name,
+                                           const char* host) {
+  ::GetInstance();
+  cs::AxisCamera camera{name, host};
+  StartAutomaticCapture(camera);
+  auto csShared = GetCameraServerShared();
+  csShared->ReportAxisCamera(camera.GetHandle());
+  return camera;
+}
+
+cs::AxisCamera CameraServer::AddAxisCamera(std::string_view name,
+                                           const std::string& host) {
+  ::GetInstance();
+  cs::AxisCamera camera{name, host};
+  StartAutomaticCapture(camera);
+  auto csShared = GetCameraServerShared();
+  csShared->ReportAxisCamera(camera.GetHandle());
+  return camera;
+}
+
+cs::AxisCamera CameraServer::AddAxisCamera(std::string_view name,
+                                           std::span<const std::string> hosts) {
+  ::GetInstance();
+  cs::AxisCamera camera{name, hosts};
+  StartAutomaticCapture(camera);
+  auto csShared = GetCameraServerShared();
+  csShared->ReportAxisCamera(camera.GetHandle());
+  return camera;
+}
+WPI_UNIGNORE_DEPRECATED
 cs::MjpegServer CameraServer::AddSwitchedCamera(std::string_view name) {
   auto& inst = ::GetInstance();
   // create a dummy CvSource
-  cs::CvSource source{name, wpi::util::PixelFormat::MJPEG, 160, 120, 30};
+  cs::CvSource source{name, cs::VideoMode::PixelFormat::kMJPEG, 160, 120, 30};
   cs::MjpegServer server = StartAutomaticCapture(source);
   inst.m_fixedSources[server.GetHandle()] = source.GetHandle();
 
@@ -517,7 +577,7 @@ cs::MjpegServer CameraServer::AddSwitchedCamera(std::string_view name) {
 cs::MjpegServer CameraServer::StartAutomaticCapture(
     const cs::VideoSource& camera) {
   AddCamera(camera);
-  auto server = AddServer(std::format("serve_{}", camera.GetName()));
+  auto server = AddServer(fmt::format("serve_{}", camera.GetName()));
   server.SetSource(camera);
   return server;
 }
@@ -544,7 +604,7 @@ cs::CvSink CameraServer::GetVideo() {
 
 cs::CvSink CameraServer::GetVideo(const cs::VideoSource& camera) {
   auto& inst = ::GetInstance();
-  wpi::util::SmallString<64> name{"opencv_"};
+  wpi::SmallString<64> name{"opencv_"};
   name += camera.GetName();
 
   {
@@ -569,9 +629,9 @@ cs::CvSink CameraServer::GetVideo(const cs::VideoSource& camera) {
 }
 
 cs::CvSink CameraServer::GetVideo(const cs::VideoSource& camera,
-                                  wpi::util::PixelFormat pixelFormat) {
+                                  cs::VideoMode::PixelFormat pixelFormat) {
   auto& inst = ::GetInstance();
-  wpi::util::SmallString<64> name{"opencv_"};
+  wpi::SmallString<64> name{"opencv_"};
   name += camera.GetName();
 
   {
@@ -612,7 +672,7 @@ cs::CvSink CameraServer::GetVideo(std::string_view name) {
 }
 
 cs::CvSink CameraServer::GetVideo(std::string_view name,
-                                  wpi::util::PixelFormat pixelFormat) {
+                                  cs::VideoMode::PixelFormat pixelFormat) {
   auto& inst = ::GetInstance();
   cs::VideoSource source;
   {
@@ -631,7 +691,7 @@ cs::CvSink CameraServer::GetVideo(std::string_view name,
 cs::CvSource CameraServer::PutVideo(std::string_view name, int width,
                                     int height) {
   ::GetInstance();
-  cs::CvSource source{name, wpi::util::PixelFormat::MJPEG, width, height, 30};
+  cs::CvSource source{name, cs::VideoMode::kMJPEG, width, height, 30};
   StartAutomaticCapture(source);
   return source;
 }
@@ -675,7 +735,7 @@ cs::VideoSink CameraServer::GetServer() {
       csShared->SetCameraServerError("no camera available");
       return cs::VideoSink{};
     }
-    name = std::format("serve_{}", inst.m_primarySourceName);
+    name = fmt::format("serve_{}", inst.m_primarySourceName);
   }
   return GetServer(name);
 }

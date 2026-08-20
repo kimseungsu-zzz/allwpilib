@@ -6,16 +6,16 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "wpi/util/ConvertUTF.hpp"
-#include "wpi/util/SmallVector.hpp"
-#include "wpi/util/ErrorHandling.hpp"
-#include <bit>
+#include "wpi/ConvertUTF.h"
+#include "wpi/SmallVector.h"
+#include "wpi/ErrorHandling.h"
+#include "wpi/SwapByteOrder.h"
 #include <span>
 #include <string>
 #include <string_view>
 #include <vector>
 
-namespace wpi::util {
+namespace wpi {
 
 bool ConvertUTF8toWide(unsigned WideCharWidth, std::string_view Source,
                        char *&ResultPtr, const UTF8 *&ErrorPtr) {
@@ -103,7 +103,7 @@ bool convertUTF16ToUTF8String(std::span<const char> SrcBytes, SmallVectorImpl<ch
   if (Src[0] == UNI_UTF16_BYTE_ORDER_MARK_SWAPPED) {
     ByteSwapped.insert(ByteSwapped.end(), Src, SrcEnd);
     for (UTF16 &I : ByteSwapped)
-      I = std::byteswap(I);
+      I = wpi::byteswap<uint16_t>(I);
     Src = &ByteSwapped[0];
     SrcEnd = &ByteSwapped[ByteSwapped.size() - 1] + 1;
   }
@@ -161,7 +161,7 @@ bool convertUTF32ToUTF8String(std::span<const char> SrcBytes, std::string &Out) 
   if (Src[0] == UNI_UTF32_BYTE_ORDER_MARK_SWAPPED) {
     ByteSwapped.insert(ByteSwapped.end(), Src, SrcEnd);
     for (UTF32 &I : ByteSwapped)
-      I = std::byteswap(I);
+      I = wpi::byteswap<uint32_t>(I);
     Src = &ByteSwapped[0];
     SrcEnd = &ByteSwapped[ByteSwapped.size() - 1] + 1;
   }
@@ -305,14 +305,5 @@ bool convertWideToUTF8(const std::wstring &Source, SmallVectorImpl<char> &Result
   }
 }
 
-bool IsSingleCodeUnitUTF8Codepoint(unsigned V) { return V <= 0x7F; }
+} // end namespace wpi
 
-bool IsSingleCodeUnitUTF16Codepoint(unsigned V) {
-  return V <= 0xD7FF || (V >= 0xE000 && V <= 0xFFFF);
-}
-
-bool IsSingleCodeUnitUTF32Codepoint(unsigned V) {
-  return V <= 0xD7FF || (V >= 0xE000 && V <= 0x10FFFF);
-}
-
-} // end namespace wpi::util

@@ -2,13 +2,13 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include <catch2/catch_test_macros.hpp>
+#include <gtest/gtest.h>
 
-#include "../StructTestBase.hpp"
-#include "wpi/math/linalg/EigenCore.hpp"
-#include "wpi/math/linalg/struct/StructProto.hpp"
+#include "../StructTestBase.h"
+#include "frc/EigenCore.h"
+#include "frc/struct/MatrixStruct.h"
 
-using namespace wpi::math;
+using namespace frc;
 
 struct MatrixStructTestData {
   using Type = Matrixd<2, 3>;
@@ -16,8 +16,8 @@ struct MatrixStructTestData {
   inline static const Type kTestData{{1.1, 1.2, 1.3}, {1.4, 1.5, 1.6}};
 
   static void CheckEq(const Type& testData, const Type& data) {
-    CHECK(testData == data);
+    EXPECT_EQ(testData, data);
   }
 };
 
-INSTANTIATE_CATCH_TYPED_TEST_SUITE_P(Matrix, StructTest, MatrixStructTestData);
+INSTANTIATE_TYPED_TEST_SUITE_P(Matrix, StructTest, MatrixStructTestData);

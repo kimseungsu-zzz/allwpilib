@@ -4,21 +4,21 @@
 
 #include <jni.h>
 
-#include "CallbackStore.hpp"
-#include "org_wpilib_hardware_hal_simulation_PowerDistributionDataJNI.h"
-#include "wpi/hal/simulation/PowerDistributionData.h"
+#include "CallbackStore.h"
+#include "edu_wpi_first_hal_simulation_PowerDistributionDataJNI.h"
+#include "hal/simulation/PowerDistributionData.h"
 
-using namespace wpi::hal;
+using namespace hal;
 
 extern "C" {
 
 /*
- * Class:     org_wpilib_hardware_hal_simulation_PowerDistributionDataJNI
+ * Class:     edu_wpi_first_hal_simulation_PowerDistributionDataJNI
  * Method:    registerInitializedCallback
  * Signature: (ILjava/lang/Object;Z)I
  */
 JNIEXPORT jint JNICALL
-Java_org_wpilib_hardware_hal_simulation_PowerDistributionDataJNI_registerInitializedCallback
+Java_edu_wpi_first_hal_simulation_PowerDistributionDataJNI_registerInitializedCallback
   (JNIEnv* env, jclass, jint index, jobject callback, jboolean initialNotify)
 {
   return sim::AllocateCallback(
@@ -27,12 +27,12 @@ Java_org_wpilib_hardware_hal_simulation_PowerDistributionDataJNI_registerInitial
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_simulation_PowerDistributionDataJNI
+ * Class:     edu_wpi_first_hal_simulation_PowerDistributionDataJNI
  * Method:    cancelInitializedCallback
  * Signature: (II)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_hardware_hal_simulation_PowerDistributionDataJNI_cancelInitializedCallback
+Java_edu_wpi_first_hal_simulation_PowerDistributionDataJNI_cancelInitializedCallback
   (JNIEnv* env, jclass, jint index, jint handle)
 {
   return sim::FreeCallback(env, handle, index,
@@ -40,36 +40,36 @@ Java_org_wpilib_hardware_hal_simulation_PowerDistributionDataJNI_cancelInitializ
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_simulation_PowerDistributionDataJNI
+ * Class:     edu_wpi_first_hal_simulation_PowerDistributionDataJNI
  * Method:    getInitialized
  * Signature: (I)Z
  */
 JNIEXPORT jboolean JNICALL
-Java_org_wpilib_hardware_hal_simulation_PowerDistributionDataJNI_getInitialized
+Java_edu_wpi_first_hal_simulation_PowerDistributionDataJNI_getInitialized
   (JNIEnv*, jclass, jint index)
 {
   return HALSIM_GetPowerDistributionInitialized(index);
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_simulation_PowerDistributionDataJNI
+ * Class:     edu_wpi_first_hal_simulation_PowerDistributionDataJNI
  * Method:    setInitialized
  * Signature: (IZ)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_hardware_hal_simulation_PowerDistributionDataJNI_setInitialized
+Java_edu_wpi_first_hal_simulation_PowerDistributionDataJNI_setInitialized
   (JNIEnv*, jclass, jint index, jboolean value)
 {
   HALSIM_SetPowerDistributionInitialized(index, value);
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_simulation_PowerDistributionDataJNI
+ * Class:     edu_wpi_first_hal_simulation_PowerDistributionDataJNI
  * Method:    registerTemperatureCallback
  * Signature: (ILjava/lang/Object;Z)I
  */
 JNIEXPORT jint JNICALL
-Java_org_wpilib_hardware_hal_simulation_PowerDistributionDataJNI_registerTemperatureCallback
+Java_edu_wpi_first_hal_simulation_PowerDistributionDataJNI_registerTemperatureCallback
   (JNIEnv* env, jclass, jint index, jobject callback, jboolean initialNotify)
 {
   return sim::AllocateCallback(
@@ -78,12 +78,12 @@ Java_org_wpilib_hardware_hal_simulation_PowerDistributionDataJNI_registerTempera
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_simulation_PowerDistributionDataJNI
+ * Class:     edu_wpi_first_hal_simulation_PowerDistributionDataJNI
  * Method:    cancelTemperatureCallback
  * Signature: (II)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_hardware_hal_simulation_PowerDistributionDataJNI_cancelTemperatureCallback
+Java_edu_wpi_first_hal_simulation_PowerDistributionDataJNI_cancelTemperatureCallback
   (JNIEnv* env, jclass, jint index, jint handle)
 {
   return sim::FreeCallback(env, handle, index,
@@ -91,36 +91,36 @@ Java_org_wpilib_hardware_hal_simulation_PowerDistributionDataJNI_cancelTemperatu
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_simulation_PowerDistributionDataJNI
+ * Class:     edu_wpi_first_hal_simulation_PowerDistributionDataJNI
  * Method:    getTemperature
  * Signature: (I)D
  */
 JNIEXPORT jdouble JNICALL
-Java_org_wpilib_hardware_hal_simulation_PowerDistributionDataJNI_getTemperature
+Java_edu_wpi_first_hal_simulation_PowerDistributionDataJNI_getTemperature
   (JNIEnv*, jclass, jint index)
 {
   return HALSIM_GetPowerDistributionTemperature(index);
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_simulation_PowerDistributionDataJNI
+ * Class:     edu_wpi_first_hal_simulation_PowerDistributionDataJNI
  * Method:    setTemperature
  * Signature: (ID)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_hardware_hal_simulation_PowerDistributionDataJNI_setTemperature
+Java_edu_wpi_first_hal_simulation_PowerDistributionDataJNI_setTemperature
   (JNIEnv*, jclass, jint index, jdouble value)
 {
   HALSIM_SetPowerDistributionTemperature(index, value);
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_simulation_PowerDistributionDataJNI
+ * Class:     edu_wpi_first_hal_simulation_PowerDistributionDataJNI
  * Method:    registerVoltageCallback
  * Signature: (ILjava/lang/Object;Z)I
  */
 JNIEXPORT jint JNICALL
-Java_org_wpilib_hardware_hal_simulation_PowerDistributionDataJNI_registerVoltageCallback
+Java_edu_wpi_first_hal_simulation_PowerDistributionDataJNI_registerVoltageCallback
   (JNIEnv* env, jclass, jint index, jobject callback, jboolean initialNotify)
 {
   return sim::AllocateCallback(
@@ -129,12 +129,12 @@ Java_org_wpilib_hardware_hal_simulation_PowerDistributionDataJNI_registerVoltage
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_simulation_PowerDistributionDataJNI
+ * Class:     edu_wpi_first_hal_simulation_PowerDistributionDataJNI
  * Method:    cancelVoltageCallback
  * Signature: (II)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_hardware_hal_simulation_PowerDistributionDataJNI_cancelVoltageCallback
+Java_edu_wpi_first_hal_simulation_PowerDistributionDataJNI_cancelVoltageCallback
   (JNIEnv* env, jclass, jint index, jint handle)
 {
   return sim::FreeCallback(env, handle, index,
@@ -142,36 +142,36 @@ Java_org_wpilib_hardware_hal_simulation_PowerDistributionDataJNI_cancelVoltageCa
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_simulation_PowerDistributionDataJNI
+ * Class:     edu_wpi_first_hal_simulation_PowerDistributionDataJNI
  * Method:    getVoltage
  * Signature: (I)D
  */
 JNIEXPORT jdouble JNICALL
-Java_org_wpilib_hardware_hal_simulation_PowerDistributionDataJNI_getVoltage
+Java_edu_wpi_first_hal_simulation_PowerDistributionDataJNI_getVoltage
   (JNIEnv*, jclass, jint index)
 {
   return HALSIM_GetPowerDistributionVoltage(index);
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_simulation_PowerDistributionDataJNI
+ * Class:     edu_wpi_first_hal_simulation_PowerDistributionDataJNI
  * Method:    setVoltage
  * Signature: (ID)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_hardware_hal_simulation_PowerDistributionDataJNI_setVoltage
+Java_edu_wpi_first_hal_simulation_PowerDistributionDataJNI_setVoltage
   (JNIEnv*, jclass, jint index, jdouble value)
 {
   HALSIM_SetPowerDistributionVoltage(index, value);
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_simulation_PowerDistributionDataJNI
+ * Class:     edu_wpi_first_hal_simulation_PowerDistributionDataJNI
  * Method:    registerCurrentCallback
  * Signature: (IILjava/lang/Object;Z)I
  */
 JNIEXPORT jint JNICALL
-Java_org_wpilib_hardware_hal_simulation_PowerDistributionDataJNI_registerCurrentCallback
+Java_edu_wpi_first_hal_simulation_PowerDistributionDataJNI_registerCurrentCallback
   (JNIEnv* env, jclass, jint index, jint channel, jobject callback,
    jboolean initialNotify)
 {
@@ -181,12 +181,12 @@ Java_org_wpilib_hardware_hal_simulation_PowerDistributionDataJNI_registerCurrent
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_simulation_PowerDistributionDataJNI
+ * Class:     edu_wpi_first_hal_simulation_PowerDistributionDataJNI
  * Method:    cancelCurrentCallback
  * Signature: (III)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_hardware_hal_simulation_PowerDistributionDataJNI_cancelCurrentCallback
+Java_edu_wpi_first_hal_simulation_PowerDistributionDataJNI_cancelCurrentCallback
   (JNIEnv* env, jclass, jint index, jint channel, jint handle)
 {
   return sim::FreeChannelCallback(
@@ -195,36 +195,36 @@ Java_org_wpilib_hardware_hal_simulation_PowerDistributionDataJNI_cancelCurrentCa
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_simulation_PowerDistributionDataJNI
+ * Class:     edu_wpi_first_hal_simulation_PowerDistributionDataJNI
  * Method:    getCurrent
  * Signature: (II)D
  */
 JNIEXPORT jdouble JNICALL
-Java_org_wpilib_hardware_hal_simulation_PowerDistributionDataJNI_getCurrent
+Java_edu_wpi_first_hal_simulation_PowerDistributionDataJNI_getCurrent
   (JNIEnv*, jclass, jint index, jint channel)
 {
   return HALSIM_GetPowerDistributionCurrent(index, channel);
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_simulation_PowerDistributionDataJNI
+ * Class:     edu_wpi_first_hal_simulation_PowerDistributionDataJNI
  * Method:    setCurrent
  * Signature: (IID)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_hardware_hal_simulation_PowerDistributionDataJNI_setCurrent
+Java_edu_wpi_first_hal_simulation_PowerDistributionDataJNI_setCurrent
   (JNIEnv*, jclass, jint index, jint channel, jdouble value)
 {
   HALSIM_SetPowerDistributionCurrent(index, channel, value);
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_simulation_PowerDistributionDataJNI
+ * Class:     edu_wpi_first_hal_simulation_PowerDistributionDataJNI
  * Method:    resetData
  * Signature: (I)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_hardware_hal_simulation_PowerDistributionDataJNI_resetData
+Java_edu_wpi_first_hal_simulation_PowerDistributionDataJNI_resetData
   (JNIEnv*, jclass, jint index)
 {
   HALSIM_ResetPowerDistributionData(index);

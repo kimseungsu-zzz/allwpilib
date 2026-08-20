@@ -2,11 +2,11 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/smartdashboard/ListenerExecutor.hpp"
+#include "frc/smartdashboard/ListenerExecutor.h"
 
 #include <utility>
 
-using namespace wpi::detail;
+using namespace frc::detail;
 
 void ListenerExecutor::Execute(std::function<void()> task) {
   std::scoped_lock lock(m_lock);

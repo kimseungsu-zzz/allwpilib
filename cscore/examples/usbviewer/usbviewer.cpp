@@ -13,26 +13,26 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/core/mat.hpp>
 #include <opencv2/imgproc.hpp>
+#include <wpi/mutex.h>
+#include <wpi/print.h>
+#include <wpi/spinlock.h>
+#include <wpigui.h>
 
-#include "wpi/cs/CvSink.hpp"
-#include "wpi/cs/UsbCamera.hpp"
-#include "wpi/gui/wpigui.hpp"
-#include "wpi/util/mutex.hpp"
-#include "wpi/util/print.hpp"
-#include "wpi/util/spinlock.hpp"
+#include "cscore.h"
+#include "cscore_cv.h"
 
 namespace gui = wpi::gui;
 
 int main() {
-  wpi::util::spinlock latestFrameMutex;
+  wpi::spinlock latestFrameMutex;
   std::unique_ptr<cv::Mat> latestFrame;
-  wpi::util::mutex freeListMutex;
+  wpi::mutex freeListMutex;
   std::vector<std::unique_ptr<cv::Mat>> freeList;
   std::atomic<bool> stopCamera{false};
 
-  wpi::cs::UsbCamera camera{"usbcam", 0};
-  camera.SetVideoMode(wpi::util::PixelFormat::MJPEG, 640, 480, 30);
-  wpi::cs::CvSink cvsink{"cvsink"};
+  cs::UsbCamera camera{"usbcam", 0};
+  camera.SetVideoMode(cs::VideoMode::kMJPEG, 640, 480, 30);
+  cs::CvSink cvsink{"cvsink"};
   cvsink.SetSource(camera);
 
   std::thread thr([&] {
@@ -41,7 +41,7 @@ int main() {
       // get frame from camera
       uint64_t time = cvsink.GrabFrame(frame);
       if (time == 0) {
-        wpi::util::print("error: {}\n", cvsink.GetError());
+        wpi::print("error: {}\n", cvsink.GetError());
         continue;
       }
 
@@ -75,7 +75,7 @@ int main() {
   });
 
   gui::CreateContext();
-  gui::Initialize("Hello World", 1024, 768, gui::RendererPreference::PREFER_2D);
+  gui::Initialize("Hello World", 1024, 768);
   gui::Texture tex;
   gui::AddEarlyExecute([&] {
     std::unique_ptr<cv::Mat> frame;
@@ -87,7 +87,7 @@ int main() {
       // create or update texture
       if (!tex || frame->cols != tex.GetWidth() ||
           frame->rows != tex.GetHeight()) {
-        tex = gui::Texture(gui::PixelFormat::RGBA, frame->cols, frame->rows,
+        tex = gui::Texture(gui::kPixelRGBA, frame->cols, frame->rows,
                            frame->data);
       } else {
         tex.Update(frame->data);

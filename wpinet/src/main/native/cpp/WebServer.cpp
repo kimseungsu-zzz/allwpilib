@@ -2,43 +2,44 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/net/WebServer.hpp"
+#include "wpinet/WebServer.h"
 
 #ifndef _WIN32
 #include <unistd.h>
 #endif
 
-#include <format>
 #include <memory>
 #include <string>
 #include <utility>
 
-#include "wpi/net/EventLoopRunner.hpp"
-#include "wpi/net/HttpServerConnection.hpp"
-#include "wpi/net/HttpUtil.hpp"
-#include "wpi/net/raw_uv_ostream.hpp"
-#include "wpi/net/uv/GetAddrInfo.hpp"
-#include "wpi/net/uv/Stream.hpp"
-#include "wpi/net/uv/Tcp.hpp"
-#include "wpi/net/uv/Timer.hpp"
-#include "wpi/util/DenseMap.hpp"
-#include "wpi/util/MemoryBuffer.hpp"
-#include "wpi/util/Signal.h"
-#include "wpi/util/SmallString.hpp"
-#include "wpi/util/StringExtras.hpp"
-#include "wpi/util/StringMap.hpp"
-#include "wpi/util/fs.hpp"
-#include "wpi/util/json.hpp"
-#include "wpi/util/print.hpp"
-#include "wpi/util/raw_ostream.hpp"
+#include <fmt/format.h>
+#include <wpi/DenseMap.h>
+#include <wpi/MemoryBuffer.h>
+#include <wpi/SmallString.h>
+#include <wpi/Signal.h>
+#include <wpi/StringMap.h>
+#include <wpi/fs.h>
+#include <wpi/json.h>
+#include <wpi/print.h>
+#include <wpi/raw_ostream.h>
 
-using namespace wpi::net;
+#include "wpinet/EventLoopRunner.h"
+#include "wpinet/HttpServerConnection.h"
+#include "wpinet/HttpUtil.h"
+#include "wpinet/UrlParser.h"
+#include "wpinet/raw_uv_ostream.h"
+#include "wpinet/uv/GetAddrInfo.h"
+#include "wpinet/uv/Stream.h"
+#include "wpinet/uv/Tcp.h"
+#include "wpinet/uv/Timer.h"
+
+using namespace wpi;
 
 namespace {
-class MyHttpConnection : public wpi::net::HttpServerConnection,
+class MyHttpConnection : public wpi::HttpServerConnection,
                          public std::enable_shared_from_this<MyHttpConnection> {
  public:
-  explicit MyHttpConnection(std::shared_ptr<wpi::net::uv::Stream> stream,
+  explicit MyHttpConnection(std::shared_ptr<wpi::uv::Stream> stream,
                             std::string_view path)
       : HttpServerConnection{std::move(stream)}, m_path{path} {}
 
@@ -95,7 +96,7 @@ class SendfileReq : public uv::RequestImpl<SendfileReq, uv_fs_t> {
     return err;
   }
 
-  wpi::util::sig::Signal<> complete;
+  wpi::sig::Signal<> complete;
 
  private:
   uv_file m_out;
@@ -119,7 +120,7 @@ static void Sendfile(uv::Loop& loop, uv_file out, uv_file in, int64_t inOffset,
 #endif
 
 static std::string_view GetMimeType(std::string_view ext) {
-  static const wpi::util::StringMap<std::string> map{
+  static const wpi::StringMap<std::string> map{
       {"css", "text/css"},
       {"csv", "text/csv"},
       {"gif", "image/gif"},
@@ -154,14 +155,14 @@ void MyHttpConnection::SendFileResponse(int code, std::string_view codeText,
                                         fs::path filename,
                                         std::string_view extraHeader) {
 #ifdef _WIN32
-  auto membuf = wpi::util::MemoryBuffer::GetFile(filename.string());
+  auto membuf = wpi::MemoryBuffer::GetFile(filename.string());
   if (!membuf) {
     SendError(404);
     return;
   }
 
-  wpi::util::SmallVector<uv::Buffer, 4> toSend;
-  wpi::net::raw_uv_ostream os{toSend, 4096};
+  wpi::SmallVector<uv::Buffer, 4> toSend;
+  wpi::raw_uv_ostream os{toSend, 4096};
   BuildHeader(os, code, codeText, contentType, (*membuf)->size(), extraHeader);
   SendData(os.bufs(), false);
   auto buf = (*membuf)->GetBuffer();
@@ -204,8 +205,8 @@ void MyHttpConnection::SendFileResponse(int code, std::string_view codeText,
     return;
   }
 
-  wpi::util::SmallVector<uv::Buffer, 4> toSend;
-  wpi::net::raw_uv_ostream os{toSend, 4096};
+  wpi::SmallVector<uv::Buffer, 4> toSend;
+  wpi::raw_uv_ostream os{toSend, 4096};
   BuildHeader(os, code, codeText, contentType, size, extraHeader);
   SendData(os.bufs(), false);
 
@@ -225,21 +226,22 @@ void MyHttpConnection::SendFileResponse(int code, std::string_view codeText,
 }
 
 void MyHttpConnection::ProcessRequest() {
-  // wpi::util::print(stderr, "HTTP request: '{}'\n", m_request.GetUrl());
-  auto url = wpi::net::ParseUrl(m_request.GetUrl());
-  if (!url) {
+  // fmt::print(stderr, "HTTP request: '{}'\n", m_request.GetUrl());
+  wpi::UrlParser url{m_request.GetUrl(),
+                     m_request.GetMethod() == wpi::HTTP_CONNECT};
+  if (!url.IsValid()) {
     // failed to parse URL
     SendError(400);
     return;
   }
 
   std::string_view path;
-  if (url->get_pathname_length() > 0) {
-    path = url->get_pathname();
+  if (url.HasPath()) {
+    path = url.GetPath();
   }
-  // wpi::util::print(stderr, "path: \"{}\"\n", path);
+  // fmt::print(stderr, "path: \"{}\"\n", path);
 
-  wpi::util::SmallString<128> pathBuf;
+  wpi::SmallString<128> pathBuf;
   bool error;
   path = UnescapeURI(path, pathBuf, &error);
   if (error) {
@@ -248,71 +250,71 @@ void MyHttpConnection::ProcessRequest() {
   }
 
   std::string_view query;
-  if (url->has_search()) {
-    query = url->get_search();
+  if (url.HasQuery()) {
+    query = url.GetQuery();
   }
-  // wpi::util::print(stderr, "query: \"{}\"\n", query);
-  ada::url_search_params qmap{query};
+  // fmt::print(stderr, "query: \"{}\"\n", query);
+  HttpQueryMap qmap{query};
 
-  const bool isGET = m_request.GetMethod() == HTTP_GET;
-  if (isGET && wpi::util::starts_with(path, '/') &&
-      !wpi::util::contains(path, "..")) {
-    fs::path fullpath = std::format("{}{}", m_path, path);
+  const bool isGET = m_request.GetMethod() == wpi::HTTP_GET;
+  if (isGET && wpi::starts_with(path, '/') && !wpi::contains(path, "..")) {
+    fs::path fullpath = fmt::format("{}{}", m_path, path);
     std::error_code ec;
     bool isdir = fs::is_directory(fullpath, ec);
     if (isdir) {
-      if (!wpi::util::ends_with(path, '/')) {
+      if (!wpi::ends_with(path, '/')) {
         // redirect to trailing / location
         SendResponse(301, "Moved Permanently", "text/plain", "",
-                     std::format("Location: {}/\r\n\r\n", path));
+                     fmt::format("Location: {}/\r\n\r\n", path));
         return;
       }
       // generate directory listing
+      wpi::SmallString<64> formatBuf;
       fs::path indexpath = fs::path{fullpath} / "index.html";
-      if (qmap.get("format").value_or("") == "json") {
-        wpi::util::json dirs = wpi::util::json::array();
-        wpi::util::json files = wpi::util::json::array();
+      if (qmap.Get("format", formatBuf).value_or("") == "json") {
+        wpi::json dirs = wpi::json::array();
+        wpi::json files = wpi::json::array();
         for (auto&& entry : fs::directory_iterator{fullpath}) {
           bool subdir = entry.is_directory(ec);
           std::string name = entry.path().filename().string();
           if (subdir) {
-            dirs.emplace_back(wpi::util::json::object("name", std::move(name)));
+            dirs.emplace_back(wpi::json{{"name", std::move(name)}});
           } else {
             files.emplace_back(
-                wpi::util::json::object("name", std::move(name), "size",
-                                        subdir ? 0 : entry.file_size(ec)));
+                wpi::json{{"name", std::move(name)},
+                          {"size", subdir ? 0 : entry.file_size(ec)}});
           }
         }
-        SendResponse(200, "OK", "text/json",
-                     wpi::util::json::object("dirs", std::move(dirs), "files",
-                                             std::move(files))
-                         .to_string());
+        SendResponse(
+            200, "OK", "text/json",
+            wpi::json{{"dirs", std::move(dirs)}, {"files", std::move(files)}}
+                .dump());
       } else if (fs::exists(indexpath)) {
         SendFileResponse(200, "OK", GetMimeType("html"), indexpath,
                          "Content-Disposition: filename=\"index.html\"\r\n");
       } else {
-        wpi::util::StringMap<std::string> dirs;
-        wpi::util::StringMap<std::string> files;
+        wpi::StringMap<std::string> dirs;
+        wpi::StringMap<std::string> files;
         for (auto&& entry : fs::directory_iterator{fullpath}) {
           bool subdir = entry.is_directory(ec);
           std::string name = entry.path().filename().string();
-          wpi::util::SmallString<128> nameUriBuf, nameHtmlBuf;
+          wpi::SmallString<128> nameUriBuf, nameHtmlBuf;
           if (subdir) {
             dirs.emplace(
-                name, std::format(
+                name, fmt::format(
                           "<tr><td><a href=\"{}/\">{}/</a></td><td></td></tr>",
                           EscapeURI(name, nameUriBuf),
                           EscapeHTML(name, nameHtmlBuf)));
           } else {
             files.emplace(
-                name, std::format(
+                name, fmt::format(
                           "<tr><td><a href=\"{}\">{}</a></td><td>{}</td></tr>",
                           EscapeURI(name, nameUriBuf),
                           EscapeHTML(name, nameHtmlBuf), entry.file_size(ec)));
           }
         }
 
-        std::string html = std::format(
+        std::string html = fmt::format(
             "<html><head><title>{}</title></head><body>"
             "<table><tr><th>Name</th><th>Size</th></tr>\n",
             path);
@@ -326,13 +328,12 @@ void MyHttpConnection::ProcessRequest() {
         SendResponse(200, "OK", "text/html", html);
       }
     } else {
-      wpi::util::SmallString<128> extraHeadersBuf;
-      wpi::util::raw_svector_ostream os{extraHeadersBuf};
+      wpi::SmallString<128> extraHeadersBuf;
+      wpi::raw_svector_ostream os{extraHeadersBuf};
       os << "Content-Disposition: filename=\"";
       os.write_escaped(fullpath.filename().string());
       os << "\"\r\n";
-      SendFileResponse(200, "OK",
-                       GetMimeType(wpi::util::rsplit(path, '.').second),
+      SendFileResponse(200, "OK", GetMimeType(wpi::rsplit(path, '.').second),
                        fullpath, os.str());
     }
   } else {
@@ -343,7 +344,7 @@ void MyHttpConnection::ProcessRequest() {
 struct WebServer::Impl {
  public:
   EventLoopRunner runner;
-  wpi::util::DenseMap<unsigned int, std::weak_ptr<uv::Tcp>> servers;
+  DenseMap<unsigned int, std::weak_ptr<uv::Tcp>> servers;
 };
 
 WebServer::WebServer() : m_impl{new Impl} {}
@@ -357,7 +358,7 @@ void WebServer::Start(unsigned int port, std::string_view path) {
   m_impl->runner.ExecSync([&](uv::Loop& loop) {
     auto server = uv::Tcp::Create(loop);
     if (!server) {
-      wpi::util::print(stderr, "WebServer: Creating server failed\n");
+      wpi::print(stderr, "WebServer: Creating server failed\n");
       return;
     }
 
@@ -365,21 +366,22 @@ void WebServer::Start(unsigned int port, std::string_view path) {
     server->Bind("", port);
 
     // when we get a connection, accept it
-    server->connection.connect([serverPtr = server.get(),
-                                path = std::string{path}] {
-      auto client = serverPtr->Accept();
-      if (!client) {
-        wpi::util::print(stderr, "WebServer: Connecting to client failed\n");
-        return;
-      }
+    server->connection.connect(
+        [serverPtr = server.get(), path = std::string{path}] {
+          auto client = serverPtr->Accept();
+          if (!client) {
+            wpi::print(stderr, "WebServer: Connecting to client failed\n");
+            return;
+          }
 
-      // close on error
-      client->error.connect(
-          [clientPtr = client.get()](uv::Error err) { clientPtr->Close(); });
+          // close on error
+          client->error.connect([clientPtr = client.get()](uv::Error err) {
+            clientPtr->Close();
+          });
 
-      auto conn = std::make_shared<MyHttpConnection>(client, path);
-      client->SetData(conn);
-    });
+          auto conn = std::make_shared<MyHttpConnection>(client, path);
+          client->SetData(conn);
+        });
 
     // start listening for incoming connections
     server->Listen();

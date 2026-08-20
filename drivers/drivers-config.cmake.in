@@ -1,5 +1,0 @@
-include(CMakeFindDependencyMacro)
-@WPILIBC_DEP_REPLACE@
-
-@FILENAME_DEP_REPLACE@
-include(${SELF_DIR}/drivers.cmake)

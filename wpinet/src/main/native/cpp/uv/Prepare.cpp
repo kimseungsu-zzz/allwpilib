@@ -2,13 +2,13 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/net/uv/Prepare.hpp"
+#include "wpinet/uv/Prepare.h"
 
 #include <memory>
 
-#include "wpi/net/uv/Loop.hpp"
+#include "wpinet/uv/Loop.h"
 
-namespace wpi::net::uv {
+namespace wpi::uv {
 
 std::shared_ptr<Prepare> Prepare::Create(Loop& loop) {
   if (loop.IsClosing()) {
@@ -34,4 +34,4 @@ void Prepare::Start() {
   });
 }
 
-}  // namespace wpi::net::uv
+}  // namespace wpi::uv

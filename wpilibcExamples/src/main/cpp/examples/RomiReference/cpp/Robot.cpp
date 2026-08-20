@@ -2,22 +2,22 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "Robot.hpp"
+#include "Robot.h"
 
-#include "wpi/commands2/CommandScheduler.hpp"
+#include <frc2/command/CommandScheduler.h>
 
 Robot::Robot() {}
 
 /**
  * This function is called every 20 ms, no matter the mode. Use
  * this for items like diagnostics that you want to run during disabled,
- * autonomous, teleoperated and utility.
+ * autonomous, teleoperated and test.
  *
  * <p> This runs after the mode specific periodic functions, but before
  * LiveWindow and SmartDashboard integrated updating.
  */
 void Robot::RobotPeriodic() {
-  wpi::cmd::CommandScheduler::GetInstance().Run();
+  frc2::CommandScheduler::GetInstance().Run();
 }
 
 /**
@@ -34,27 +34,25 @@ void Robot::DisabledPeriodic() {}
  * RobotContainer} class.
  */
 void Robot::AutonomousInit() {
-  autonomousCommand = container.GetAutonomousCommand();
+  m_autonomousCommand = m_container.GetAutonomousCommand();
 
-  if (autonomousCommand != nullptr) {
-    wpi::cmd::CommandScheduler::GetInstance().Schedule(autonomousCommand);
+  if (m_autonomousCommand != nullptr) {
+    frc2::CommandScheduler::GetInstance().Schedule(m_autonomousCommand);
   }
 }
 
 void Robot::AutonomousPeriodic() {}
 
-void Robot::AutonomousExit() {
+void Robot::TeleopInit() {
   // This makes sure that the autonomous stops running when
-  // autonomous mode ends. If you want the autonomous to
+  // teleop starts running. If you want the autonomous to
   // continue until interrupted by another command, remove
   // this line or comment it out.
-  if (autonomousCommand != nullptr) {
-    autonomousCommand->Cancel();
-    autonomousCommand = nullptr;
+  if (m_autonomousCommand != nullptr) {
+    m_autonomousCommand->Cancel();
+    m_autonomousCommand = nullptr;
   }
 }
-
-void Robot::TeleopInit() {}
 
 /**
  * This function is called periodically during operator control.
@@ -62,12 +60,12 @@ void Robot::TeleopInit() {}
 void Robot::TeleopPeriodic() {}
 
 /**
- * This function is called periodically during utility mode.
+ * This function is called periodically during test mode.
  */
-void Robot::UtilityPeriodic() {}
+void Robot::TestPeriodic() {}
 
-#ifndef RUNNING_WPILIB_TESTS
+#ifndef RUNNING_FRC_TESTS
 int main() {
-  return wpi::StartRobot<Robot>();
+  return frc::StartRobot<Robot>();
 }
 #endif

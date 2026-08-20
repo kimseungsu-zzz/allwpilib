@@ -2,27 +2,27 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/simulation/JoystickSim.hpp"
+#include "frc/simulation/JoystickSim.h"
 
-#include "wpi/driverstation/Joystick.hpp"
-#include "wpi/simulation/GenericHIDSim.hpp"
+#include "frc/Joystick.h"
+#include "frc/simulation/GenericHIDSim.h"
 
-using namespace wpi;
-using namespace wpi::sim;
+using namespace frc;
+using namespace frc::sim;
 
 JoystickSim::JoystickSim(const Joystick& joystick)
-    : GenericHIDSim{joystick.GetHID()}, m_joystick{&joystick} {
+    : GenericHIDSim{joystick}, m_joystick{&joystick} {
   // default to a reasonable joystick configuration
-  SetAxesMaximumIndex(5);
-  SetButtonsMaximumIndex(12);
-  SetPOVsMaximumIndex(1);
+  SetAxisCount(5);
+  SetButtonCount(12);
+  SetPOVCount(1);
 }
 
 JoystickSim::JoystickSim(int port) : GenericHIDSim{port} {
   // default to a reasonable joystick configuration
-  SetAxesMaximumIndex(5);
-  SetButtonsMaximumIndex(12);
-  SetPOVsMaximumIndex(1);
+  SetAxisCount(5);
+  SetButtonCount(12);
+  SetPOVCount(1);
 }
 
 void JoystickSim::SetX(double value) {

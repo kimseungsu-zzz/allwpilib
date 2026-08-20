@@ -2,31 +2,30 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/event/NetworkBooleanEvent.hpp"
+#include <gtest/gtest.h>
+#include <networktables/BooleanTopic.h>
+#include <networktables/NetworkTableInstance.h>
 
-#include <catch2/catch_test_macros.hpp>
-#include <catch2/matchers/catch_matchers_floating_point.hpp>
+#include "frc/event/EventLoop.h"
+#include "frc/event/NetworkBooleanEvent.h"
 
-#include "wpi/event/EventLoop.hpp"
-#include "wpi/nt/BooleanTopic.hpp"
-#include "wpi/nt/NetworkTableInstance.hpp"
+using namespace frc;
 
-using namespace wpi;
-
-class NetworkBooleanEventTest {
+class NetworkBooleanEventTest : public ::testing::Test {
  public:
   NetworkBooleanEventTest() {
-    m_inst = wpi::nt::NetworkTableInstance::Create();
+    m_inst = nt::NetworkTableInstance::Create();
     m_inst.StartLocal();
   }
 
-  ~NetworkBooleanEventTest() { wpi::nt::NetworkTableInstance::Destroy(m_inst); }
+  ~NetworkBooleanEventTest() override {
+    nt::NetworkTableInstance::Destroy(m_inst);
+  }
 
-  wpi::nt::NetworkTableInstance m_inst;
+  nt::NetworkTableInstance m_inst;
 };
 
-TEST_CASE_METHOD(NetworkBooleanEventTest, "NetworkBooleanEventTest Set",
-                 "[wpilibc][event]") {
+TEST_F(NetworkBooleanEventTest, Set) {
   EventLoop loop;
   int counter = 0;
 
@@ -37,11 +36,11 @@ TEST_CASE_METHOD(NetworkBooleanEventTest, "NetworkBooleanEventTest Set",
   });
   pub.Set(false);
   loop.Poll();
-  CHECK(0 == counter);
+  EXPECT_EQ(0, counter);
   pub.Set(true);
   loop.Poll();
-  CHECK(1 == counter);
+  EXPECT_EQ(1, counter);
   pub.Set(false);
   loop.Poll();
-  CHECK(1 == counter);
+  EXPECT_EQ(1, counter);
 }

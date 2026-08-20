@@ -31,15 +31,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
  */
 
-// clang-format off
-#include "wpi/util/Signal.h"
-// clang-format on
+#include "wpi/Signal.h"  // NOLINT(build/include_order)
 
-#include <catch2/catch_template_test_macros.hpp>
-#include <catch2/catch_test_macros.hpp>
-#include <catch2/matchers/catch_matchers_floating_point.hpp>
-#include <catch2/matchers/catch_matchers_range_equals.hpp>
-#include <catch2/matchers/catch_matchers_vector.hpp>
+#include <gtest/gtest.h>
 
 namespace {
 
@@ -62,14 +56,14 @@ struct object {
   }
 
   T v;
-  wpi::util::sig::Signal_r<T> sig;
+  wpi::sig::Signal_r<T> sig;
 };
 
 }  // namespace
 
-namespace wpi::util {
+namespace wpi {
 
-TEST_CASE("SignalTest Recursive", "[wpiutil][sigslot]") {
+TEST(SignalTest, Recursive) {
   object<int> i1(-1);
   object<int> i2(10);
 
@@ -78,13 +72,13 @@ TEST_CASE("SignalTest Recursive", "[wpiutil][sigslot]") {
 
   i1.inc_val(0);
 
-  REQUIRE(i1.v == i2.v);
+  ASSERT_EQ(i1.v, i2.v);
 }
 
-TEST_CASE("SignalTest SelfRecursive", "[wpiutil][sigslot]") {
+TEST(SignalTest, SelfRecursive) {
   int i = 0;
 
-  wpi::util::sig::Signal_r<int> s;
+  wpi::sig::Signal_r<int> s;
   s.connect([&](int v) {
     if (i < 10) {
       i++;
@@ -94,7 +88,7 @@ TEST_CASE("SignalTest SelfRecursive", "[wpiutil][sigslot]") {
 
   s(0);
 
-  REQUIRE(i == 10);
+  ASSERT_EQ(i, 10);
 }
 
-}  // namespace wpi::util
+}  // namespace wpi

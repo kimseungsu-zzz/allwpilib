@@ -2,21 +2,18 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/math/path/TravelingSalesman.hpp"
-
 #include <cassert>
-#include <cstddef>
 #include <span>
 #include <vector>
 
-#include <catch2/catch_test_macros.hpp>
+#include <gtest/gtest.h>
+#include <wpi/array.h>
+#include <wpi/circular_buffer.h>
 
-#include "wpi/math/geometry/Pose2d.hpp"
-#include "wpi/math/geometry/Rotation2d.hpp"
-#include "wpi/units/angle.hpp"
-#include "wpi/units/length.hpp"
-#include "wpi/util/array.hpp"
-#include "wpi/util/circular_buffer.hpp"
+#include "frc/EigenCore.h"
+#include "frc/geometry/Pose2d.h"
+#include "frc/geometry/Rotation2d.h"
+#include "frc/path/TravelingSalesman.h"
 
 /**
  * Returns true if the cycles represented by the two lists match.
@@ -24,13 +21,12 @@
  * @param expected The expected cycle.
  * @param actual The actual cycle.
  */
-bool IsMatchingCycle(std::span<const wpi::math::Pose2d> expected,
-                     std::span<const wpi::math::Pose2d> actual) {
+bool IsMatchingCycle(std::span<const frc::Pose2d> expected,
+                     std::span<const frc::Pose2d> actual) {
   assert(expected.size() == actual.size());
 
   // Check actual has expected cycle (forward)
-  wpi::util::circular_buffer<wpi::math::Pose2d> actualBufferForward{
-      expected.size()};
+  wpi::circular_buffer<frc::Pose2d> actualBufferForward{expected.size()};
   for (size_t i = 0; i < actual.size(); ++i) {
     actualBufferForward.push_back(actual[i % actual.size()]);
   }
@@ -40,8 +36,7 @@ bool IsMatchingCycle(std::span<const wpi::math::Pose2d> expected,
   }
 
   // Check actual has expected cycle (reverse)
-  wpi::util::circular_buffer<wpi::math::Pose2d> actualBufferReverse{
-      expected.size()};
+  wpi::circular_buffer<frc::Pose2d> actualBufferReverse{expected.size()};
   for (size_t i = 0; i < actual.size(); ++i) {
     actualBufferReverse.push_front(actual[(1 + i) % actual.size()]);
   }
@@ -54,100 +49,96 @@ bool IsMatchingCycle(std::span<const wpi::math::Pose2d> expected,
   return matchesExpectedForward || matchesExpectedReverse;
 }
 
-TEST_CASE("TravelingSalesmanTest FiveLengthStaticPathWithDistanceCost",
-          "[wpimath]") {
+TEST(TravelingSalesmanTest, FiveLengthStaticPathWithDistanceCost) {
   // ...................
   // ........2..........
   // ..0..........4.....
   // ...................
   // ....3.....1........
   // ...................
-  wpi::util::array<wpi::math::Pose2d, 5> poses{
-      wpi::math::Pose2d{3_m, 3_m, 0_rad}, wpi::math::Pose2d{11_m, 5_m, 0_rad},
-      wpi::math::Pose2d{9_m, 2_m, 0_rad}, wpi::math::Pose2d{5_m, 5_m, 0_rad},
-      wpi::math::Pose2d{14_m, 3_m, 0_rad}};
+  wpi::array<frc::Pose2d, 5> poses{
+      frc::Pose2d{3_m, 3_m, 0_rad}, frc::Pose2d{11_m, 5_m, 0_rad},
+      frc::Pose2d{9_m, 2_m, 0_rad}, frc::Pose2d{5_m, 5_m, 0_rad},
+      frc::Pose2d{14_m, 3_m, 0_rad}};
 
-  wpi::math::TravelingSalesman traveler;
-  wpi::util::array<wpi::math::Pose2d, 5> solution = traveler.Solve(poses, 500);
+  frc::TravelingSalesman traveler;
+  wpi::array<frc::Pose2d, 5> solution = traveler.Solve(poses, 500);
 
-  wpi::util::array<wpi::math::Pose2d, 5> expected{poses[0], poses[2], poses[4],
-                                                  poses[1], poses[3]};
+  wpi::array<frc::Pose2d, 5> expected{poses[0], poses[2], poses[4], poses[1],
+                                      poses[3]};
 
-  CHECK(IsMatchingCycle(expected, solution));
+  EXPECT_TRUE(IsMatchingCycle(expected, solution));
 }
 
-TEST_CASE("TravelingSalesmanTest FiveLengthDynamicPathWithDistanceCost",
-          "[wpimath]") {
+TEST(TravelingSalesmanTest, FiveLengthDynamicPathWithDistanceCost) {
   // ...................
   // ........2..........
   // ..0..........4.....
   // ...................
   // ....3.....1........
   // ...................
-  wpi::util::array<wpi::math::Pose2d, 5> poses{
-      wpi::math::Pose2d{3_m, 3_m, 0_rad}, wpi::math::Pose2d{11_m, 5_m, 0_rad},
-      wpi::math::Pose2d{9_m, 2_m, 0_rad}, wpi::math::Pose2d{5_m, 5_m, 0_rad},
-      wpi::math::Pose2d{14_m, 3_m, 0_rad}};
+  wpi::array<frc::Pose2d, 5> poses{
+      frc::Pose2d{3_m, 3_m, 0_rad}, frc::Pose2d{11_m, 5_m, 0_rad},
+      frc::Pose2d{9_m, 2_m, 0_rad}, frc::Pose2d{5_m, 5_m, 0_rad},
+      frc::Pose2d{14_m, 3_m, 0_rad}};
 
-  wpi::math::TravelingSalesman traveler;
-  std::vector<wpi::math::Pose2d> solution =
-      traveler.Solve(std::span<const wpi::math::Pose2d>{poses}, 500);
+  frc::TravelingSalesman traveler;
+  std::vector<frc::Pose2d> solution =
+      traveler.Solve(std::span<const frc::Pose2d>{poses}, 500);
 
-  REQUIRE(5u == solution.size());
-  wpi::util::array<wpi::math::Pose2d, 5> expected{poses[0], poses[2], poses[4],
-                                                  poses[1], poses[3]};
+  ASSERT_EQ(5u, solution.size());
+  wpi::array<frc::Pose2d, 5> expected{poses[0], poses[2], poses[4], poses[1],
+                                      poses[3]};
 
-  CHECK(IsMatchingCycle(expected, solution));
+  EXPECT_TRUE(IsMatchingCycle(expected, solution));
 }
 
-TEST_CASE("TravelingSalesmanTest TenLengthStaticPathWithDistanceCost",
-          "[wpimath]") {
+TEST(TravelingSalesmanTest, TenLengthStaticPathWithDistanceCost) {
   // ....6.3..1.2.......
   // ..4................
   // .............9.....
   // .0.................
   // .....7..5...8......
   // ...................
-  wpi::util::array<wpi::math::Pose2d, 10> poses{
-      wpi::math::Pose2d{2_m, 4_m, 0_rad},  wpi::math::Pose2d{10_m, 1_m, 0_rad},
-      wpi::math::Pose2d{12_m, 1_m, 0_rad}, wpi::math::Pose2d{7_m, 1_m, 0_rad},
-      wpi::math::Pose2d{3_m, 2_m, 0_rad},  wpi::math::Pose2d{9_m, 5_m, 0_rad},
-      wpi::math::Pose2d{5_m, 1_m, 0_rad},  wpi::math::Pose2d{6_m, 5_m, 0_rad},
-      wpi::math::Pose2d{13_m, 5_m, 0_rad}, wpi::math::Pose2d{14_m, 3_m, 0_rad}};
+  wpi::array<frc::Pose2d, 10> poses{
+      frc::Pose2d{2_m, 4_m, 0_rad},  frc::Pose2d{10_m, 1_m, 0_rad},
+      frc::Pose2d{12_m, 1_m, 0_rad}, frc::Pose2d{7_m, 1_m, 0_rad},
+      frc::Pose2d{3_m, 2_m, 0_rad},  frc::Pose2d{9_m, 5_m, 0_rad},
+      frc::Pose2d{5_m, 1_m, 0_rad},  frc::Pose2d{6_m, 5_m, 0_rad},
+      frc::Pose2d{13_m, 5_m, 0_rad}, frc::Pose2d{14_m, 3_m, 0_rad}};
 
-  wpi::math::TravelingSalesman traveler;
-  wpi::util::array<wpi::math::Pose2d, 10> solution = traveler.Solve(poses, 500);
+  frc::TravelingSalesman traveler;
+  wpi::array<frc::Pose2d, 10> solution = traveler.Solve(poses, 500);
 
-  wpi::util::array<wpi::math::Pose2d, 10> expected{
-      poses[0], poses[4], poses[6], poses[3], poses[1],
-      poses[2], poses[9], poses[8], poses[5], poses[7]};
+  wpi::array<frc::Pose2d, 10> expected{poses[0], poses[4], poses[6], poses[3],
+                                       poses[1], poses[2], poses[9], poses[8],
+                                       poses[5], poses[7]};
 
-  CHECK(IsMatchingCycle(expected, solution));
+  EXPECT_TRUE(IsMatchingCycle(expected, solution));
 }
 
-TEST_CASE("TravelingSalesmanTest TenLengthDynamicPathWithDistanceCost",
-          "[wpimath]") {
+TEST(TravelingSalesmanTest, TenLengthDynamicPathWithDistanceCost) {
   // ....6.3..1.2.......
   // ..4................
   // .............9.....
   // .0.................
   // .....7..5...8......
   // ...................
-  wpi::util::array<wpi::math::Pose2d, 10> poses{
-      wpi::math::Pose2d{2_m, 4_m, 0_rad},  wpi::math::Pose2d{10_m, 1_m, 0_rad},
-      wpi::math::Pose2d{12_m, 1_m, 0_rad}, wpi::math::Pose2d{7_m, 1_m, 0_rad},
-      wpi::math::Pose2d{3_m, 2_m, 0_rad},  wpi::math::Pose2d{9_m, 5_m, 0_rad},
-      wpi::math::Pose2d{5_m, 1_m, 0_rad},  wpi::math::Pose2d{6_m, 5_m, 0_rad},
-      wpi::math::Pose2d{13_m, 5_m, 0_rad}, wpi::math::Pose2d{14_m, 3_m, 0_rad}};
+  wpi::array<frc::Pose2d, 10> poses{
+      frc::Pose2d{2_m, 4_m, 0_rad},  frc::Pose2d{10_m, 1_m, 0_rad},
+      frc::Pose2d{12_m, 1_m, 0_rad}, frc::Pose2d{7_m, 1_m, 0_rad},
+      frc::Pose2d{3_m, 2_m, 0_rad},  frc::Pose2d{9_m, 5_m, 0_rad},
+      frc::Pose2d{5_m, 1_m, 0_rad},  frc::Pose2d{6_m, 5_m, 0_rad},
+      frc::Pose2d{13_m, 5_m, 0_rad}, frc::Pose2d{14_m, 3_m, 0_rad}};
 
-  wpi::math::TravelingSalesman traveler;
-  std::vector<wpi::math::Pose2d> solution =
-      traveler.Solve(std::span<const wpi::math::Pose2d>{poses}, 500);
+  frc::TravelingSalesman traveler;
+  std::vector<frc::Pose2d> solution =
+      traveler.Solve(std::span<const frc::Pose2d>{poses}, 500);
 
-  REQUIRE(10u == solution.size());
-  wpi::util::array<wpi::math::Pose2d, 10> expected{
-      poses[0], poses[4], poses[6], poses[3], poses[1],
-      poses[2], poses[9], poses[8], poses[5], poses[7]};
+  ASSERT_EQ(10u, solution.size());
+  wpi::array<frc::Pose2d, 10> expected{poses[0], poses[4], poses[6], poses[3],
+                                       poses[1], poses[2], poses[9], poses[8],
+                                       poses[5], poses[7]};
 
-  CHECK(IsMatchingCycle(expected, solution));
+  EXPECT_TRUE(IsMatchingCycle(expected, solution));
 }

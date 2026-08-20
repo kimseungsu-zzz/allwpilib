@@ -17,16 +17,16 @@
         -- Eugene Hopkinson <slowriot at voxelstorm dot com>
 */
 
-#include "wpi/util/sha1.hpp"
+#include "wpi/sha1.h"
 
 #include <string>
 
-#include "wpi/util/SmallVector.hpp"
-#include "wpi/util/StringExtras.hpp"
-#include "wpi/util/raw_istream.hpp"
-#include "wpi/util/raw_ostream.hpp"
+#include "wpi/SmallVector.h"
+#include "wpi/StringExtras.h"
+#include "wpi/raw_istream.h"
+#include "wpi/raw_ostream.h"
 
-using namespace wpi::util;
+using namespace wpi;
 
 static const size_t BLOCK_INTS =
     16; /* number of 32bit integers per SHA1 block */

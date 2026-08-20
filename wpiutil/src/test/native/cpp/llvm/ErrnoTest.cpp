@@ -6,37 +6,33 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "wpi/util/Errno.hpp"
-#include <catch2/catch_test_macros.hpp>
-#include <catch2/matchers/catch_matchers_floating_point.hpp>
-#include <catch2/matchers/catch_matchers_range_equals.hpp>
-#include <catch2/matchers/catch_matchers_vector.hpp>
-#include <catch2/catch_template_test_macros.hpp>
+#include "wpi/Errno.h"
+#include "gtest/gtest.h"
 
-using namespace wpi::util::sys;
+using namespace wpi::sys;
 
-TEST_CASE("ErrnoTest RetryAfterSignal", "[wpiutil][llvm]") {
-  CHECK(1 == RetryAfterSignal(-1, [] { return 1; }));
+TEST(ErrnoTest, RetryAfterSignal) {
+  EXPECT_EQ(1, RetryAfterSignal(-1, [] { return 1; }));
 
-  CHECK(-1 == RetryAfterSignal(-1, [] {
+  EXPECT_EQ(-1, RetryAfterSignal(-1, [] {
     errno = EAGAIN;
     return -1;
   }));
-  CHECK(EAGAIN == errno);
+  EXPECT_EQ(EAGAIN, errno);
 
   unsigned calls = 0;
-  CHECK(1 == RetryAfterSignal(-1, [&calls] {
+  EXPECT_EQ(1, RetryAfterSignal(-1, [&calls] {
               errno = EINTR;
               ++calls;
               return calls == 1 ? -1 : 1;
             }));
-  CHECK(2u == calls);
+  EXPECT_EQ(2u, calls);
 
-  CHECK(1 == RetryAfterSignal(-1, [](int x) { return x; }, 1));
+  EXPECT_EQ(1, RetryAfterSignal(-1, [](int x) { return x; }, 1));
 
   std::unique_ptr<int> P(RetryAfterSignal(nullptr, [] { return new int(47); }));
-  CHECK(47 == *P);
+  EXPECT_EQ(47, *P);
 
   errno = EINTR;
-  CHECK(-1 == RetryAfterSignal(-1, [] { return -1; }));
+  EXPECT_EQ(-1, RetryAfterSignal(-1, [] { return -1; }));
 }

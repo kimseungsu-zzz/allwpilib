@@ -2,10 +2,11 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/halsim/ws_core/WSHalProviders.hpp"
+#include "WSHalProviders.h"
 
-#include <format>
 #include <memory>
+
+#include <fmt/format.h>
 
 namespace wpilibws {
 
@@ -23,13 +24,11 @@ void HALSimWSHalProvider::OnNetworkDisconnected() {
   CancelCallbacks();
 }
 
-void HALSimWSHalProvider::ProcessHalCallback(const wpi::util::json& payload) {
+void HALSimWSHalProvider::ProcessHalCallback(const wpi::json& payload) {
   auto ws = m_ws.lock();
   if (ws) {
-    auto netValue = wpi::util::json::object();
-    netValue["type"] = m_type;
-    netValue["device"] = m_deviceId;
-    netValue["data"] = payload;
+    wpi::json netValue = {
+        {"type", m_type}, {"device", m_deviceId}, {"data", payload}};
     ws->OnSimValueChanged(netValue);
   }
 }
@@ -38,7 +37,7 @@ HALSimWSHalChanProvider::HALSimWSHalChanProvider(int32_t channel,
                                                  std::string_view key,
                                                  std::string_view type)
     : HALSimWSHalProvider(key, type), m_channel(channel) {
-  m_deviceId = std::format("{}", channel);
+  m_deviceId = fmt::format("{}", channel);
 }
 
 }  // namespace wpilibws

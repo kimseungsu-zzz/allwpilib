@@ -2,35 +2,35 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/cameraserver/CameraServerShared.hpp"
+#include "cameraserver/CameraServerShared.h"
 
-#include <format>
 #include <memory>
-#include <string_view>
 #include <utility>
 
-#include "wpi/util/mutex.hpp"
+#include <wpi/mutex.h>
 
 namespace {
-class DefaultCameraServerShared : public wpi::CameraServerShared {
+class DefaultCameraServerShared : public frc::CameraServerShared {
  public:
-  void ReportUsage(std::string_view resource, std::string_view data) override {}
-  void SetCameraServerErrorV(std::string_view format,
-                             std::format_args args) override {}
-  void SetVisionRunnerErrorV(std::string_view format,
-                             std::format_args args) override {}
-  void ReportDriverStationErrorV(std::string_view format,
-                                 std::format_args args) override {}
+  void ReportUsbCamera(int id) override {}
+  void ReportAxisCamera(int id) override {}
+  void ReportVideoServer(int id) override {}
+  void SetCameraServerErrorV(fmt::string_view format,
+                             fmt::format_args args) override {}
+  void SetVisionRunnerErrorV(fmt::string_view format,
+                             fmt::format_args args) override {}
+  void ReportDriverStationErrorV(fmt::string_view format,
+                                 fmt::format_args args) override {}
   std::pair<std::thread::id, bool> GetRobotMainThreadId() const override {
     return std::pair{std::thread::id(), false};
   }
 };
 }  // namespace
 
-static std::unique_ptr<wpi::CameraServerShared> cameraServerShared = nullptr;
-static wpi::util::mutex setLock;
+static std::unique_ptr<frc::CameraServerShared> cameraServerShared = nullptr;
+static wpi::mutex setLock;
 
-namespace wpi {
+namespace frc {
 CameraServerShared* GetCameraServerShared() {
   std::unique_lock lock(setLock);
   if (!cameraServerShared) {
@@ -38,10 +38,10 @@ CameraServerShared* GetCameraServerShared() {
   }
   return cameraServerShared.get();
 }
-}  // namespace wpi
+}  // namespace frc
 
 extern "C" {
-void CameraServer_SetCameraServerShared(wpi::CameraServerShared* shared) {
+void CameraServer_SetCameraServerShared(frc::CameraServerShared* shared) {
   std::unique_lock lock(setLock);
   cameraServerShared.reset(shared);
 }

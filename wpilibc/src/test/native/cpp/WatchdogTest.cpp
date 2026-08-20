@@ -2,111 +2,107 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/system/Watchdog.hpp"
+#include "frc/Watchdog.h"  // NOLINT(build/include_order)
 
 #include <stdint.h>
 
-#include <catch2/catch_test_macros.hpp>
-#include <catch2/matchers/catch_matchers_floating_point.hpp>
+#include <gtest/gtest.h>
 
-#include "wpi/simulation/SimHooks.hpp"
+#include "frc/simulation/SimHooks.h"
 
-using namespace wpi;
+using namespace frc;
 
 namespace {
-class WatchdogTest {
- public:
-  WatchdogTest() { wpi::sim::PauseTiming(); }
+class WatchdogTest : public ::testing::Test {
+ protected:
+  void SetUp() override { frc::sim::PauseTiming(); }
 
-  ~WatchdogTest() { wpi::sim::ResumeTiming(); }
+  void TearDown() override { frc::sim::ResumeTiming(); }
 };
 
 }  // namespace
 
-TEST_CASE_METHOD(WatchdogTest, "WatchdogTest EnableDisable", "[wpilibc]") {
+TEST_F(WatchdogTest, EnableDisable) {
   uint32_t watchdogCounter = 0;
 
   Watchdog watchdog(0.4_s, [&] { watchdogCounter++; });
 
   // Run 1
   watchdog.Enable();
-  wpi::sim::StepTiming(0.2_s);
+  frc::sim::StepTiming(0.2_s);
   watchdog.Disable();
 
-  UNSCOPED_INFO("Watchdog triggered early");
-  CHECK(0u == watchdogCounter);
+  EXPECT_EQ(0u, watchdogCounter) << "Watchdog triggered early";
 
   // Run 2
   watchdogCounter = 0;
   watchdog.Enable();
-  wpi::sim::StepTiming(0.4_s);
+  frc::sim::StepTiming(0.4_s);
   watchdog.Disable();
 
-  UNSCOPED_INFO("Watchdog either didn't trigger or triggered more than once");
-  CHECK(1u == watchdogCounter);
+  EXPECT_EQ(1u, watchdogCounter)
+      << "Watchdog either didn't trigger or triggered more than once";
 
   // Run 3
   watchdogCounter = 0;
   watchdog.Enable();
-  wpi::sim::StepTiming(1_s);
+  frc::sim::StepTiming(1_s);
   watchdog.Disable();
 
-  UNSCOPED_INFO("Watchdog either didn't trigger or triggered more than once");
-  CHECK(1u == watchdogCounter);
+  EXPECT_EQ(1u, watchdogCounter)
+      << "Watchdog either didn't trigger or triggered more than once";
 }
 
-TEST_CASE_METHOD(WatchdogTest, "WatchdogTest Reset", "[wpilibc]") {
+TEST_F(WatchdogTest, Reset) {
   uint32_t watchdogCounter = 0;
 
   Watchdog watchdog(0.4_s, [&] { watchdogCounter++; });
 
   watchdog.Enable();
-  wpi::sim::StepTiming(0.2_s);
+  frc::sim::StepTiming(0.2_s);
   watchdog.Reset();
-  wpi::sim::StepTiming(0.2_s);
+  frc::sim::StepTiming(0.2_s);
   watchdog.Disable();
 
-  UNSCOPED_INFO("Watchdog triggered early");
-  CHECK(0u == watchdogCounter);
+  EXPECT_EQ(0u, watchdogCounter) << "Watchdog triggered early";
 }
 
-TEST_CASE_METHOD(WatchdogTest, "WatchdogTest SetTimeout", "[wpilibc]") {
+TEST_F(WatchdogTest, SetTimeout) {
   uint32_t watchdogCounter = 0;
 
   Watchdog watchdog(1_s, [&] { watchdogCounter++; });
 
   watchdog.Enable();
-  wpi::sim::StepTiming(0.2_s);
+  frc::sim::StepTiming(0.2_s);
   watchdog.SetTimeout(0.2_s);
 
-  CHECK(0.2_s == watchdog.GetTimeout());
-  UNSCOPED_INFO("Watchdog triggered early");
-  CHECK(0u == watchdogCounter);
+  EXPECT_EQ(0.2_s, watchdog.GetTimeout());
+  EXPECT_EQ(0u, watchdogCounter) << "Watchdog triggered early";
 
-  wpi::sim::StepTiming(0.3_s);
+  frc::sim::StepTiming(0.3_s);
   watchdog.Disable();
 
-  UNSCOPED_INFO("Watchdog either didn't trigger or triggered more than once");
-  CHECK(1u == watchdogCounter);
+  EXPECT_EQ(1u, watchdogCounter)
+      << "Watchdog either didn't trigger or triggered more than once";
 }
 
-TEST_CASE_METHOD(WatchdogTest, "WatchdogTest IsExpired", "[wpilibc]") {
+TEST_F(WatchdogTest, IsExpired) {
   Watchdog watchdog(0.2_s, [] {});
-  CHECK_FALSE(watchdog.IsExpired());
+  EXPECT_FALSE(watchdog.IsExpired());
   watchdog.Enable();
 
-  CHECK_FALSE(watchdog.IsExpired());
-  wpi::sim::StepTiming(0.3_s);
-  CHECK(watchdog.IsExpired());
+  EXPECT_FALSE(watchdog.IsExpired());
+  frc::sim::StepTiming(0.3_s);
+  EXPECT_TRUE(watchdog.IsExpired());
 
   watchdog.Disable();
-  CHECK(watchdog.IsExpired());
+  EXPECT_TRUE(watchdog.IsExpired());
 
   watchdog.Reset();
-  CHECK_FALSE(watchdog.IsExpired());
+  EXPECT_FALSE(watchdog.IsExpired());
 }
 
-TEST_CASE_METHOD(WatchdogTest, "WatchdogTest Epochs", "[wpilibc]") {
+TEST_F(WatchdogTest, Epochs) {
   uint32_t watchdogCounter = 0;
 
   Watchdog watchdog(0.4_s, [&] { watchdogCounter++; });
@@ -114,29 +110,27 @@ TEST_CASE_METHOD(WatchdogTest, "WatchdogTest Epochs", "[wpilibc]") {
   // Run 1
   watchdog.Enable();
   watchdog.AddEpoch("Epoch 1");
-  wpi::sim::StepTiming(0.1_s);
+  frc::sim::StepTiming(0.1_s);
   watchdog.AddEpoch("Epoch 2");
-  wpi::sim::StepTiming(0.1_s);
+  frc::sim::StepTiming(0.1_s);
   watchdog.AddEpoch("Epoch 3");
   watchdog.Disable();
 
-  UNSCOPED_INFO("Watchdog triggered early");
-  CHECK(0u == watchdogCounter);
+  EXPECT_EQ(0u, watchdogCounter) << "Watchdog triggered early";
 
   // Run 2
   watchdog.Enable();
   watchdog.AddEpoch("Epoch 1");
-  wpi::sim::StepTiming(0.2_s);
+  frc::sim::StepTiming(0.2_s);
   watchdog.Reset();
-  wpi::sim::StepTiming(0.2_s);
+  frc::sim::StepTiming(0.2_s);
   watchdog.AddEpoch("Epoch 2");
   watchdog.Disable();
 
-  UNSCOPED_INFO("Watchdog triggered early");
-  CHECK(0u == watchdogCounter);
+  EXPECT_EQ(0u, watchdogCounter) << "Watchdog triggered early";
 }
 
-TEST_CASE_METHOD(WatchdogTest, "WatchdogTest MultiWatchdog", "[wpilibc]") {
+TEST_F(WatchdogTest, MultiWatchdog) {
   uint32_t watchdogCounter1 = 0;
   uint32_t watchdogCounter2 = 0;
 
@@ -144,20 +138,17 @@ TEST_CASE_METHOD(WatchdogTest, "WatchdogTest MultiWatchdog", "[wpilibc]") {
   Watchdog watchdog2(0.6_s, [&] { watchdogCounter2++; });
 
   watchdog2.Enable();
-  wpi::sim::StepTiming(0.25_s);
-  UNSCOPED_INFO("Watchdog triggered early");
-  CHECK(0u == watchdogCounter1);
-  UNSCOPED_INFO("Watchdog triggered early");
-  CHECK(0u == watchdogCounter2);
+  frc::sim::StepTiming(0.25_s);
+  EXPECT_EQ(0u, watchdogCounter1) << "Watchdog triggered early";
+  EXPECT_EQ(0u, watchdogCounter2) << "Watchdog triggered early";
 
   // Sleep enough such that only the watchdog enabled later times out first
   watchdog1.Enable();
-  wpi::sim::StepTiming(0.25_s);
+  frc::sim::StepTiming(0.25_s);
   watchdog1.Disable();
   watchdog2.Disable();
 
-  UNSCOPED_INFO("Watchdog either didn't trigger or triggered more than once");
-  CHECK(1u == watchdogCounter1);
-  UNSCOPED_INFO("Watchdog triggered early");
-  CHECK(0u == watchdogCounter2);
+  EXPECT_EQ(1u, watchdogCounter1)
+      << "Watchdog either didn't trigger or triggered more than once";
+  EXPECT_EQ(0u, watchdogCounter2) << "Watchdog triggered early";
 }

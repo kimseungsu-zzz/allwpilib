@@ -2,23 +2,23 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "commands/TurnTime.hpp"
+#include "commands/TurnTime.h"
 
 void TurnTime::Initialize() {
-  timer.Start();
-  drive->ArcadeDrive(0, 0);
+  m_timer.Start();
+  m_drive->ArcadeDrive(0, 0);
 }
 
 void TurnTime::Execute() {
-  drive->ArcadeDrive(0, velocity);
+  m_drive->ArcadeDrive(0, m_speed);
 }
 
 void TurnTime::End(bool interrupted) {
-  drive->ArcadeDrive(0, 0);
-  timer.Stop();
-  timer.Reset();
+  m_drive->ArcadeDrive(0, 0);
+  m_timer.Stop();
+  m_timer.Reset();
 }
 
 bool TurnTime::IsFinished() {
-  return timer.HasElapsed(duration);
+  return m_timer.HasElapsed(m_duration);
 }

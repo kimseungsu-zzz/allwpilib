@@ -31,17 +31,11 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
  */
 
-// clang-format off
-#include "wpi/util/Signal.h"
-// clang-format on
+#include "wpi/Signal.h"  // NOLINT(build/include_order)
 
-#include <catch2/catch_template_test_macros.hpp>
-#include <catch2/catch_test_macros.hpp>
-#include <catch2/matchers/catch_matchers_floating_point.hpp>
-#include <catch2/matchers/catch_matchers_range_equals.hpp>
-#include <catch2/matchers/catch_matchers_vector.hpp>
+#include <gtest/gtest.h>
 
-using namespace wpi::util::sig;
+using namespace wpi::sig;
 
 namespace {
 
@@ -72,54 +66,54 @@ struct o {
 
 }  // namespace
 
-namespace wpi::util {
+namespace wpi {
 
-TEST_CASE("SignalExtendedTest FreeConnection", "[wpiutil][sigslot]") {
+TEST(SignalExtendedTest, FreeConnection) {
   sum = 0;
   Signal<int> sig;
   sig.connect_extended(f);
 
   sig(1);
-  REQUIRE(sum == 1);
+  ASSERT_EQ(sum, 1);
   sig(1);
-  REQUIRE(sum == 1);
+  ASSERT_EQ(sum, 1);
 }
 
-TEST_CASE("SignalExtendedTest StaticConnection", "[wpiutil][sigslot]") {
+TEST(SignalExtendedTest, StaticConnection) {
   sum = 0;
   Signal<int> sig;
   sig.connect_extended(&s::sf);
 
   sig(1);
-  REQUIRE(sum == 1);
+  ASSERT_EQ(sum, 1);
   sig(1);
-  REQUIRE(sum == 1);
+  ASSERT_EQ(sum, 1);
 }
 
-TEST_CASE("SignalExtendedTest PmfConnection", "[wpiutil][sigslot]") {
+TEST(SignalExtendedTest, PmfConnection) {
   sum = 0;
   Signal<int> sig;
   s p;
   sig.connect_extended(&s::f, &p);
 
   sig(1);
-  REQUIRE(sum == 1);
+  ASSERT_EQ(sum, 1);
   sig(1);
-  REQUIRE(sum == 1);
+  ASSERT_EQ(sum, 1);
 }
 
-TEST_CASE("SignalExtendedTest FunctionObjectConnection", "[wpiutil][sigslot]") {
+TEST(SignalExtendedTest, FunctionObjectConnection) {
   sum = 0;
   Signal<int> sig;
   sig.connect_extended(o{});
 
   sig(1);
-  REQUIRE(sum == 1);
+  ASSERT_EQ(sum, 1);
   sig(1);
-  REQUIRE(sum == 1);
+  ASSERT_EQ(sum, 1);
 }
 
-TEST_CASE("SignalExtendedTest LambdaConnection", "[wpiutil][sigslot]") {
+TEST(SignalExtendedTest, LambdaConnection) {
   sum = 0;
   Signal<int> sig;
 
@@ -128,16 +122,16 @@ TEST_CASE("SignalExtendedTest LambdaConnection", "[wpiutil][sigslot]") {
     c.disconnect();
   });
   sig(1);
-  REQUIRE(sum == 1);
+  ASSERT_EQ(sum, 1);
 
   sig.connect_extended([&](Connection& c, int i) mutable {
     sum += 2 * i;
     c.disconnect();
   });
   sig(1);
-  REQUIRE(sum == 3);
+  ASSERT_EQ(sum, 3);
   sig(1);
-  REQUIRE(sum == 3);
+  ASSERT_EQ(sum, 3);
 }
 
-}  // namespace wpi::util
+}  // namespace wpi

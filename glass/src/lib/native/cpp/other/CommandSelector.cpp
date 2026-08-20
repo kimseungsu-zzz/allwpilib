@@ -2,15 +2,16 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/glass/other/CommandSelector.hpp"
+#include "glass/other/CommandSelector.h"
 
 #include <imgui.h>
 
-#include "wpi/glass/DataSource.hpp"
+#include "glass/Context.h"
+#include "glass/DataSource.h"
 
-using namespace wpi::glass;
+using namespace glass;
 
-void wpi::glass::DisplayCommandSelector(CommandSelectorModel* m) {
+void glass::DisplayCommandSelector(CommandSelectorModel* m) {
   if (auto name = m->GetName()) {
     ImGui::Text("%s", name);
   }

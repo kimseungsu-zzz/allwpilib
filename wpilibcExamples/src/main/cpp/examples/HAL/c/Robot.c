@@ -15,26 +15,41 @@ that want even more control over what code runs on their robot.
 
 #include <stdio.h>
 
-#include "wpi/hal/DIO.h"
-#include "wpi/hal/DriverStation.h"
-#include "wpi/hal/DriverStationTypes.h"
-#include "wpi/hal/HAL.h"
-#include "wpi/hal/PWM.h"
+#include <hal/HAL.h>
 
-HAL_RobotMode getDSMode(void) {
+enum DriverStationMode {
+  DisabledMode,
+  TeleopMode,
+  TestMode,
+  AutoMode,
+};
+
+enum DriverStationMode getDSMode(void) {
   // Get Robot State
   HAL_ControlWord word;
   HAL_GetControlWord(&word);
 
   // We send the observes, otherwise the DS disables
-  HAL_ObserveUserProgram(word);
-  return HAL_ControlWord_IsEnabled(word) ? HAL_ControlWord_GetRobotMode(word)
-                                         : HAL_ROBOT_MODE_UNKNOWN;
+  if (!word.enabled) {
+    HAL_ObserveUserProgramDisabled();
+    return DisabledMode;
+  } else {
+    if (word.autonomous) {
+      HAL_ObserveUserProgramAutonomous();
+      return AutoMode;
+    } else if (word.test) {
+      HAL_ObserveUserProgramTest();
+      return TestMode;
+    } else {
+      HAL_ObserveUserProgramTeleop();
+      return TeleopMode;
+    }
+  }
 }
 
 int main(void) {
   // Must initialize the HAL, 500ms timeout
-  HAL_Bool initialized = HAL_Initialize();
+  HAL_Bool initialized = HAL_Initialize(500, 0);
   if (!initialized) {
     printf("Failed to initialize the HAL\n");
     return 1;
@@ -42,34 +57,13 @@ int main(void) {
 
   int32_t status = 0;
 
-  // Create an opmode per robot mode
-  static struct HAL_OpModeOption opmodes[] = {
-      {HAL_MAKE_OPMODEID(HAL_ROBOT_MODE_AUTONOMOUS, 0),
-       {"Auto", 4},
-       {"", 0},
-       {"", 0},
-       -1,
-       -1},
-      {HAL_MAKE_OPMODEID(HAL_ROBOT_MODE_TELEOPERATED, 0),
-       {"Teleop", 6},
-       {"", 0},
-       {"", 0},
-       -1,
-       -1},
-      {HAL_MAKE_OPMODEID(HAL_ROBOT_MODE_UTILITY, 0),
-       {"Utility", 4},
-       {"", 0},
-       {"", 0},
-       -1,
-       -1}};
-  HAL_SetOpModeOptions(opmodes, sizeof(opmodes) / sizeof(opmodes[0]));
-
   // For DS to see valid robot code
   HAL_ObserveUserProgramStarting();
 
   // Create a Motor Controller
   status = 0;
-  HAL_DigitalHandle pwmPort = HAL_InitializePWMPort(1, NULL, &status);
+  HAL_DigitalHandle pwmPort =
+      HAL_InitializePWMPort(HAL_GetPort(2), NULL, &status);
 
   if (status != 0) {
     const char* message = HAL_GetLastError(&status);
@@ -77,9 +71,13 @@ int main(void) {
     return 1;
   }
 
+  // Set PWM config to standard servo speeds
+  HAL_SetPWMConfigMicroseconds(pwmPort, 2000, 1501, 1500, 1499, 1000, &status);
+
   // Create an Input
   status = 0;
-  HAL_DigitalHandle dio = HAL_InitializeDIOPort(2, 1, NULL, &status);
+  HAL_DigitalHandle dio =
+      HAL_InitializeDIOPort(HAL_GetPort(2), 1, NULL, &status);
 
   if (status != 0) {
     const char* message = HAL_GetLastError(&status);
@@ -88,7 +86,7 @@ int main(void) {
     return 1;
   }
 
-  WPI_EventHandle eventHandle = WPI_MakeEvent(0, 0);
+  WPI_EventHandle eventHandle = WPI_CreateEvent(0, 0);
   HAL_ProvideNewDataEventHandle(eventHandle);
 
   while (1) {
@@ -102,21 +100,21 @@ int main(void) {
 
     HAL_RefreshDSData();
 
-    HAL_RobotMode dsMode = getDSMode();
+    enum DriverStationMode dsMode = getDSMode();
     switch (dsMode) {
-      case HAL_ROBOT_MODE_UNKNOWN:
+      case DisabledMode:
         break;
-      case HAL_ROBOT_MODE_TELEOPERATED:
+      case TeleopMode:
         status = 0;
         if (HAL_GetDIO(dio, &status)) {
-          HAL_SetPWMPulseTimeMicroseconds(pwmPort, 2000, &status);
+          HAL_SetPWMSpeed(pwmPort, 1.0, &status);
         } else {
-          HAL_SetPWMPulseTimeMicroseconds(pwmPort, 1500, &status);
+          HAL_SetPWMSpeed(pwmPort, 0, &status);
         }
         break;
-      case HAL_ROBOT_MODE_AUTONOMOUS:
+      case AutoMode:
         break;
-      case HAL_ROBOT_MODE_UTILITY:
+      case TestMode:
         break;
       default:
         break;

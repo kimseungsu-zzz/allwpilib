@@ -13,49 +13,50 @@
 
 namespace slp {
 
-/// The result of a multistart solve.
-///
-/// @tparam Scalar Scalar type.
-/// @tparam DecisionVariables The type containing the decision variable initial
-///     guess.
-template <typename Scalar, typename DecisionVariables>
+/**
+ * The result of a multistart solve.
+ *
+ * @tparam DecisionVariables The type containing the decision variable initial
+ *   guess.
+ */
+template <typename DecisionVariables>
 struct MultistartResult {
   /// The solver exit status.
   ExitStatus status;
   /// The solution's cost.
-  Scalar cost;
+  double cost;
   /// The decision variables.
   DecisionVariables variables;
 };
 
-/// Solves an optimization problem from different starting points in parallel,
-/// then returns the solution with the lowest cost.
-///
-/// Each solve is performed on a separate thread. Solutions from successful
-/// solves are always preferred over solutions from unsuccessful solves, and
-/// cost (lower is better) is the tiebreaker between successful solves.
-///
-/// @tparam Scalar Scalar type.
-/// @tparam DecisionVariables The type containing the decision variable initial
-///     guess.
-/// @param solve A user-provided function that takes a decision variable initial
-///     guess and returns a MultistartResult.
-/// @param initial_guesses A list of decision variable initial guesses to try.
-template <typename Scalar, typename DecisionVariables>
-MultistartResult<Scalar, DecisionVariables> multistart(
-    function_ref<MultistartResult<Scalar, DecisionVariables>(
+/**
+ * Solves an optimization problem from different starting points in parallel,
+ * then returns the solution with the lowest cost.
+ *
+ * Each solve is performed on a separate thread. Solutions from successful
+ * solves are always preferred over solutions from unsuccessful solves, and cost
+ * (lower is better) is the tiebreaker between successful solves.
+ *
+ * @tparam DecisionVariables The type containing the decision variable initial
+ *   guess.
+ * @param solve A user-provided function that takes a decision variable initial
+ *   guess and returns a MultistartResult.
+ * @param initial_guesses A list of decision variable initial guesses to try.
+ */
+template <typename DecisionVariables>
+MultistartResult<DecisionVariables> Multistart(
+    function_ref<MultistartResult<DecisionVariables>(
         const DecisionVariables& initial_guess)>
         solve,
     std::span<const DecisionVariables> initial_guesses) {
-  gch::small_vector<std::future<MultistartResult<Scalar, DecisionVariables>>>
-      futures;
+  gch::small_vector<std::future<MultistartResult<DecisionVariables>>> futures;
   futures.reserve(initial_guesses.size());
 
   for (const auto& initial_guess : initial_guesses) {
     futures.emplace_back(std::async(std::launch::async, solve, initial_guess));
   }
 
-  gch::small_vector<MultistartResult<Scalar, DecisionVariables>> results;
+  gch::small_vector<MultistartResult<DecisionVariables>> results;
   results.reserve(futures.size());
 
   for (auto& future : futures) {

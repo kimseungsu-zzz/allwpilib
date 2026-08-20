@@ -2,15 +2,12 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "camerasupport.hpp"
+#include "camerasupport.h"
 
 #ifdef _WIN32
-
-#include <windows.h>
-#include <delayimp.h>
-
+#include "Windows.h"
+#include "delayimp.h"
 #pragma comment(lib, "delayimp.lib")
-
 static int CheckDelayException(int exception_value) {
   if (exception_value ==
           VcppException(ERROR_SEVERITY_ERROR, ERROR_MOD_NOT_FOUND) ||
@@ -19,11 +16,9 @@ static int CheckDelayException(int exception_value) {
     // This example just executes the handler.
     return EXCEPTION_EXECUTE_HANDLER;
   }
-
   // Don't attempt to handle other errors
   return EXCEPTION_CONTINUE_SEARCH;
 }
-
 static bool TryDelayLoadAllImports(LPCSTR szDll) {
   __try {
     HRESULT hr = __HrLoadAllImportsForDll(szDll);
@@ -35,9 +30,7 @@ static bool TryDelayLoadAllImports(LPCSTR szDll) {
   }
   return true;
 }
-
-namespace wpi::glass {
-
+namespace glass {
 bool HasCameraSupport() {
   bool hasCameraSupport = false;
   hasCameraSupport = TryDelayLoadAllImports("MF.dll");
@@ -49,17 +42,11 @@ bool HasCameraSupport() {
   }
   return hasCameraSupport;
 }
-
-}  // namespace wpi::glass
-
+}  // namespace glass
 #else
-
-namespace wpi::glass {
-
+namespace glass {
 bool HasCameraSupport() {
   return true;
 }
-
-}  // namespace wpi::glass
-
+}  // namespace glass
 #endif

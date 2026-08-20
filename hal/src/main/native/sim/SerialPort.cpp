@@ -2,26 +2,26 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/hal/SerialPort.h"
+#include "hal/SerialPort.h"
 
-#include "HALInitializer.hpp"
+#include "HALInitializer.h"
 
-namespace wpi::hal::init {
+namespace hal::init {
 void InitializeSerialPort() {}
-}  // namespace wpi::hal::init
+}  // namespace hal::init
 
 extern "C" {
 HAL_SerialPortHandle HAL_InitializeSerialPort(HAL_SerialPort port,
                                               int32_t* status) {
-  wpi::hal::init::CheckInit();
-  return HAL_INVALID_HANDLE;
+  hal::init::CheckInit();
+  return HAL_kInvalidHandle;
 }
 
 HAL_SerialPortHandle HAL_InitializeSerialPortDirect(HAL_SerialPort port,
                                                     const char* portName,
                                                     int32_t* status) {
-  wpi::hal::init::CheckInit();
-  return HAL_INVALID_HANDLE;
+  hal::init::CheckInit();
+  return HAL_kInvalidHandle;
 }
 
 int HAL_GetSerialFD(HAL_SerialPortHandle handle, int32_t* status) {

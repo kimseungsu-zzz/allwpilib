@@ -4,15 +4,14 @@
 
 #include <string>
 
-#include <catch2/catch_test_macros.hpp>
+#include <gtest/gtest.h>
 
-#include "wpi/hal/CTREPCM.h"
-#include "wpi/hal/Errors.h"
-#include "wpi/hal/HAL.h"
-#include "wpi/hal/handles/HandlesInternal.hpp"
-#include "wpi/hal/simulation/CTREPCMData.h"
+#include "hal/CTREPCM.h"
+#include "hal/HAL.h"
+#include "hal/handles/HandlesInternal.h"
+#include "hal/simulation/CTREPCMData.h"
 
-namespace wpi::hal {
+namespace hal {
 
 std::string gTestSolenoidCallbackName;
 HAL_Value gTestSolenoidCallbackValue;
@@ -23,14 +22,14 @@ void TestSolenoidInitializationCallback(const char* name, void* param,
   gTestSolenoidCallbackValue = *value;
 }
 
-TEST_CASE("PCMDataTest PCMInitialization", "[hal][mockdata]") {
+TEST(PCMDataTest, PCMInitialization) {
   const int MODULE_TO_TEST = 2;
 
   int callbackParam = 0;
   int callbackId = HALSIM_RegisterCTREPCMInitializedCallback(
       MODULE_TO_TEST, &TestSolenoidInitializationCallback, &callbackParam,
       false);
-  REQUIRE(0 != callbackId);
+  ASSERT_TRUE(0 != callbackId);
 
   int32_t status = 0;
   int32_t module;
@@ -39,48 +38,48 @@ TEST_CASE("PCMDataTest PCMInitialization", "[hal][mockdata]") {
   // Use out of range index
   module = 8000;
   gTestSolenoidCallbackName = "Unset";
-  pcmHandle = HAL_InitializeCTREPCM(0, module, nullptr, &status);
-  CHECK(HAL_INVALID_HANDLE == pcmHandle);
-  CHECK(HAL_USE_LAST_ERROR == status);
+  pcmHandle = HAL_InitializeCTREPCM(module, nullptr, &status);
+  EXPECT_EQ(HAL_kInvalidHandle, pcmHandle);
+  EXPECT_EQ(HAL_USE_LAST_ERROR, status);
   HAL_GetLastError(&status);
-  CHECK(HAL_RESOURCE_OUT_OF_RANGE == status);
-  CHECK("Unset" == gTestSolenoidCallbackName);
+  EXPECT_EQ(RESOURCE_OUT_OF_RANGE, status);
+  EXPECT_STREQ("Unset", gTestSolenoidCallbackName.c_str());
 
   // Successful setup
   status = 0;
   module = MODULE_TO_TEST;
   gTestSolenoidCallbackName = "Unset";
-  pcmHandle = HAL_InitializeCTREPCM(0, module, nullptr, &status);
-  CHECK(HAL_INVALID_HANDLE != pcmHandle);
-  CHECK(0 == status);
-  CHECK("Initialized" == gTestSolenoidCallbackName);
+  pcmHandle = HAL_InitializeCTREPCM(module, nullptr, &status);
+  EXPECT_TRUE(HAL_kInvalidHandle != pcmHandle);
+  EXPECT_EQ(0, status);
+  EXPECT_STREQ("Initialized", gTestSolenoidCallbackName.c_str());
 
   // Double initialize... should fail
   status = 0;
   module = MODULE_TO_TEST;
   gTestSolenoidCallbackName = "Unset";
-  pcmHandle = HAL_InitializeCTREPCM(0, module, nullptr, &status);
-  CHECK(HAL_INVALID_HANDLE == pcmHandle);
-  CHECK(HAL_USE_LAST_ERROR == status);
+  pcmHandle = HAL_InitializeCTREPCM(module, nullptr, &status);
+  EXPECT_EQ(HAL_kInvalidHandle, pcmHandle);
+  EXPECT_EQ(HAL_USE_LAST_ERROR, status);
   HAL_GetLastError(&status);
-  CHECK(HAL_RESOURCE_IS_ALLOCATED == status);
-  CHECK("Unset" == gTestSolenoidCallbackName);
+  EXPECT_EQ(RESOURCE_IS_ALLOCATED, status);
+  EXPECT_STREQ("Unset", gTestSolenoidCallbackName.c_str());
 
   // Reset, should allow you to re-register
-  wpi::hal::HandleBase::ResetGlobalHandles();
+  hal::HandleBase::ResetGlobalHandles();
   HALSIM_ResetCTREPCMData(MODULE_TO_TEST);
   callbackId = HALSIM_RegisterCTREPCMInitializedCallback(
       MODULE_TO_TEST, &TestSolenoidInitializationCallback, &callbackParam,
       false);
-  REQUIRE(0 != callbackId);
+  ASSERT_TRUE(0 != callbackId);
 
   status = 0;
   module = MODULE_TO_TEST;
   gTestSolenoidCallbackName = "Unset";
-  pcmHandle = HAL_InitializeCTREPCM(0, module, nullptr, &status);
-  CHECK(HAL_INVALID_HANDLE != pcmHandle);
-  CHECK(0 == status);
-  CHECK("Initialized" == gTestSolenoidCallbackName);
+  pcmHandle = HAL_InitializeCTREPCM(module, nullptr, &status);
+  EXPECT_TRUE(HAL_kInvalidHandle != pcmHandle);
+  EXPECT_EQ(0, status);
+  EXPECT_STREQ("Initialized", gTestSolenoidCallbackName.c_str());
 }
 
-}  // namespace wpi::hal
+}  // namespace hal

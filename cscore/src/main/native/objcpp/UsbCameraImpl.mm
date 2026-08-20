@@ -9,21 +9,20 @@
 
 #include <vector>
 #include <string>
-#include "wpi/util/timestamp.hpp"
+#include <wpi/timestamp.h>
 
 #pragma GCC diagnostic ignored "-Wunused-parameter"
-#include "Handle.hpp"
-#include "Log.hpp"
-#include "Notifier.hpp"
-#include "Instance.hpp"
-#include "c_util.hpp"
-#include "wpi/cs/cscore_cpp.hpp"
-#include "wpi/util/PixelFormat.hpp"
-#include "UsbCameraImpl.hpp"
+#include "Handle.h"
+#include "Log.h"
+#include "Notifier.h"
+#include "Instance.h"
+#include "c_util.h"
+#include "cscore_cpp.h"
+#include "UsbCameraImpl.h"
 
-namespace wpi::cs {
+namespace cs {
 
-UsbCameraImpl::UsbCameraImpl(std::string_view name, wpi::util::Logger& logger,
+UsbCameraImpl::UsbCameraImpl(std::string_view name, wpi::Logger& logger,
                              Notifier& notifier, Telemetry& telemetry,
                              std::string_view path)
     : SourceImpl{name, logger, notifier, telemetry} {
@@ -33,7 +32,7 @@ UsbCameraImpl::UsbCameraImpl(std::string_view name, wpi::util::Logger& logger,
                                      encoding:NSUTF8StringEncoding];
   m_objc = objc;
 }
-UsbCameraImpl::UsbCameraImpl(std::string_view name, wpi::util::Logger& logger,
+UsbCameraImpl::UsbCameraImpl(std::string_view name, wpi::Logger& logger,
                              Notifier& notifier, Telemetry& telemetry,
                              int deviceId)
     : SourceImpl{name, logger, notifier, telemetry} {
@@ -89,7 +88,7 @@ void UsbCameraImpl::SetExposureManual(int value, CS_Status* status) {
 bool UsbCameraImpl::SetVideoMode(const VideoMode& mode, CS_Status* status) {
   return [m_objc setVideoMode:mode status:status];
 }
-bool UsbCameraImpl::SetPixelFormat(wpi::util::PixelFormat pixelFormat,
+bool UsbCameraImpl::SetPixelFormat(VideoMode::PixelFormat pixelFormat,
                                    CS_Status* status) {
   return [m_objc setPixelFormat:pixelFormat status:status];
 }
@@ -109,7 +108,7 @@ void UsbCameraImpl::NumSinksEnabledChanged() {
 
 CS_Source CreateUsbCameraDev(std::string_view name, int dev,
                              CS_Status* status) {
-  std::vector<UsbCameraInfo> devices = wpi::cs::EnumerateUsbCameras(status);
+  std::vector<UsbCameraInfo> devices = cs::EnumerateUsbCameras(status);
   if (static_cast<int>(devices.size()) > dev) {
     return CreateUsbCameraPath(name, devices[dev].path, status);
   }
@@ -204,4 +203,4 @@ UsbCameraInfo GetUsbCameraInfo(CS_Source source, CS_Status* status) {
   return info;
 }
 
-}  // namespace wpi::cs
+}  // namespace cs

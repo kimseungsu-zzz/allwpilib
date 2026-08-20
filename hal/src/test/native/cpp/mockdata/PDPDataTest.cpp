@@ -4,12 +4,12 @@
 
 #include <string>
 
-#include <catch2/catch_test_macros.hpp>
+#include <gtest/gtest.h>
 
-#include "wpi/hal/PowerDistribution.h"
-#include "wpi/hal/simulation/PowerDistributionData.h"
+#include "hal/PowerDistribution.h"
+#include "hal/simulation/PowerDistributionData.h"
 
-namespace wpi::hal {
+namespace hal {
 
 std::string gTestPdpCallbackName;
 HAL_Value gTestPdpCallbackValue;
@@ -20,22 +20,22 @@ void TestPdpInitializationCallback(const char* name, void* param,
   gTestPdpCallbackValue = *value;
 }
 
-TEST_CASE("PdpSimTest PdpInitialization", "[hal][mockdata]") {
+TEST(PdpSimTest, PdpInitialization) {
   const int INDEX_TO_TEST = 1;
 
   int callbackParam = 0;
   int callbackId = HALSIM_RegisterPowerDistributionInitializedCallback(
       INDEX_TO_TEST, &TestPdpInitializationCallback, &callbackParam, false);
-  REQUIRE(0 != callbackId);
+  ASSERT_TRUE(0 != callbackId);
 
   int32_t status = 0;
 
   // Use out of range index
   gTestPdpCallbackName = "Unset";
-  HAL_InitializePowerDistribution(0, INDEX_TO_TEST, HAL_POWER_DISTRIBUTION_CTRE,
-                                  nullptr, &status);
-  CHECK(0 == status);
-  CHECK("Initialized" == gTestPdpCallbackName);
+  HAL_InitializePowerDistribution(
+      INDEX_TO_TEST, HAL_PowerDistributionType_kCTRE, nullptr, &status);
+  EXPECT_EQ(0, status);
+  EXPECT_STREQ("Initialized", gTestPdpCallbackName.c_str());
 }
 
-}  // namespace wpi::hal
+}  // namespace hal

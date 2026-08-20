@@ -2,23 +2,22 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/simulation/DIOSim.hpp"
+#include "frc/simulation/DIOSim.h"  // NOLINT(build/include_order)
 
-#include <catch2/catch_test_macros.hpp>
-#include <catch2/matchers/catch_matchers_floating_point.hpp>
+#include <gtest/gtest.h>
+#include <hal/HAL.h>
 
-#include "callback_helpers/TestCallbackHelpers.hpp"
-#include "wpi/hal/HAL.h"
-#include "wpi/hardware/discrete/DigitalInput.hpp"
-#include "wpi/hardware/discrete/DigitalOutput.hpp"
+#include "callback_helpers/TestCallbackHelpers.h"
+#include "frc/DigitalInput.h"
+#include "frc/DigitalOutput.h"
 
-namespace wpi::sim {
+namespace frc::sim {
 
-TEST_CASE("DIOSimTest Initialization", "[wpilibc][simulation]") {
-  HAL_Initialize();
+TEST(DIOSimTest, Initialization) {
+  HAL_Initialize(500, 0);
   DIOSim sim{2};
   sim.ResetData();
-  CHECK_FALSE(sim.GetInitialized());
+  EXPECT_FALSE(sim.GetInitialized());
 
   BooleanCallback initializeCallback;
   BooleanCallback isInputCallback;
@@ -29,53 +28,53 @@ TEST_CASE("DIOSimTest Initialization", "[wpilibc][simulation]") {
       sim.RegisterIsInputCallback(isInputCallback.GetCallback(), false);
 
   DigitalOutput output(2);
-  CHECK(sim.GetInitialized());
-  CHECK(initializeCallback.WasTriggered());
-  CHECK(initializeCallback.GetLastValue());
-  CHECK_FALSE(sim.GetIsInput());
-  CHECK(isInputCallback.WasTriggered());
-  CHECK_FALSE(isInputCallback.GetLastValue());
+  EXPECT_TRUE(sim.GetInitialized());
+  EXPECT_TRUE(initializeCallback.WasTriggered());
+  EXPECT_TRUE(initializeCallback.GetLastValue());
+  EXPECT_FALSE(sim.GetIsInput());
+  EXPECT_TRUE(isInputCallback.WasTriggered());
+  EXPECT_FALSE(isInputCallback.GetLastValue());
 
   initializeCallback.Reset();
   sim.SetInitialized(false);
-  CHECK(initializeCallback.WasTriggered());
-  CHECK_FALSE(initializeCallback.GetLastValue());
+  EXPECT_TRUE(initializeCallback.WasTriggered());
+  EXPECT_FALSE(initializeCallback.GetLastValue());
 }
 
-TEST_CASE("DIOSimTest Input", "[wpilibc][simulation]") {
-  HAL_Initialize();
+TEST(DIOSimTest, Input) {
+  HAL_Initialize(500, 0);
 
   DigitalInput input{0};
   DIOSim sim(input);
-  CHECK(sim.GetIsInput());
+  EXPECT_TRUE(sim.GetIsInput());
 
   BooleanCallback valueCallback;
 
   auto cb = sim.RegisterValueCallback(valueCallback.GetCallback(), false);
-  CHECK(input.Get());
-  CHECK(sim.GetValue());
+  EXPECT_TRUE(input.Get());
+  EXPECT_TRUE(sim.GetValue());
 
-  CHECK_FALSE(valueCallback.WasTriggered());
+  EXPECT_FALSE(valueCallback.WasTriggered());
   sim.SetValue(false);
-  CHECK(valueCallback.WasTriggered());
-  CHECK_FALSE(valueCallback.GetLastValue());
+  EXPECT_TRUE(valueCallback.WasTriggered());
+  EXPECT_FALSE(valueCallback.GetLastValue());
 }
 
-TEST_CASE("DIOSimTest Output", "[wpilibc][simulation]") {
-  HAL_Initialize();
+TEST(DIOSimTest, Output) {
+  HAL_Initialize(500, 0);
   DigitalOutput output{0};
   DIOSim sim(output);
-  CHECK_FALSE(sim.GetIsInput());
+  EXPECT_FALSE(sim.GetIsInput());
 
   BooleanCallback valueCallback;
 
   auto cb = sim.RegisterValueCallback(valueCallback.GetCallback(), false);
-  CHECK(output.Get());
-  CHECK(sim.GetValue());
+  EXPECT_TRUE(output.Get());
+  EXPECT_TRUE(sim.GetValue());
 
-  CHECK_FALSE(valueCallback.WasTriggered());
+  EXPECT_FALSE(valueCallback.WasTriggered());
   output.Set(false);
-  CHECK(valueCallback.WasTriggered());
-  CHECK_FALSE(valueCallback.GetLastValue());
+  EXPECT_TRUE(valueCallback.WasTriggered());
+  EXPECT_FALSE(valueCallback.GetLastValue());
 }
-}  // namespace wpi::sim
+}  // namespace frc::sim

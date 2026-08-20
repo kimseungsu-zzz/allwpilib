@@ -2,32 +2,33 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/smartdashboard/SmartDashboard.hpp"
+#include "frc/smartdashboard/SmartDashboard.h"
 
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
 
-#include "wpi/hal/UsageReporting.hpp"
-#include "wpi/nt/NetworkTable.hpp"
-#include "wpi/nt/NetworkTableInstance.hpp"
-#include "wpi/smartdashboard/ListenerExecutor.hpp"
-#include "wpi/smartdashboard/SendableBuilderImpl.hpp"
-#include "wpi/system/Errors.hpp"
-#include "wpi/util/StringMap.hpp"
-#include "wpi/util/mutex.hpp"
-#include "wpi/util/sendable/SendableRegistry.hpp"
+#include <hal/FRCUsageReporting.h>
+#include <networktables/NetworkTable.h>
+#include <networktables/NetworkTableInstance.h>
+#include <wpi/StringMap.h>
+#include <wpi/mutex.h>
+#include <wpi/sendable/SendableRegistry.h>
 
-using namespace wpi;
+#include "frc/Errors.h"
+#include "frc/smartdashboard/ListenerExecutor.h"
+#include "frc/smartdashboard/SendableBuilderImpl.h"
+
+using namespace frc;
 
 namespace {
 struct Instance {
   detail::ListenerExecutor listenerExecutor;
-  std::shared_ptr<wpi::nt::NetworkTable> table =
-      wpi::nt::NetworkTableInstance::GetDefault().GetTable("SmartDashboard");
-  wpi::util::StringMap<wpi::util::SendableRegistry::UID> tablesToData;
-  wpi::util::mutex tablesToDataMutex;
+  std::shared_ptr<nt::NetworkTable> table =
+      nt::NetworkTableInstance::GetDefault().GetTable("SmartDashboard");
+  wpi::StringMap<wpi::SendableRegistry::UID> tablesToData;
+  wpi::mutex tablesToDataMutex;
 };
 }  // namespace
 
@@ -40,12 +41,12 @@ static Instance& GetInstance() {
   return *GetInstanceHolder();
 }
 
-#ifndef __FIRST_SYSTEMCORE__
-namespace wpi::impl {
+#ifndef __FRC_ROBORIO__
+namespace frc::impl {
 void ResetSmartDashboardInstance() {
   std::make_unique<Instance>().swap(GetInstanceHolder());
 }
-}  // namespace wpi::impl
+}  // namespace frc::impl
 #endif
 
 static bool gReported = false;
@@ -74,56 +75,58 @@ bool SmartDashboard::IsPersistent(std::string_view key) {
   return GetEntry(key).IsPersistent();
 }
 
-wpi::nt::NetworkTableEntry SmartDashboard::GetEntry(std::string_view key) {
+nt::NetworkTableEntry SmartDashboard::GetEntry(std::string_view key) {
   if (!gReported) {
-    HAL_ReportUsage("SmartDashboard", "");
+    HAL_Report(HALUsageReporting::kResourceType_SmartDashboard,
+               HALUsageReporting::kSmartDashboard_Instance);
     gReported = true;
   }
   return GetInstance().table->GetEntry(key);
 }
 
-void SmartDashboard::PutData(std::string_view key, wpi::util::Sendable* data) {
+void SmartDashboard::PutData(std::string_view key, wpi::Sendable* data) {
   if (!data) {
-    throw WPILIB_MakeError(err::NullParameter, "value");
+    throw FRC_MakeError(err::NullParameter, "value");
   }
   if (!gReported) {
-    HAL_ReportUsage("SmartDashboard", "");
+    HAL_Report(HALUsageReporting::kResourceType_SmartDashboard,
+               HALUsageReporting::kSmartDashboard_Instance);
     gReported = true;
   }
   auto& inst = GetInstance();
   std::scoped_lock lock(inst.tablesToDataMutex);
   auto& uid = inst.tablesToData[key];
-  wpi::util::Sendable* sddata = wpi::util::SendableRegistry::GetSendable(uid);
-  if (sddata != data || !wpi::util::SendableRegistry::IsPublished(uid)) {
-    uid = wpi::util::SendableRegistry::GetUniqueId(data);
+  wpi::Sendable* sddata = wpi::SendableRegistry::GetSendable(uid);
+  if (sddata != data) {
+    uid = wpi::SendableRegistry::GetUniqueId(data);
     auto dataTable = inst.table->GetSubTable(key);
     auto builder = std::make_unique<SendableBuilderImpl>();
     auto builderPtr = builder.get();
     builderPtr->SetTable(dataTable);
-    wpi::util::SendableRegistry::Publish(uid, std::move(builder));
+    wpi::SendableRegistry::Publish(uid, std::move(builder));
     builderPtr->StartListeners();
     dataTable->GetEntry(".name").SetString(key);
   }
 }
 
-void SmartDashboard::PutData(wpi::util::Sendable* value) {
+void SmartDashboard::PutData(wpi::Sendable* value) {
   if (!value) {
-    throw WPILIB_MakeError(err::NullParameter, "value");
+    throw FRC_MakeError(err::NullParameter, "value");
   }
-  auto name = wpi::util::SendableRegistry::GetName(value);
+  auto name = wpi::SendableRegistry::GetName(value);
   if (!name.empty()) {
     PutData(name, value);
   }
 }
 
-wpi::util::Sendable* SmartDashboard::GetData(std::string_view key) {
+wpi::Sendable* SmartDashboard::GetData(std::string_view key) {
   auto& inst = GetInstance();
   std::scoped_lock lock(inst.tablesToDataMutex);
   auto it = inst.tablesToData.find(key);
   if (it == inst.tablesToData.end()) {
-    throw WPILIB_MakeError(err::SmartDashboardMissingKey, "{}", key);
+    throw FRC_MakeError(err::SmartDashboardMissingKey, "{}", key);
   }
-  return wpi::util::SendableRegistry::GetSendable(it->second);
+  return wpi::SendableRegistry::GetSendable(it->second);
 }
 
 bool SmartDashboard::PutBoolean(std::string_view keyName, bool value) {
@@ -229,16 +232,16 @@ std::vector<uint8_t> SmartDashboard::GetRaw(
 }
 
 bool SmartDashboard::PutValue(std::string_view keyName,
-                              const wpi::nt::Value& value) {
+                              const nt::Value& value) {
   return GetInstance().table->GetEntry(keyName).SetValue(value);
 }
 
 bool SmartDashboard::SetDefaultValue(std::string_view key,
-                                     const wpi::nt::Value& defaultValue) {
+                                     const nt::Value& defaultValue) {
   return GetEntry(key).SetDefaultValue(defaultValue);
 }
 
-wpi::nt::Value SmartDashboard::GetValue(std::string_view keyName) {
+nt::Value SmartDashboard::GetValue(std::string_view keyName) {
   return GetInstance().table->GetEntry(keyName).GetValue();
 }
 
@@ -251,6 +254,6 @@ void SmartDashboard::UpdateValues() {
   inst.listenerExecutor.RunListenerTasks();
   std::scoped_lock lock(inst.tablesToDataMutex);
   for (auto& i : inst.tablesToData) {
-    wpi::util::SendableRegistry::Update(i.second);
+    wpi::SendableRegistry::Update(i.second);
   }
 }

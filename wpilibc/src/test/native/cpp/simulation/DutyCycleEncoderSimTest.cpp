@@ -2,36 +2,36 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/simulation/DutyCycleEncoderSim.hpp"
+#include "frc/simulation/DutyCycleEncoderSim.h"  // NOLINT(build/include_order)
 
-#include <catch2/catch_test_macros.hpp>
-#include <catch2/matchers/catch_matchers_floating_point.hpp>
+#include <gtest/gtest.h>
+#include <hal/HAL.h>
 
-#include "wpi/hal/HAL.h"
-#include "wpi/hardware/rotation/DutyCycleEncoder.hpp"
+#include "callback_helpers/TestCallbackHelpers.h"
+#include "frc/DutyCycleEncoder.h"
 
-namespace wpi::sim {
+namespace frc::sim {
 
-TEST_CASE("DutyCycleEncoderSimTest Set", "[wpilibc][simulation]") {
-  HAL_Initialize();
+TEST(DutyCycleEncoderSimTest, Set) {
+  HAL_Initialize(500, 0);
 
   DutyCycleEncoder enc{0, 10, 0};
   DutyCycleEncoderSim sim(enc);
 
   constexpr double kTestValue{5.67};
   sim.Set(kTestValue);
-  CHECK(kTestValue == enc.Get());
+  EXPECT_EQ(kTestValue, enc.Get());
 }
 
-TEST_CASE("DutyCycleEncoderSimTest SetIsConnected", "[wpilibc][simulation]") {
-  HAL_Initialize();
+TEST(DutyCycleEncoderSimTest, SetIsConnected) {
+  HAL_Initialize(500, 0);
 
   DutyCycleEncoder enc{0};
   DutyCycleEncoderSim sim(enc);
   sim.SetConnected(true);
-  CHECK(enc.IsConnected());
+  EXPECT_TRUE(enc.IsConnected());
   sim.SetConnected(false);
-  CHECK_FALSE(enc.IsConnected());
+  EXPECT_FALSE(enc.IsConnected());
 }
 
-}  // namespace wpi::sim
+}  // namespace frc::sim

@@ -2,20 +2,21 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/net/EventLoopRunner.hpp"
+#include "wpinet/EventLoopRunner.h"
 
 #include <memory>
 #include <utility>
 
-#include "wpi/net/uv/AsyncFunction.hpp"
-#include "wpi/net/uv/Loop.hpp"
-#include "wpi/util/SmallVector.hpp"
-#include "wpi/util/condition_variable.hpp"
-#include "wpi/util/mutex.hpp"
+#include <wpi/SmallVector.h>
+#include <wpi/condition_variable.h>
+#include <wpi/mutex.h>
 
-using namespace wpi::net;
+#include "wpinet/uv/AsyncFunction.h"
+#include "wpinet/uv/Loop.h"
 
-class EventLoopRunner::Thread : public wpi::util::SafeThread {
+using namespace wpi;
+
+class EventLoopRunner::Thread : public SafeThread {
  public:
   using UvExecFunc = uv::AsyncFunction<void(LoopFunc)>;
 
@@ -75,7 +76,7 @@ void EventLoopRunner::ExecAsync(LoopFunc func) {
 }
 
 void EventLoopRunner::ExecSync(LoopFunc func) {
-  wpi::util::future<void> f;
+  wpi::future<void> f;
   if (auto thr = m_owner.GetThread()) {
     if (auto doExec = thr->m_doExec.lock()) {
       f = doExec->Call(std::move(func));

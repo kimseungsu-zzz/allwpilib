@@ -2,24 +2,25 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/glass/networktables/NTAlerts.hpp"
+#include "glass/networktables/NTAlerts.h"
 
-#include <format>
 #include <utility>
 
-using namespace wpi::glass;
+#include <fmt/format.h>
+
+using namespace glass;
 
 NTAlertsModel::NTAlertsModel(std::string_view path)
-    : NTAlertsModel{wpi::nt::NetworkTableInstance::GetDefault(), path} {}
+    : NTAlertsModel{nt::NetworkTableInstance::GetDefault(), path} {}
 
-NTAlertsModel::NTAlertsModel(wpi::nt::NetworkTableInstance inst,
+NTAlertsModel::NTAlertsModel(nt::NetworkTableInstance inst,
                              std::string_view path)
     : m_inst{inst},
-      m_infos{m_inst.GetStringArrayTopic(std::format("{}/infos", path))
+      m_infos{m_inst.GetStringArrayTopic(fmt::format("{}/infos", path))
                   .Subscribe({})},
-      m_warnings{m_inst.GetStringArrayTopic(std::format("{}/warnings", path))
+      m_warnings{m_inst.GetStringArrayTopic(fmt::format("{}/warnings", path))
                      .Subscribe({})},
-      m_errors{m_inst.GetStringArrayTopic(std::format("{}/errors", path))
+      m_errors{m_inst.GetStringArrayTopic(fmt::format("{}/errors", path))
                    .Subscribe({})} {}
 
 void NTAlertsModel::Update() {

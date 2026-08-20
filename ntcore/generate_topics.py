@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 
+import argparse
 import json
-import sys
 from pathlib import Path
-
-# When invoked directly, Python puts the script directory on sys.path.
-# Add the repo root so absolute package imports still work.
-sys.path.insert(0, str(Path(__file__).absolute().parent.parent))
 
 from jinja2 import Environment, FileSystemLoader
 
-from shared.generation import add_jinja_args, make_arg_parser, write_file
+
+def Output(output_dir: Path, controller_name: str, contents: str):
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_file = output_dir / controller_name
+    output_file.write_text(contents, encoding="utf-8", newline="\n")
 
 
 def generate_topics(
@@ -25,22 +25,24 @@ def generate_topics(
         loader=FileSystemLoader(java_template_directory), autoescape=False
     )
 
-    generated_output_dir = output_directory / "main/java/org/wpilib/networktables"
+    generated_output_dir = output_directory / "main/java/edu/wpi/first/networktables"
     for fn in java_template_directory.glob("*.jinja"):
         template = env.get_template(fn.name)
         outfn = fn.stem
-        if outfn.startswith(("NetworkTable", "Generic")):
-            write_file(generated_output_dir, outfn, template.render(types=types))
+        if outfn.startswith("NetworkTable") or outfn.startswith("Generic"):
+            output = template.render(types=types)
+            Output(generated_output_dir, outfn, output)
         else:
             for replacements in types:
+                output = template.render(replacements)
                 if outfn == "Timestamped.java":
                     outfn2 = f"Timestamped{replacements['TypeName']}.java"
                 else:
                     outfn2 = f"{replacements['TypeName']}{outfn}"
-                write_file(generated_output_dir, outfn2, template.render(replacements))
+                Output(generated_output_dir, outfn2, output)
 
     # C++ classes
-    cpp_subdirectory = "main/native/include/wpi/nt"
+    cpp_subdirectory = "main/native/include/networktables"
     cpp_template_directory = template_root / cpp_subdirectory
     env = Environment(
         loader=FileSystemLoader(cpp_template_directory),
@@ -54,7 +56,7 @@ def generate_topics(
         for replacements in types:
             output = template.render(replacements)
             outfn2 = f"{replacements['TypeName']}{outfn}"
-            write_file(generated_output_dir, outfn2, output)
+            Output(generated_output_dir, outfn2, output)
 
     # C++ handle API (header)
     hdr_subdirectory = "main/native/include"
@@ -63,11 +65,12 @@ def generate_topics(
         loader=FileSystemLoader(hdr_template_directory),
         autoescape=False,
     )
-    template = env.get_template("ntcore_cpp_types.hpp.jinja")
-    write_file(
-        output_directory / hdr_subdirectory / "wpi/nt",
-        "ntcore_cpp_types.hpp",
-        template.render(types=types),
+    template = env.get_template("ntcore_cpp_types.h.jinja")
+    output = template.render(types=types)
+    Output(
+        output_directory / hdr_subdirectory,
+        "ntcore_cpp_types.h",
+        output,
     )
 
     # C++ handle API (source)
@@ -78,10 +81,11 @@ def generate_topics(
         autoescape=False,
     )
     template = env.get_template("ntcore_cpp_types.cpp.jinja")
-    write_file(
+    output = template.render(types=types)
+    Output(
         output_directory / cpp_subdirectory,
         "ntcore_cpp_types.cpp",
-        template.render(types=types),
+        output,
     )
 
     # C handle API (header)
@@ -92,11 +96,8 @@ def generate_topics(
         autoescape=False,
     )
     template = env.get_template("ntcore_c_types.h.jinja")
-    write_file(
-        output_directory / hdr_subdirectory / "wpi/nt",
-        "ntcore_c_types.h",
-        template.render(types=types),
-    )
+    output = template.render(types=types)
+    Output(output_directory / hdr_subdirectory, "ntcore_c_types.h", output)
 
     # C handle API (source)
     c_subdirectory = "main/native/cpp"
@@ -106,11 +107,8 @@ def generate_topics(
         autoescape=False,
     )
     template = env.get_template("ntcore_c_types.cpp.jinja")
-    write_file(
-        output_directory / c_subdirectory,
-        "ntcore_c_types.cpp",
-        template.render(types=types),
-    )
+    output = template.render(types=types)
+    Output(output_directory / c_subdirectory, "ntcore_c_types.cpp", output)
 
     # JNI
     jni_subdirectory = "main/native/cpp/jni"
@@ -120,22 +118,36 @@ def generate_topics(
         autoescape=False,
     )
     template = env.get_template("types_jni.cpp.jinja")
-    write_file(
-        output_directory / jni_subdirectory,
-        "types_jni.cpp",
-        template.render(types=types),
-    )
+    output = template.render(types=types)
+    Output(output_directory / jni_subdirectory, "types_jni.cpp", output)
 
 
 def main():
     script_path = Path(__file__).resolve()
     dirname = script_path.parent
 
-    parser = make_arg_parser(dirname, dirname.parent)
-    add_jinja_args(parser, dirname, dirname / "src/generate/types.json")
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--output_directory",
+        help="Optional. If set, will output the generated files to this directory, otherwise it will use a path relative to the script",
+        default=dirname / "src/generated",
+        type=Path,
+    )
+    parser.add_argument(
+        "--types_schema_file",
+        help="Optional. If set, this file will be used to load the types schema",
+        default=dirname / "src/generate/types.json",
+        type=Path,
+    )
+    parser.add_argument(
+        "--template_root",
+        help="Optional. If set, will use this directory as the root for the jinja templates",
+        default=dirname / "src/generate",
+        type=Path,
+    )
     args = parser.parse_args()
 
-    generate_topics(args.output_directory, args.template_root, args.schema_file)
+    generate_topics(args.output_directory, args.template_root, args.types_schema_file)
 
 
 if __name__ == "__main__":

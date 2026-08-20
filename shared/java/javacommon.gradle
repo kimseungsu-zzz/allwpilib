@@ -4,7 +4,7 @@ apply plugin: 'jacoco'
 
 def baseArtifactId = project.baseId
 def artifactGroupId = project.groupId
-def javaBaseName = makeZipBaseName(artifactGroupId, "${baseArtifactId}-java")
+def javaBaseName = "_GROUP_${project.groupId.replace('.', '_')}_ID_${project.baseId}-java_CLS"
 
 def outputsFolder = file("$project.buildDir/outputs")
 
@@ -84,7 +84,7 @@ test {
     finalizedBy jacocoTestReport
 }
 
-if (project.hasProperty('onlylinuxsystemcore') || project.hasProperty('onlylinuxarm32') || project.hasProperty('onlylinuxarm64') || project.hasProperty('onlywindowsarm64')) {
+if (project.hasProperty('onlylinuxathena') || project.hasProperty('onlylinuxarm32') || project.hasProperty('onlylinuxarm64') || project.hasProperty('onlywindowsarm64')) {
     test.enabled = false
 }
 
@@ -103,14 +103,31 @@ configurations {
     devImplementation.extendsFrom(implementation)
 }
 
+tasks.withType(JavaCompile).configureEach {
+    options.compilerArgs = [
+        '--release',
+        '17',
+        '-encoding',
+        'UTF8',
+        "-Werror",
+        "-Xlint:all",
+        // ignore AutoCloseable warnings
+        "-Xlint:-try",
+        // ignore missing serialVersionUID warnings
+        "-Xlint:-serial",
+        // ignore unclaimed annotation warning from annotation processing
+        "-Xlint:-processing",
+    ]
+}
+
 dependencies {
-    testImplementation libs.junit.api
-    testRuntimeOnly libs.junit.launcher
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.13.4'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 
     devImplementation sourceSets.main.output
 }
 
-tasks.register('run', JavaExec) {
+task run(type: JavaExec) {
     classpath = sourceSets.dev.runtimeClasspath
 
     mainClass = project.devMain
@@ -119,7 +136,7 @@ tasks.register('run', JavaExec) {
 build.dependsOn devClasses
 
 jacoco {
-    toolVersion = "0.8.14"
+    toolVersion = "0.8.13"
 }
 
 jacocoTestReport {

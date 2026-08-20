@@ -5,16 +5,17 @@
 #include <cstdio>
 #include <memory>
 
-#include "wpi/net/EventLoopRunner.hpp"
-#include "wpi/net/HttpServerConnection.hpp"
-#include "wpi/net/HttpUtil.hpp"
-#include "wpi/net/uv/Loop.hpp"
-#include "wpi/net/uv/Tcp.hpp"
-#include "wpi/util/print.hpp"
+#include <wpi/print.h>
 
-namespace uv = wpi::net::uv;
+#include "wpinet/EventLoopRunner.h"
+#include "wpinet/HttpServerConnection.h"
+#include "wpinet/UrlParser.h"
+#include "wpinet/uv/Loop.h"
+#include "wpinet/uv/Tcp.h"
 
-class MyHttpServerConnection : public wpi::net::HttpServerConnection {
+namespace uv = wpi::uv;
+
+class MyHttpServerConnection : public wpi::HttpServerConnection {
  public:
   explicit MyHttpServerConnection(std::shared_ptr<uv::Stream> stream)
       : HttpServerConnection(stream) {}
@@ -24,27 +25,28 @@ class MyHttpServerConnection : public wpi::net::HttpServerConnection {
 };
 
 void MyHttpServerConnection::ProcessRequest() {
-  wpi::util::print(stderr, "HTTP request: '{}'\n", m_request.GetUrl());
-  auto url = wpi::net::ParseUrl(m_request.GetUrl());
-  if (!url) {
+  wpi::print(stderr, "HTTP request: '{}'\n", m_request.GetUrl());
+  wpi::UrlParser url{m_request.GetUrl(),
+                     m_request.GetMethod() == wpi::HTTP_CONNECT};
+  if (!url.IsValid()) {
     // failed to parse URL
     SendError(400);
     return;
   }
 
   std::string_view path;
-  if (url->get_pathname_length() > 0) {
-    path = url->get_pathname();
+  if (url.HasPath()) {
+    path = url.GetPath();
   }
-  wpi::util::print(stderr, "path: \"{}\"\n", path);
+  wpi::print(stderr, "path: \"{}\"\n", path);
 
   std::string_view query;
-  if (url->has_search()) {
-    query = url->get_search();
+  if (url.HasQuery()) {
+    query = url.GetQuery();
   }
-  wpi::util::print(stderr, "query: \"{}\"\n", query);
+  wpi::print(stderr, "query: \"{}\"\n", query);
 
-  const bool isGET = m_request.GetMethod() == HTTP_GET;
+  const bool isGET = m_request.GetMethod() == wpi::HTTP_GET;
   if (isGET && path == "/") {
     // build HTML root page
     SendResponse(200, "OK", "text/html",
@@ -58,7 +60,7 @@ void MyHttpServerConnection::ProcessRequest() {
 
 int main() {
   // Kick off the event loop on a separate thread
-  wpi::net::EventLoopRunner loop;
+  wpi::EventLoopRunner loop;
   loop.ExecAsync([](uv::Loop& loop) {
     auto tcp = uv::Tcp::Create(loop);
 

@@ -6,9 +6,10 @@
 #include <cstdio>
 #include <thread>
 
-#include "wpi/cs/UsbCamera.hpp"
-#include "wpi/util/StringExtras.hpp"
-#include "wpi/util/print.hpp"
+#include <wpi/StringExtras.h>
+#include <wpi/print.h>
+
+#include "cscore.h"
 
 int main(int argc, char** argv) {
   if (argc < 2) {
@@ -19,14 +20,14 @@ int main(int argc, char** argv) {
   }
 
   int id;
-  if (auto v = wpi::util::parse_integer<int>(argv[1], 10)) {
+  if (auto v = wpi::parse_integer<int>(argv[1], 10)) {
     id = v.value();
   } else {
     std::fputs("Expected number for camera\n", stderr);
     return 2;
   }
 
-  wpi::cs::UsbCamera camera{"usbcam", id};
+  cs::UsbCamera camera{"usbcam", id};
 
   // Set prior to connect
   int arg = 2;
@@ -36,7 +37,7 @@ int main(int argc, char** argv) {
       propName = argv[arg];
     } else {
       std::string_view propVal{argv[arg]};
-      if (auto v = wpi::util::parse_integer<int>(propVal, 10)) {
+      if (auto v = wpi::parse_integer<int>(propVal, 10)) {
         camera.GetProperty(propName).Set(v.value());
       } else {
         camera.GetProperty(propName).SetString(propVal);
@@ -60,7 +61,7 @@ int main(int argc, char** argv) {
       propName = argv[arg];
     } else {
       std::string_view propVal{argv[arg]};
-      if (auto v = wpi::util::parse_integer<int>(propVal, 10)) {
+      if (auto v = wpi::parse_integer<int>(propVal, 10)) {
         camera.GetProperty(propName).Set(v.value());
       } else {
         camera.GetProperty(propName).SetString(propVal);
@@ -72,26 +73,26 @@ int main(int argc, char** argv) {
   // Print settings
   std::puts("Properties:");
   for (const auto& prop : camera.EnumerateProperties()) {
-    wpi::util::print("  {}", prop.GetName());
+    wpi::print("  {}", prop.GetName());
     switch (prop.GetKind()) {
-      case wpi::cs::VideoProperty::kBoolean:
-        wpi::util::print(" (bool): value={} default={}", prop.Get(),
-                         prop.GetDefault());
+      case cs::VideoProperty::kBoolean:
+        wpi::print(" (bool): value={} default={}", prop.Get(),
+                   prop.GetDefault());
         break;
-      case wpi::cs::VideoProperty::kInteger:
-        wpi::util::print(" (int): value={} min={} max={} step={} default={}",
-                         prop.Get(), prop.GetMin(), prop.GetMax(),
-                         prop.GetStep(), prop.GetDefault());
+      case cs::VideoProperty::kInteger:
+        wpi::print(" (int): value={} min={} max={} step={} default={}",
+                   prop.Get(), prop.GetMin(), prop.GetMax(), prop.GetStep(),
+                   prop.GetDefault());
         break;
-      case wpi::cs::VideoProperty::kString:
-        wpi::util::print(" (string): {}", prop.GetString());
+      case cs::VideoProperty::kString:
+        wpi::print(" (string): {}", prop.GetString());
         break;
-      case wpi::cs::VideoProperty::kEnum: {
-        wpi::util::print(" (enum): value={}", prop.Get());
+      case cs::VideoProperty::kEnum: {
+        wpi::print(" (enum): value={}", prop.Get());
         auto choices = prop.GetChoices();
         for (size_t i = 0; i < choices.size(); ++i) {
           if (!choices[i].empty()) {
-            wpi::util::print("\n    {}: {}", i, choices[i]);
+            wpi::print("\n    {}: {}", i, choices[i]);
           }
         }
         break;

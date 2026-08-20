@@ -2,18 +2,16 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "AvahiClient.hpp"
+#include "AvahiClient.h"
 
-#include <memory>
+#include <wpi/mutex.h>
+
+#include <thread>
 
 #include "dlfcn.h"
-#include "wpi/util/mutex.hpp"
 
-using namespace wpi::net;
+using namespace wpi;
 
-#ifdef DIRECT_LINK_AVAHI
-#define AvahiFunctionLoad(snake_name) snake_name = &::avahi_##snake_name
-#else
 #define AvahiFunctionLoad(snake_name)                                          \
   do {                                                                         \
     snake_name =                                                               \
@@ -22,7 +20,6 @@ using namespace wpi::net;
       return;                                                                  \
     }                                                                          \
   } while (false)
-#endif
 
 AvahiFunctionTable::AvahiFunctionTable() {
   void* lib = dlopen("libavahi-common.so.3", RTLD_LAZY);
@@ -76,7 +73,7 @@ AvahiFunctionTable& AvahiFunctionTable::Get() {
   return table;
 }
 
-static wpi::util::mutex ThreadLoopLock;
+static wpi::mutex ThreadLoopLock;
 static std::weak_ptr<AvahiThread> ThreadLoop;
 
 std::shared_ptr<AvahiThread> AvahiThread::Get() {

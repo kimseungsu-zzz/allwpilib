@@ -2,126 +2,120 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/math/geometry/Translation2d.hpp"
-
 #include <cmath>
 
-#include <Eigen/Core>
-#include <catch2/catch_test_macros.hpp>
+#include <gtest/gtest.h>
 
-#include "wpi/math/TestAssertions.hpp"
-#include "wpi/math/geometry/Rotation2d.hpp"
-#include "wpi/units/angle.hpp"
-#include "wpi/units/length.hpp"
+#include "frc/geometry/Translation2d.h"
 
-using namespace wpi::math;
+using namespace frc;
 
-TEST_CASE("Translation2dTest Sum", "[wpimath]") {
+TEST(Translation2dTest, Sum) {
   const Translation2d one{1_m, 3_m};
   const Translation2d two{2_m, 5_m};
 
   const auto sum = one + two;
 
-  CHECK_DOUBLE_EQ(3.0, sum.X().value());
-  CHECK_DOUBLE_EQ(8.0, sum.Y().value());
+  EXPECT_DOUBLE_EQ(3.0, sum.X().value());
+  EXPECT_DOUBLE_EQ(8.0, sum.Y().value());
 }
 
-TEST_CASE("Translation2dTest Difference", "[wpimath]") {
+TEST(Translation2dTest, Difference) {
   const Translation2d one{1_m, 3_m};
   const Translation2d two{2_m, 5_m};
 
   const auto difference = one - two;
 
-  CHECK_DOUBLE_EQ(-1.0, difference.X().value());
-  CHECK_DOUBLE_EQ(-2.0, difference.Y().value());
+  EXPECT_DOUBLE_EQ(-1.0, difference.X().value());
+  EXPECT_DOUBLE_EQ(-2.0, difference.Y().value());
 }
 
-TEST_CASE("Translation2dTest RotateBy", "[wpimath]") {
+TEST(Translation2dTest, RotateBy) {
   const Translation2d another{3_m, 0_m};
   const auto rotated = another.RotateBy(90_deg);
 
-  CHECK_NEAR(0.0, rotated.X().value(), 1e-9);
-  CHECK_NEAR(3.0, rotated.Y().value(), 1e-9);
+  EXPECT_NEAR(0.0, rotated.X().value(), 1e-9);
+  EXPECT_NEAR(3.0, rotated.Y().value(), 1e-9);
 }
 
-TEST_CASE("Translation2dTest RotateAround", "[wpimath]") {
+TEST(Translation2dTest, RotateAround) {
   const Translation2d translation{2_m, 1_m};
   const Translation2d other{3_m, 2_m};
   const auto rotated = translation.RotateAround(other, 180_deg);
 
-  CHECK_NEAR(4.0, rotated.X().value(), 1e-9);
-  CHECK_NEAR(3.0, rotated.Y().value(), 1e-9);
+  EXPECT_NEAR(4.0, rotated.X().value(), 1e-9);
+  EXPECT_NEAR(3.0, rotated.Y().value(), 1e-9);
 }
 
-TEST_CASE("Translation2dTest Multiplication", "[wpimath]") {
+TEST(Translation2dTest, Multiplication) {
   const Translation2d original{3_m, 5_m};
   const auto mult = original * 3;
 
-  CHECK_DOUBLE_EQ(9.0, mult.X().value());
-  CHECK_DOUBLE_EQ(15.0, mult.Y().value());
+  EXPECT_DOUBLE_EQ(9.0, mult.X().value());
+  EXPECT_DOUBLE_EQ(15.0, mult.Y().value());
 }
 
-TEST_CASE("Translation2dTest Division", "[wpimath]") {
+TEST(Translation2dTest, Division) {
   const Translation2d original{3_m, 5_m};
   const auto div = original / 2;
 
-  CHECK_DOUBLE_EQ(1.5, div.X().value());
-  CHECK_DOUBLE_EQ(2.5, div.Y().value());
+  EXPECT_DOUBLE_EQ(1.5, div.X().value());
+  EXPECT_DOUBLE_EQ(2.5, div.Y().value());
 }
 
-TEST_CASE("Translation2dTest Norm", "[wpimath]") {
+TEST(Translation2dTest, Norm) {
   const Translation2d one{3_m, 5_m};
-  CHECK_DOUBLE_EQ(std::hypot(3.0, 5.0), one.Norm().value());
+  EXPECT_DOUBLE_EQ(std::hypot(3.0, 5.0), one.Norm().value());
 }
 
-TEST_CASE("Translation2dTest SquaredNorm", "[wpimath]") {
+TEST(Translation2dTest, SquaredNorm) {
   const Translation2d one{3_m, 5_m};
-  CHECK_DOUBLE_EQ(34.0, one.SquaredNorm().value());
+  EXPECT_DOUBLE_EQ(34.0, one.SquaredNorm().value());
 }
 
-TEST_CASE("Translation2dTest Distance", "[wpimath]") {
+TEST(Translation2dTest, Distance) {
   const Translation2d one{1_m, 1_m};
   const Translation2d two{6_m, 6_m};
-  CHECK_DOUBLE_EQ(5.0 * std::sqrt(2.0), one.Distance(two).value());
+  EXPECT_DOUBLE_EQ(5.0 * std::sqrt(2.0), one.Distance(two).value());
 }
 
-TEST_CASE("Translation2dTest SquaredDistance", "[wpimath]") {
+TEST(Translation2dTest, SquaredDistance) {
   const Translation2d one{1_m, 1_m};
   const Translation2d two{6_m, 6_m};
-  CHECK_DOUBLE_EQ(50.0, one.SquaredDistance(two).value());
+  EXPECT_DOUBLE_EQ(50.0, one.SquaredDistance(two).value());
 }
 
-TEST_CASE("Translation2dTest UnaryMinus", "[wpimath]") {
+TEST(Translation2dTest, UnaryMinus) {
   const Translation2d original{-4.5_m, 7_m};
   const auto inverted = -original;
 
-  CHECK_DOUBLE_EQ(4.5, inverted.X().value());
-  CHECK_DOUBLE_EQ(-7.0, inverted.Y().value());
+  EXPECT_DOUBLE_EQ(4.5, inverted.X().value());
+  EXPECT_DOUBLE_EQ(-7.0, inverted.Y().value());
 }
 
-TEST_CASE("Translation2dTest Equality", "[wpimath]") {
+TEST(Translation2dTest, Equality) {
   const Translation2d one{9_m, 5.5_m};
   const Translation2d two{9_m, 5.5_m};
-  CHECK(one == two);
+  EXPECT_TRUE(one == two);
 }
 
-TEST_CASE("Translation2dTest Inequality", "[wpimath]") {
+TEST(Translation2dTest, Inequality) {
   const Translation2d one{9_m, 5.5_m};
   const Translation2d two{9_m, 5.7_m};
-  CHECK(one != two);
+  EXPECT_TRUE(one != two);
 }
 
-TEST_CASE("Translation2dTest PolarConstructor", "[wpimath]") {
+TEST(Translation2dTest, PolarConstructor) {
   Translation2d one{std::sqrt(2) * 1_m, Rotation2d{45_deg}};
-  CHECK_DOUBLE_EQ(1.0, one.X().value());
-  CHECK_DOUBLE_EQ(1.0, one.Y().value());
+  EXPECT_DOUBLE_EQ(1.0, one.X().value());
+  EXPECT_DOUBLE_EQ(1.0, one.Y().value());
 
   Translation2d two{2_m, Rotation2d{60_deg}};
-  CHECK_DOUBLE_EQ(1.0, two.X().value());
-  CHECK_DOUBLE_EQ(std::sqrt(3.0), two.Y().value());
+  EXPECT_DOUBLE_EQ(1.0, two.X().value());
+  EXPECT_DOUBLE_EQ(std::sqrt(3.0), two.Y().value());
 }
 
-TEST_CASE("Translation2dTest Nearest", "[wpimath]") {
+TEST(Translation2dTest, Nearest) {
   const Translation2d origin{0_m, 0_m};
 
   const Translation2d translation1{1_m, Rotation2d{45_deg}};
@@ -130,39 +124,39 @@ TEST_CASE("Translation2dTest Nearest", "[wpimath]") {
   const Translation2d translation4{4_m, Rotation2d{180_deg}};
   const Translation2d translation5{5_m, Rotation2d{270_deg}};
 
-  CHECK_DOUBLE_EQ(
+  EXPECT_DOUBLE_EQ(
       origin.Nearest({translation5, translation3, translation4}).X().value(),
       translation3.X().value());
-  CHECK_DOUBLE_EQ(
+  EXPECT_DOUBLE_EQ(
       origin.Nearest({translation5, translation3, translation4}).Y().value(),
       translation3.Y().value());
 
-  CHECK_DOUBLE_EQ(
+  EXPECT_DOUBLE_EQ(
       origin.Nearest({translation1, translation2, translation3}).X().value(),
       translation1.X().value());
-  CHECK_DOUBLE_EQ(
+  EXPECT_DOUBLE_EQ(
       origin.Nearest({translation1, translation2, translation3}).Y().value(),
       translation1.Y().value());
 
-  CHECK_DOUBLE_EQ(
+  EXPECT_DOUBLE_EQ(
       origin.Nearest({translation4, translation2, translation3}).X().value(),
       translation2.X().value());
-  CHECK_DOUBLE_EQ(
+  EXPECT_DOUBLE_EQ(
       origin.Nearest({translation4, translation2, translation3}).Y().value(),
       translation2.Y().value());
 }
 
-TEST_CASE("Translation2dTest ToVector", "[wpimath]") {
+TEST(Translation2dTest, ToVector) {
   const Eigen::Vector2d vec(1.0, 2.0);
   const Translation2d translation{vec};
 
-  CHECK_DOUBLE_EQ(vec[0], translation.X().value());
-  CHECK_DOUBLE_EQ(vec[1], translation.Y().value());
+  EXPECT_DOUBLE_EQ(vec[0], translation.X().value());
+  EXPECT_DOUBLE_EQ(vec[1], translation.Y().value());
 
-  CHECK(vec == translation.ToVector());
+  EXPECT_TRUE(vec == translation.ToVector());
 }
 
-TEST_CASE("Translation2dTest Constexpr", "[wpimath]") {
+TEST(Translation2dTest, Constexpr) {
   constexpr Translation2d defaultCtor;
   constexpr Translation2d componentCtor{1_m, 2_m};
   constexpr auto added = defaultCtor + componentCtor;
@@ -180,14 +174,14 @@ TEST_CASE("Translation2dTest Constexpr", "[wpimath]") {
   static_assert(divided.Y() == 1_m);
 }
 
-TEST_CASE("Translation2dTest Dot", "[wpimath]") {
+TEST(Translation2dTest, Dot) {
   const Translation2d one{2_m, 3_m};
   const Translation2d two{3_m, 4_m};
-  CHECK_DOUBLE_EQ(18.0, one.Dot(two).value());
+  EXPECT_DOUBLE_EQ(18.0, one.Dot(two).value());
 }
 
-TEST_CASE("Translation2dTest Cross", "[wpimath]") {
+TEST(Translation2dTest, Cross) {
   const Translation2d one{2_m, 3_m};
   const Translation2d two{3_m, 4_m};
-  CHECK_DOUBLE_EQ(-1.0, one.Cross(two).value());
+  EXPECT_DOUBLE_EQ(-1.0, one.Cross(two).value());
 }

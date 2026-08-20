@@ -2,30 +2,39 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include <stdexcept>
+#include <exception>
 
-#include <catch2/catch_test_macros.hpp>
-#include <catch2/matchers/catch_matchers_floating_point.hpp>
+#include <gtest/gtest.h>
+#include <hal/HAL.h>
 
-#include "wpi/hal/HAL.h"
-#include "wpi/simulation/AddressableLEDSim.hpp"
-#include "wpi/simulation/AnalogInputSim.hpp"
-#include "wpi/simulation/CTREPCMSim.hpp"
-#include "wpi/simulation/DIOSim.hpp"
-#include "wpi/simulation/DigitalPWMSim.hpp"
-#include "wpi/simulation/DriverStationSim.hpp"
-#include "wpi/simulation/DutyCycleSim.hpp"
-#include "wpi/simulation/EncoderSim.hpp"
-#include "wpi/simulation/PWMSim.hpp"
-#include "wpi/simulation/PowerDistributionSim.hpp"
-#include "wpi/simulation/RoboRioSim.hpp"
+#include "frc/simulation/AddressableLEDSim.h"
+#include "frc/simulation/AnalogGyroSim.h"
+#include "frc/simulation/AnalogInputSim.h"
+#include "frc/simulation/AnalogOutputSim.h"
+#include "frc/simulation/AnalogTriggerSim.h"
+#include "frc/simulation/BuiltInAccelerometerSim.h"
+#include "frc/simulation/CTREPCMSim.h"
+#include "frc/simulation/DIOSim.h"
+#include "frc/simulation/DigitalPWMSim.h"
+#include "frc/simulation/DriverStationSim.h"
+#include "frc/simulation/DutyCycleSim.h"
+#include "frc/simulation/EncoderSim.h"
+#include "frc/simulation/PWMSim.h"
+#include "frc/simulation/PowerDistributionSim.h"
+#include "frc/simulation/RelaySim.h"
+#include "frc/simulation/RoboRioSim.h"
+#include "frc/simulation/SPIAccelerometerSim.h"
 
-using namespace wpi::sim;
+using namespace frc::sim;
 
-TEST_CASE("SimInitializationTest AllInitialize", "[wpilibc][simulation]") {
-  HAL_Initialize();
+TEST(SimInitializationTest, AllInitialize) {
+  HAL_Initialize(500, 0);
+  BuiltInAccelerometerSim biacsim;
+  AnalogGyroSim agsim{0};
   AnalogInputSim aisim{0};
-  CHECK_THROWS_AS(DigitalPWMSim::CreateForChannel(0), std::out_of_range);
+  AnalogOutputSim aosim{0};
+  EXPECT_THROW(AnalogTriggerSim::CreateForChannel(0), std::out_of_range);
+  EXPECT_THROW(DigitalPWMSim::CreateForChannel(0), std::out_of_range);
   DIOSim diosim{0};
   DriverStationSim dssim;
   (void)dssim;
@@ -34,9 +43,11 @@ TEST_CASE("SimInitializationTest AllInitialize", "[wpilibc][simulation]") {
   CTREPCMSim pcmsim{0};
   PowerDistributionSim pdpsim{0};
   PWMSim pwmsim{0};
+  RelaySim rsim{0};
   RoboRioSim rrsim;
   (void)rrsim;
-  DutyCycleSim dcsim = DutyCycleSim::CreateForChannel(0);
+  SPIAccelerometerSim sasim{0};
+  DutyCycleSim dcsim = DutyCycleSim::CreateForIndex(0);
   (void)dcsim;
-  AddressableLEDSim adLED{0};
+  AddressableLEDSim adLED;
 }

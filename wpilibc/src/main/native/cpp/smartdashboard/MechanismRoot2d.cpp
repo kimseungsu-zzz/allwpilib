@@ -2,13 +2,11 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/smartdashboard/MechanismRoot2d.hpp"
+#include "frc/smartdashboard/MechanismRoot2d.h"
 
-#include <memory>
+#include "frc/util/Color8Bit.h"
 
-#include "wpi/util/Color8Bit.hpp"
-
-using namespace wpi;
+using namespace frc;
 
 MechanismRoot2d::MechanismRoot2d(std::string_view name, double x, double y,
                                  const private_init&)
@@ -21,8 +19,7 @@ void MechanismRoot2d::SetPosition(double x, double y) {
   Flush();
 }
 
-void MechanismRoot2d::UpdateEntries(
-    std::shared_ptr<wpi::nt::NetworkTable> table) {
+void MechanismRoot2d::UpdateEntries(std::shared_ptr<nt::NetworkTable> table) {
   m_xPub = table->GetDoubleTopic("x").Publish();
   m_yPub = table->GetDoubleTopic("y").Publish();
   Flush();

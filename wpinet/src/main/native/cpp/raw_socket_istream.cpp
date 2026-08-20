@@ -2,11 +2,11 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/net/raw_socket_istream.hpp"
+#include "wpinet/raw_socket_istream.h"
 
-#include "wpi/net/NetworkStream.hpp"
+#include "wpinet/NetworkStream.h"
 
-using namespace wpi::net;
+using namespace wpi;
 
 void raw_socket_istream::read_impl(void* data, size_t len) {
   char* cdata = static_cast<char*>(data);

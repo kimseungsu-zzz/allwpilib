@@ -2,14 +2,13 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/math/linalg/proto/VectorProto.hpp"
+#include <gtest/gtest.h>
 
-#include <catch2/catch_test_macros.hpp>
+#include "../ProtoTestBase.h"
+#include "frc/EigenCore.h"
+#include "frc/proto/VectorProto.h"
 
-#include "../ProtoTestBase.hpp"
-#include "wpi/math/linalg/EigenCore.hpp"
-
-using namespace wpi::math;
+using namespace frc;
 
 struct VectorProtoTestData {
   using Type = Vectord<2>;
@@ -17,8 +16,8 @@ struct VectorProtoTestData {
   inline static const Type kTestData{1.1, 1.2};
 
   static void CheckEq(const Type& testData, const Type& data) {
-    CHECK(testData == data);
+    EXPECT_EQ(testData, data);
   }
 };
 
-INSTANTIATE_CATCH_TYPED_TEST_SUITE_P(Vector, ProtoTest, VectorProtoTestData);
+INSTANTIATE_TYPED_TEST_SUITE_P(Vector, ProtoTest, VectorProtoTestData);

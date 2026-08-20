@@ -5,8 +5,9 @@
 #include <cstdio>
 #include <memory>
 
-#include "wpi/hal/Extensions.h"
-#include "wpi/halsim/ws_server/HALSimWSServer.hpp"
+#include <hal/Extensions.h>
+
+#include "HALSimWSServer.h"
 
 using namespace std::placeholders;
 using namespace wpilibws;

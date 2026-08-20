@@ -2,7 +2,7 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "UsbCameraImpl.hpp"
+#include "UsbCameraImpl.h"
 
 #include <dirent.h>
 #include <fcntl.h>
@@ -20,26 +20,28 @@
 #include <unistd.h>
 
 #include <algorithm>
-#include <format>
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
 
-#include "Instance.hpp"
-#include "JpegUtil.hpp"
-#include "Log.hpp"
-#include "Notifier.hpp"
-#include "Telemetry.hpp"
-#include "UsbUtil.hpp"
-#include "wpi/cs/cscore_cpp.hpp"
-#include "wpi/util/SmallString.hpp"
-#include "wpi/util/StringExtras.hpp"
-#include "wpi/util/fs.hpp"
-#include "wpi/util/raw_istream.hpp"
-#include "wpi/util/timestamp.hpp"
+#include <fmt/format.h>
+#include <wpi/MemAlloc.h>
+#include <wpi/SmallString.h>
+#include <wpi/StringExtras.h>
+#include <wpi/fs.h>
+#include <wpi/raw_ostream.h>
+#include <wpi/timestamp.h>
 
-using namespace wpi::cs;
+#include "Instance.h"
+#include "JpegUtil.h"
+#include "Log.h"
+#include "Notifier.h"
+#include "Telemetry.h"
+#include "UsbUtil.h"
+#include "cscore_cpp.h"
+
+using namespace cs;
 
 namespace {
 // Find the length of an array.
@@ -69,48 +71,48 @@ static inline struct v4l2_fract FPSToFract(int fps) {
   return timeperframe;
 }
 
-// Conversion from v4l2_format pixelformat to wpi::util::PixelFormat
-static wpi::util::PixelFormat ToPixelFormat(__u32 pixelFormat) {
+// Conversion from v4l2_format pixelformat to VideoMode::PixelFormat
+static VideoMode::PixelFormat ToPixelFormat(__u32 pixelFormat) {
   switch (pixelFormat) {
     case V4L2_PIX_FMT_MJPEG:
-      return wpi::util::PixelFormat::MJPEG;
+      return VideoMode::kMJPEG;
     case V4L2_PIX_FMT_YUYV:
-      return wpi::util::PixelFormat::YUYV;
+      return VideoMode::kYUYV;
     case V4L2_PIX_FMT_RGB565:
-      return wpi::util::PixelFormat::RGB565;
+      return VideoMode::kRGB565;
     case V4L2_PIX_FMT_BGR24:
-      return wpi::util::PixelFormat::BGR;
+      return VideoMode::kBGR;
     case V4L2_PIX_FMT_ABGR32:
-      return wpi::util::PixelFormat::BGRA;
+      return VideoMode::kBGRA;
     case V4L2_PIX_FMT_GREY:
-      return wpi::util::PixelFormat::GRAY;
+      return VideoMode::kGray;
     case V4L2_PIX_FMT_Y16:
-      return wpi::util::PixelFormat::Y16;
+      return VideoMode::kY16;
     case V4L2_PIX_FMT_UYVY:
-      return wpi::util::PixelFormat::UYVY;
+      return VideoMode::kUYVY;
     default:
-      return wpi::util::PixelFormat::UNKNOWN;
+      return VideoMode::kUnknown;
   }
 }
 
-// Conversion from wpi::util::PixelFormat to v4l2_format pixelformat
-static __u32 FromPixelFormat(wpi::util::PixelFormat pixelFormat) {
+// Conversion from VideoMode::PixelFormat to v4l2_format pixelformat
+static __u32 FromPixelFormat(VideoMode::PixelFormat pixelFormat) {
   switch (pixelFormat) {
-    case wpi::util::PixelFormat::MJPEG:
+    case VideoMode::kMJPEG:
       return V4L2_PIX_FMT_MJPEG;
-    case wpi::util::PixelFormat::YUYV:
+    case VideoMode::kYUYV:
       return V4L2_PIX_FMT_YUYV;
-    case wpi::util::PixelFormat::RGB565:
+    case VideoMode::kRGB565:
       return V4L2_PIX_FMT_RGB565;
-    case wpi::util::PixelFormat::BGR:
+    case VideoMode::kBGR:
       return V4L2_PIX_FMT_BGR24;
-    case wpi::util::PixelFormat::BGRA:
+    case VideoMode::kBGRA:
       return V4L2_PIX_FMT_ABGR32;
-    case wpi::util::PixelFormat::GRAY:
+    case VideoMode::kGray:
       return V4L2_PIX_FMT_GREY;
-    case wpi::util::PixelFormat::Y16:
+    case VideoMode::kY16:
       return V4L2_PIX_FMT_Y16;
-    case wpi::util::PixelFormat::UYVY:
+    case VideoMode::kUYVY:
       return V4L2_PIX_FMT_UYVY;
     default:
       return 0;
@@ -118,8 +120,8 @@ static __u32 FromPixelFormat(wpi::util::PixelFormat pixelFormat) {
 }
 
 static bool IsPercentageProperty(std::string_view name) {
-  if (wpi::util::starts_with(name, "raw_")) {
-    name = wpi::util::substr(name, 4);
+  if (wpi::starts_with(name, "raw_")) {
+    name = wpi::substr(name, 4);
   }
   return name == "brightness" || name == "contrast" || name == "saturation" ||
          name == "hue" || name == "sharpness" || name == "gain" ||
@@ -189,7 +191,7 @@ int UsbCameraImpl::PercentageToRaw(const UsbCameraProperty& rawProp,
 
 static bool GetVendorProduct(int dev, int* vendor, int* product) {
   auto ifpath =
-      std::format("/sys/class/video4linux/video{}/device/modalias", dev);
+      fmt::format("/sys/class/video4linux/video{}/device/modalias", dev);
 
   int fd = open(ifpath.c_str(), O_RDONLY);
   if (fd < 0) {
@@ -204,18 +206,14 @@ static bool GetVendorProduct(int dev, int* vendor, int* product) {
     return false;
   }
   std::string_view readStr{readBuf};
-  if (auto v = wpi::util::parse_integer<int>(
-          wpi::util::substr(wpi::util::substr(readStr, readStr.find('v')), 1,
-                            4),
-          16)) {
+  if (auto v = wpi::parse_integer<int>(
+          wpi::substr(wpi::substr(readStr, readStr.find('v')), 1, 4), 16)) {
     *vendor = v.value();
   } else {
     return false;
   }
-  if (auto v = wpi::util::parse_integer<int>(
-          wpi::util::substr(wpi::util::substr(readStr, readStr.find('p')), 1,
-                            4),
-          16)) {
+  if (auto v = wpi::parse_integer<int>(
+          wpi::substr(wpi::substr(readStr, readStr.find('p')), 1, 4), 16)) {
     *product = v.value();
   } else {
     return false;
@@ -226,7 +224,7 @@ static bool GetVendorProduct(int dev, int* vendor, int* product) {
 
 static bool GetDescriptionSysV4L(int dev, std::string* desc) {
   auto ifpath =
-      std::format("/sys/class/video4linux/video{}/device/interface", dev);
+      fmt::format("/sys/class/video4linux/video{}/device/interface", dev);
 
   int fd = open(ifpath.c_str(), O_RDONLY);
   if (fd < 0) {
@@ -241,7 +239,7 @@ static bool GetDescriptionSysV4L(int dev, std::string* desc) {
     return false;
   }
 
-  *desc = wpi::util::rtrim(std::string_view(readBuf, n));
+  *desc = wpi::rtrim(std::string_view(readBuf, n));
   return true;
 }
 
@@ -263,11 +261,9 @@ static bool GetDescriptionIoctl(const char* cpath, std::string* desc) {
   // try to convert "UVC Camera (0000:0000)" into a better name
   std::optional<int> vendor;
   std::optional<int> product;
-  if (wpi::util::starts_with(card, "UVC Camera (") &&
-      (vendor =
-           wpi::util::parse_integer<int>(wpi::util::substr(card, 12, 4), 16)) &&
-      (product =
-           wpi::util::parse_integer<int>(wpi::util::substr(card, 17, 4), 16))) {
+  if (wpi::starts_with(card, "UVC Camera (") &&
+      (vendor = wpi::parse_integer<int>(wpi::substr(card, 12, 4), 16)) &&
+      (product = wpi::parse_integer<int>(wpi::substr(card, 17, 4), 16))) {
     std::string card2 = GetUsbNameFromId(vendor.value(), product.value());
     if (!card2.empty()) {
       *desc = std::move(card2);
@@ -310,10 +306,10 @@ static int GetDeviceNum(const char* cpath) {
   }
 
   std::string fn = path.filename();
-  if (!wpi::util::starts_with(fn, "video")) {
+  if (!wpi::starts_with(fn, "video")) {
     return -1;
   }
-  if (auto dev = wpi::util::parse_integer<int>(wpi::util::substr(fn, 5), 10)) {
+  if (auto dev = wpi::parse_integer<int>(wpi::substr(fn, 5), 10)) {
     return dev.value();
   }
   return -1;
@@ -338,7 +334,7 @@ static std::string GetDescriptionImpl(const char* cpath) {
   return std::string{};
 }
 
-UsbCameraImpl::UsbCameraImpl(std::string_view name, wpi::util::Logger& logger,
+UsbCameraImpl::UsbCameraImpl(std::string_view name, wpi::Logger& logger,
                              Notifier& notifier, Telemetry& telemetry,
                              std::string_view path)
     : SourceImpl{name, logger, notifier, telemetry},
@@ -395,27 +391,27 @@ void UsbCameraImpl::Start() {
 void UsbCameraImpl::CameraThreadMain() {
   // We want to be notified on file creation and deletion events in the device
   // path.  This is used to detect disconnects and reconnects.
-  std::unique_ptr<wpi::util::raw_fd_istream> notify_is;
+  std::unique_ptr<wpi::raw_fd_istream> notify_is;
   int notify_fd = inotify_init();
   if (notify_fd >= 0) {
     // need to make a copy as dirname can modify it
-    wpi::util::SmallString<64> pathCopy{m_path};
+    wpi::SmallString<64> pathCopy{m_path};
     pathCopy.push_back('\0');
     if (inotify_add_watch(notify_fd, dirname(pathCopy.data()),
                           IN_CREATE | IN_DELETE) < 0) {
       close(notify_fd);
       notify_fd = -1;
     } else {
-      notify_is = std::make_unique<wpi::util::raw_fd_istream>(
+      notify_is = std::make_unique<wpi::raw_fd_istream>(
           notify_fd, true, sizeof(struct inotify_event) + NAME_MAX + 1);
     }
   }
   bool notified = (notify_fd < 0);  // treat as always notified if cannot notify
 
   // Get the basename for later notify use
-  wpi::util::SmallString<64> pathCopy{m_path};
+  wpi::SmallString<64> pathCopy{m_path};
   pathCopy.push_back('\0');
-  wpi::util::SmallString<64> base{basename(pathCopy.data())};
+  wpi::SmallString<64> base{basename(pathCopy.data())};
 
   // Used to restart streaming on reconnect
   bool wasStreaming = false;
@@ -490,7 +486,7 @@ void UsbCameraImpl::CameraThreadMain() {
         // Read the event structure
         notify_is->read(&event, sizeof(event));
         // Read the event name
-        wpi::util::SmallString<64> raw_name;
+        wpi::SmallString<64> raw_name;
         raw_name.resize(event.len);
         notify_is->read(raw_name.data(), event.len);
         // If the name is what we expect...
@@ -553,26 +549,26 @@ void UsbCameraImpl::CameraThreadMain() {
         int width = m_mode.width;
         int height = m_mode.height;
         bool good = true;
-        if (m_mode.pixelFormat == wpi::util::PixelFormat::MJPEG &&
+        if (m_mode.pixelFormat == VideoMode::kMJPEG &&
             !GetJpegSize(image, &width, &height)) {
           SWARNING("invalid JPEG image received from camera");
           good = false;
         }
         if (good) {
-          Frame::Time frameTime{wpi::util::Now()};
+          Frame::Time frameTime{wpi::Now()};
           WPI_TimestampSource timeSource{WPI_TIMESRC_FRAME_DEQUEUE};
 
           // check the timestamp time
           auto tsFlags = buf.flags & V4L2_BUF_FLAG_TIMESTAMP_MASK;
           SDEBUG4("Flags {}", tsFlags);
           if (tsFlags == V4L2_BUF_FLAG_TIMESTAMP_UNKNOWN) {
-            SDEBUG4("Got unknown time for frame - default to wpi::util::Now");
+            SDEBUG4("Got unknown time for frame - default to wpi::Now");
           } else if (tsFlags == V4L2_BUF_FLAG_TIMESTAMP_MONOTONIC) {
             SDEBUG4("Got valid monotonic time for frame");
             // we can't go directly to frametime, since the rest of cscore
-            // expects us to use wpi::util::Now, which is in an arbitrary
-            // timebase (see timestamp.cpp). Best I can do is (approximately)
-            // translate between timebases
+            // expects us to use wpi::Now, which is in an arbitrary timebase
+            // (see timestamp.cpp). Best I can do is (approximately) translate
+            // between timebases
 
             // grab current time in the same timebase as buf.timestamp
             struct timespec ts;
@@ -599,12 +595,11 @@ void UsbCameraImpl::CameraThreadMain() {
               // Can't do anything if we can't access the clock, leave default
             }
           } else if (tsFlags == V4L2_BUF_FLAG_TIMESTAMP_COPY) {
-            SDEBUG4(
-                "Got valid copy time for frame - default to wpi::util::Now");
+            SDEBUG4("Got valid copy time for frame - default to wpi::Now");
           }
 
-          PutFrame(m_mode.pixelFormat, width, height, image, frameTime,
-                   timeSource);
+          PutFrame(static_cast<VideoMode::PixelFormat>(m_mode.pixelFormat),
+                   width, height, image, frameTime, timeSource);
         }
       }
 
@@ -818,10 +813,10 @@ bool UsbCameraImpl::DeviceStreamOff() {
 }
 
 CS_StatusValue UsbCameraImpl::DeviceCmdSetMode(
-    std::unique_lock<wpi::util::mutex>& lock, const Message& msg) {
+    std::unique_lock<wpi::mutex>& lock, const Message& msg) {
   VideoMode newMode;
   if (msg.kind == Message::kCmdSetMode) {
-    newMode.pixelFormat = static_cast<wpi::util::PixelFormat>(msg.data[0]);
+    newMode.pixelFormat = msg.data[0];
     newMode.width = msg.data[1];
     newMode.height = msg.data[2];
     newMode.fps = msg.data[3];
@@ -830,7 +825,7 @@ CS_StatusValue UsbCameraImpl::DeviceCmdSetMode(
     m_modeSetFPS = true;
   } else if (msg.kind == Message::kCmdSetPixelFormat) {
     newMode = m_mode;
-    newMode.pixelFormat = static_cast<wpi::util::PixelFormat>(msg.data[0]);
+    newMode.pixelFormat = msg.data[0];
     m_modeSetPixelFormat = true;
   } else if (msg.kind == Message::kCmdSetResolution) {
     newMode = m_mode;
@@ -882,7 +877,7 @@ CS_StatusValue UsbCameraImpl::DeviceCmdSetMode(
 }
 
 CS_StatusValue UsbCameraImpl::DeviceCmdSetProperty(
-    std::unique_lock<wpi::util::mutex>& lock, const Message& msg) {
+    std::unique_lock<wpi::mutex>& lock, const Message& msg) {
   bool setString = (msg.kind == Message::kCmdSetPropertyStr);
   int property = msg.data[0];
   int value = msg.data[1];
@@ -945,7 +940,7 @@ CS_StatusValue UsbCameraImpl::DeviceCmdSetProperty(
 }
 
 CS_StatusValue UsbCameraImpl::DeviceCmdSetPath(
-    std::unique_lock<wpi::util::mutex>& lock, const Message& msg) {
+    std::unique_lock<wpi::mutex>& lock, const Message& msg) {
   m_path = msg.dataStr;
   lock.unlock();
   // disconnect and reconnect
@@ -965,7 +960,7 @@ CS_StatusValue UsbCameraImpl::DeviceCmdSetPath(
 }
 
 CS_StatusValue UsbCameraImpl::DeviceProcessCommand(
-    std::unique_lock<wpi::util::mutex>& lock, const Message& msg) {
+    std::unique_lock<wpi::mutex>& lock, const Message& msg) {
   if (msg.kind == Message::kCmdSetMode ||
       msg.kind == Message::kCmdSetPixelFormat ||
       msg.kind == Message::kCmdSetResolution ||
@@ -1017,21 +1012,22 @@ void UsbCameraImpl::DeviceSetMode() {
                           : 0;
 #endif
   vfmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-  vfmt.fmt.pix.pixelformat = FromPixelFormat(m_mode.pixelFormat);
+  vfmt.fmt.pix.pixelformat =
+      FromPixelFormat(static_cast<VideoMode::PixelFormat>(m_mode.pixelFormat));
   if (vfmt.fmt.pix.pixelformat == 0) {
     SWARNING("could not set format {}, defaulting to MJPEG",
-             static_cast<int>(m_mode.pixelFormat));
+             m_mode.pixelFormat);
     vfmt.fmt.pix.pixelformat = V4L2_PIX_FMT_MJPEG;
   }
   vfmt.fmt.pix.width = m_mode.width;
   vfmt.fmt.pix.height = m_mode.height;
   vfmt.fmt.pix.field = V4L2_FIELD_ANY;
   if (DoIoctl(fd, VIDIOC_S_FMT, &vfmt) != 0) {
-    SWARNING("could not set format {} res {}x{}",
-             static_cast<int>(m_mode.pixelFormat), m_mode.width, m_mode.height);
+    SWARNING("could not set format {} res {}x{}", m_mode.pixelFormat,
+             m_mode.width, m_mode.height);
   } else {
-    SINFO("set format {} res {}x{}", static_cast<int>(m_mode.pixelFormat),
-          m_mode.width, m_mode.height);
+    SINFO("set format {} res {}x{}", m_mode.pixelFormat, m_mode.width,
+          m_mode.height);
   }
 }
 
@@ -1078,10 +1074,10 @@ void UsbCameraImpl::DeviceCacheMode() {
   if (DoIoctl(fd, VIDIOC_G_FMT, &vfmt) != 0) {
     SERROR("could not read current video mode");
     std::scoped_lock lock(m_mutex);
-    m_mode = VideoMode{wpi::util::PixelFormat::MJPEG, 320, 240, 30};
+    m_mode = VideoMode{VideoMode::kMJPEG, 320, 240, 30};
     return;
   }
-  wpi::util::PixelFormat pixelFormat = ToPixelFormat(vfmt.fmt.pix.pixelformat);
+  VideoMode::PixelFormat pixelFormat = ToPixelFormat(vfmt.fmt.pix.pixelformat);
   int width = vfmt.fmt.pix.width;
   int height = vfmt.fmt.pix.height;
 
@@ -1103,13 +1099,13 @@ void UsbCameraImpl::DeviceCacheMode() {
     // User set pixel format
     if (pixelFormat != m_mode.pixelFormat) {
       formatChanged = true;
-      pixelFormat = static_cast<wpi::util::PixelFormat>(m_mode.pixelFormat);
+      pixelFormat = static_cast<VideoMode::PixelFormat>(m_mode.pixelFormat);
     }
   } else {
     // Default to MJPEG
-    if (pixelFormat != wpi::util::PixelFormat::MJPEG) {
+    if (pixelFormat != VideoMode::kMJPEG) {
       formatChanged = true;
-      pixelFormat = wpi::util::PixelFormat::MJPEG;
+      pixelFormat = VideoMode::kMJPEG;
     }
   }
 
@@ -1318,8 +1314,8 @@ void UsbCameraImpl::DeviceCacheVideoModes() {
   std::memset(&fmt, 0, sizeof(fmt));
   fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
   for (fmt.index = 0; TryIoctl(fd, VIDIOC_ENUM_FMT, &fmt) >= 0; ++fmt.index) {
-    wpi::util::PixelFormat pixelFormat = ToPixelFormat(fmt.pixelformat);
-    if (pixelFormat == wpi::util::PixelFormat::UNKNOWN) {
+    VideoMode::PixelFormat pixelFormat = ToPixelFormat(fmt.pixelformat);
+    if (pixelFormat == VideoMode::kUnknown) {
       continue;
     }
 
@@ -1358,9 +1354,8 @@ void UsbCameraImpl::DeviceCacheVideoModes() {
   // provide a set of discrete modes; list based on
   // https://picamera.readthedocs.io/en/release-1.10/fov.html
   if (modes.empty() && m_picamera) {
-    for (wpi::util::PixelFormat pixelFormat :
-         {wpi::util::PixelFormat::YUYV, wpi::util::PixelFormat::MJPEG,
-          wpi::util::PixelFormat::BGR}) {
+    for (VideoMode::PixelFormat pixelFormat :
+         {VideoMode::kYUYV, VideoMode::kMJPEG, VideoMode::kBGR}) {
       modes.emplace_back(pixelFormat, 1920, 1080, 30);
       modes.emplace_back(pixelFormat, 2592, 1944, 15);
       modes.emplace_back(pixelFormat, 1296, 972, 42);
@@ -1458,12 +1453,12 @@ bool UsbCameraImpl::CacheProperties(CS_Status* status) const {
 }
 
 void UsbCameraImpl::SetQuirks() {
-  wpi::util::SmallString<128> descbuf;
+  wpi::SmallString<128> descbuf;
   std::string_view desc = GetDescription(descbuf);
-  m_lifecam_exposure = wpi::util::ends_with(desc, "LifeCam HD-3000") ||
-                       wpi::util::ends_with(desc, "LifeCam Cinema (TM)");
-  m_ov9281_exposure = wpi::util::contains(desc, "OV9281");
-  m_picamera = wpi::util::ends_with(desc, "mmal service");
+  m_lifecam_exposure = wpi::ends_with(desc, "LifeCam HD-3000") ||
+                       wpi::ends_with(desc, "LifeCam Cinema (TM)");
+  m_ov9281_exposure = wpi::contains(desc, "OV9281");
+  m_picamera = wpi::ends_with(desc, "mmal service");
 
   int deviceNum = GetDeviceNum(m_path.c_str());
   if (deviceNum >= 0) {
@@ -1566,7 +1561,7 @@ void UsbCameraImpl::SetExposureManual(int value, CS_Status* status) {
 
 bool UsbCameraImpl::SetVideoMode(const VideoMode& mode, CS_Status* status) {
   Message msg{Message::kCmdSetMode};
-  msg.data[0] = static_cast<int>(mode.pixelFormat);
+  msg.data[0] = mode.pixelFormat;
   msg.data[1] = mode.width;
   msg.data[2] = mode.height;
   msg.data[3] = mode.fps;
@@ -1574,10 +1569,10 @@ bool UsbCameraImpl::SetVideoMode(const VideoMode& mode, CS_Status* status) {
   return *status == CS_OK;
 }
 
-bool UsbCameraImpl::SetPixelFormat(wpi::util::PixelFormat pixelFormat,
+bool UsbCameraImpl::SetPixelFormat(VideoMode::PixelFormat pixelFormat,
                                    CS_Status* status) {
   Message msg{Message::kCmdSetPixelFormat};
-  msg.data[0] = static_cast<int>(pixelFormat);
+  msg.data[0] = pixelFormat;
   *status = SendAndWait(std::move(msg));
   return *status == CS_OK;
 }
@@ -1616,11 +1611,11 @@ std::string UsbCameraImpl::GetPath() const {
   return m_path;
 }
 
-namespace wpi::cs {
+namespace cs {
 
 CS_Source CreateUsbCameraDev(std::string_view name, int dev,
                              CS_Status* status) {
-  return CreateUsbCameraPath(name, std::format("/dev/video{}", dev), status);
+  return CreateUsbCameraPath(name, fmt::format("/dev/video{}", dev), status);
 }
 
 CS_Source CreateUsbCameraPath(std::string_view name, std::string_view path,
@@ -1673,7 +1668,7 @@ UsbCameraInfo GetUsbCameraInfo(CS_Source source, CS_Status* status) {
 
   // look through /dev/v4l/by-id and /dev/v4l/by-path for symlinks to the
   // keypath
-  wpi::util::SmallString<128> path;
+  wpi::SmallString<128> path;
   for (auto symlinkDir : symlinkDirs) {
     if (DIR* dp = ::opendir(symlinkDir)) {
       while (struct dirent* ep = ::readdir(dp)) {
@@ -1708,13 +1703,13 @@ std::vector<UsbCameraInfo> EnumerateUsbCameras(CS_Status* status) {
   if (DIR* dp = ::opendir("/dev")) {
     while (struct dirent* ep = ::readdir(dp)) {
       std::string_view fname{ep->d_name};
-      if (!wpi::util::starts_with(fname, "video")) {
+      if (!wpi::starts_with(fname, "video")) {
         continue;
       }
 
       unsigned int dev = 0;
-      if (auto v = wpi::util::parse_integer<unsigned int>(
-              wpi::util::substr(fname, 5), 10)) {
+      if (auto v =
+              wpi::parse_integer<unsigned int>(wpi::substr(fname, 5), 10)) {
         dev = v.value();
       } else {
         continue;
@@ -1723,7 +1718,7 @@ std::vector<UsbCameraInfo> EnumerateUsbCameras(CS_Status* status) {
       UsbCameraInfo info;
       info.dev = dev;
 
-      wpi::util::SmallString<32> path{"/dev/"};
+      wpi::SmallString<32> path{"/dev/"};
       path += fname;
       info.path = path.str();
 
@@ -1752,7 +1747,7 @@ std::vector<UsbCameraInfo> EnumerateUsbCameras(CS_Status* status) {
 
   // look through /dev/v4l/by-id and /dev/v4l/by-path for symlinks to
   // /dev/videoN
-  wpi::util::SmallString<128> path;
+  wpi::SmallString<128> path;
   for (auto symlinkDir : symlinkDirs) {
     if (DIR* dp = ::opendir(symlinkDir)) {
       while (struct dirent* ep = ::readdir(dp)) {
@@ -1764,9 +1759,9 @@ std::vector<UsbCameraInfo> EnumerateUsbCameras(CS_Status* status) {
           if (target) {
             std::string fname = fs::path{target}.filename();
             std::optional<unsigned int> dev;
-            if (wpi::util::starts_with(fname, "video") &&
-                (dev = wpi::util::parse_integer<unsigned int>(
-                     wpi::util::substr(fname, 5), 10)) &&
+            if (wpi::starts_with(fname, "video") &&
+                (dev = wpi::parse_integer<unsigned int>(wpi::substr(fname, 5),
+                                                        10)) &&
                 dev.value() < retval.size()) {
               retval[dev.value()].otherPaths.emplace_back(path.str());
             }
@@ -1787,4 +1782,4 @@ std::vector<UsbCameraInfo> EnumerateUsbCameras(CS_Status* status) {
   return retval;
 }
 
-}  // namespace wpi::cs
+}  // namespace cs

@@ -2,16 +2,17 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "ServerClient.hpp"
+#include "ServerClient.h"
 
 #include <utility>
 
-#include "server/MessagePackWriter.hpp"
-#include "server/ServerPublisher.hpp"
-#include "server/ServerStorage.hpp"
-#include "wpi/util/MessagePack.hpp"
+#include <wpi/MessagePack.h>
 
-using namespace wpi::nt::server;
+#include "server/MessagePackWriter.h"
+#include "server/ServerPublisher.h"
+#include "server/ServerStorage.h"
+
+using namespace nt::server;
 using namespace mpack;
 
 void ServerClient::UpdateMetaClientPub() {
@@ -46,7 +47,7 @@ void ServerClient::UpdateMetaClientSub() {
 
 std::span<ServerSubscriber*> ServerClient::GetSubscribers(
     std::string_view name, bool special,
-    wpi::util::SmallVectorImpl<ServerSubscriber*>& buf) {
+    wpi::SmallVectorImpl<ServerSubscriber*>& buf) {
   buf.resize(0);
   for (auto&& subPair : m_subscribers) {
     ServerSubscriber* subscriber = subPair.getSecond().get();

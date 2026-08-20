@@ -2,13 +2,13 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/math/controller/PIDController.hpp"
+#include "frc/controller/PIDController.h"
 
-#include "wpi/util/sendable/SendableBuilder.hpp"
+#include <wpi/sendable/SendableBuilder.h>
 
-using namespace wpi::math;
+using namespace frc;
 
-void PIDController::InitSendable(wpi::util::SendableBuilder& builder) {
+void PIDController::InitSendable(wpi::SendableBuilder& builder) {
   builder.SetSmartDashboardType("PIDController");
   builder.AddDoubleProperty(
       "p", [this] { return GetP(); }, [this](double value) { SetP(value); });

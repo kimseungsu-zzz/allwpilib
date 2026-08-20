@@ -136,25 +136,16 @@ def copy_upstream_src(wpilib_root: Path):
             f, [wpimath / "src/main/native/thirdparty/eigen/include"]
         )
 
-    for f in [
+    shutil.copyfile(
         ".clang-format",
-        "BUILD.bazel",
-        "COPYING.APACHE",
-        "COPYING.BSD",
-        "COPYING.MINPACK",
-        "COPYING.MPL2",
-        "MODULE.bazel",
-    ]:
-        shutil.copyfile(
-            f,
-            wpimath / "src/main/native/thirdparty/eigen/include" / f,
-        )
+        wpimath / "src/main/native/thirdparty/eigen/include/.clang-format",
+    )
 
 
 def main():
     name = "eigen"
     url = "https://gitlab.com/libeigen/eigen.git"
-    tag = "5.0.1"
+    tag = "5.0.0"
 
     eigen = Lib(name, url, tag, copy_upstream_src)
     eigen.main()

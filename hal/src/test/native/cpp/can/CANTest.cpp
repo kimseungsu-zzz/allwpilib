@@ -2,27 +2,24 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include <cstring>
 #include <utility>
 
-#include <catch2/catch_test_macros.hpp>
+#include <gtest/gtest.h>
 
-#include "wpi/hal/CANAPI.h"
-#include "wpi/hal/simulation/CanData.h"
+#include "hal/CANAPI.h"
+#include "hal/simulation/CanData.h"
 
-namespace wpi::hal {
-static constexpr int32_t kCANBusS0 = 0;
-
+namespace hal {
 struct CANTestStore {
-  CANTestStore(int32_t busId, int32_t deviceId, int32_t* status) {
+  CANTestStore(int32_t deviceId, int32_t* status) {
     this->deviceId = deviceId;
     handle = HAL_InitializeCAN(
-        busId, HAL_CANManufacturer::HAL_CAN_MAN_TEAM_USE, deviceId,
-        HAL_CANDeviceType::HAL_CAN_DEV_MISCELLANEOUS, status);
+        HAL_CANManufacturer::HAL_CAN_Man_kTeamUse, deviceId,
+        HAL_CANDeviceType::HAL_CAN_Dev_kMiscellaneous, status);
   }
 
   ~CANTestStore() {
-    if (handle != HAL_INVALID_HANDLE) {
+    if (handle != HAL_kInvalidHandle) {
       HAL_CleanCAN(handle);
     }
   }
@@ -43,46 +40,43 @@ struct CANSendCallbackStore {
   int32_t handle;
 };
 
-TEST_CASE("CANTest CanIdPacking", "[hal][can]") {
+TEST(CANTest, CanIdPacking) {
   int32_t status = 0;
   int32_t deviceId = 12;
-  CANTestStore testStore(kCANBusS0, deviceId, &status);
-  REQUIRE(0 == status);
+  CANTestStore testStore(deviceId, &status);
+  ASSERT_EQ(0, status);
 
   std::pair<int32_t, bool> storePair;
   storePair.second = false;
 
   auto cbHandle = HALSIM_RegisterCanSendMessageCallback(
-      [](const char* name, void* param, int32_t busId, uint32_t messageId,
-         const struct HAL_CANMessage* message, int32_t periodMs,
-         int32_t* status) {
+      [](const char* name, void* param, uint32_t messageID, const uint8_t* data,
+         uint8_t dataSize, int32_t periodMs, int32_t* status) {
         std::pair<int32_t, bool>* paramI =
             reinterpret_cast<std::pair<int32_t, bool>*>(param);
-        paramI->first = messageId;
+        paramI->first = messageID;
         paramI->second = true;
       },
       &storePair);
 
   CANSendCallbackStore cbStore(cbHandle);
-  HAL_CANMessage message;
-  std::memset(&message, 0, sizeof(message));
-  message.dataSize = 8;
+  uint8_t data[8];
 
   int32_t apiId = 42;
 
-  HAL_WriteCANPacket(testStore.handle, apiId, &message, &status);
+  HAL_WriteCANPacket(testStore.handle, data, 8, 42, &status);
 
-  REQUIRE(0 == status);
+  ASSERT_EQ(0, status);
 
-  REQUIRE(storePair.second);
+  ASSERT_TRUE(storePair.second);
 
-  REQUIRE(0 != storePair.first);
+  ASSERT_NE(0, storePair.first);
 
-  REQUIRE(deviceId == (storePair.first & 0x3F));
-  REQUIRE(apiId == ((storePair.first & 0x0000FFC0) >> 6));
-  REQUIRE(static_cast<int32_t>(HAL_CANManufacturer::HAL_CAN_MAN_TEAM_USE) ==
-          (storePair.first & 0x00FF0000) >> 16);
-  REQUIRE(static_cast<int32_t>(HAL_CANDeviceType::HAL_CAN_DEV_MISCELLANEOUS) ==
-          (storePair.first & 0x1F000000) >> 24);
+  ASSERT_EQ(deviceId, storePair.first & 0x3F);
+  ASSERT_EQ(apiId, (storePair.first & 0x0000FFC0) >> 6);
+  ASSERT_EQ(static_cast<int32_t>(HAL_CANManufacturer::HAL_CAN_Man_kTeamUse),
+            (storePair.first & 0x00FF0000) >> 16);
+  ASSERT_EQ(static_cast<int32_t>(HAL_CANDeviceType::HAL_CAN_Dev_kMiscellaneous),
+            (storePair.first & 0x1F000000) >> 24);
 }
-}  // namespace wpi::hal
+}  // namespace hal

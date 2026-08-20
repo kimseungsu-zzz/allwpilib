@@ -4,14 +4,13 @@ apply plugin: 'cpp'
 apply plugin: 'c'
 apply plugin: 'google-test-test-suite'
 apply plugin: 'visual-studio'
-apply plugin: 'org.wpilib.NativeUtils'
+apply plugin: 'edu.wpi.first.NativeUtils'
 apply plugin: ExtraTasks
 
 evaluationDependsOn(':hal')
-evaluationDependsOn(':drivers')
 
 apply from: '../shared/config.gradle'
-apply from: "${rootDir}/shared/catch2.gradle"
+apply from: "${rootDir}/shared/googletest.gradle"
 
 ext.examplesMap = [:]
 ext.templatesMap = [:]
@@ -68,7 +67,6 @@ ext {
 
 def simModules = ["halsim_gui"]
 
-apply from: "${rootDir}/shared/libmrclib.gradle"
 apply from: "${rootDir}/shared/opencv.gradle"
 
 model {
@@ -79,18 +77,15 @@ model {
                     binary.buildable = false
                     return
                 }
-                lib project: ':commandsv2', library: 'commandsv2', linkage: 'shared'
+                lib project: ':wpilibNewCommands', library: 'wpilibNewCommands', linkage: 'shared'
                 lib project: ':romiVendordep', library: 'romiVendordep', linkage: 'shared'
                 lib project: ':xrpVendordep', library: 'xrpVendordep', linkage: 'shared'
                 lib project: ':apriltag', library: 'apriltag', linkage: 'shared'
-                lib project: ':fields', library: 'fields', linkage: 'shared'
                 lib project: ':wpilibc', library: 'wpilibc', linkage: 'shared'
-                lib project: ':drivers', library: 'drivers', linkage: 'shared'
                 lib project: ':wpimath', library: 'wpimath', linkage: 'shared'
                 project(':ntcore').addNtcoreDependency(binary, 'shared')
                 lib project: ':cscore', library: 'cscore', linkage: 'shared'
-                nativeUtils.useRequiredLibrary(binary, 'mrclib')
-                lib project: ':hal', library: 'hal', linkage: 'shared'
+                project(':hal').addHalDependency(binary, 'shared')
                 lib project: ':cameraserver', library: 'cameraserver', linkage: 'shared'
                 lib project: ':wpinet', library: 'wpinet', linkage: 'shared'
                 lib project: ':wpiutil', library: 'wpiutil', linkage: 'shared'
@@ -113,21 +108,21 @@ model {
             "${key}"(NativeExecutableSpec) {
                 targetBuildTypes 'debug'
                 binaries.all { binary ->
-                    lib project: ':commandsv2', library: 'commandsv2', linkage: 'shared'
+                    lib project: ':wpilibNewCommands', library: 'wpilibNewCommands', linkage: 'shared'
                     lib project: ':romiVendordep', library: 'romiVendordep', linkage: 'shared'
                     lib project: ':xrpVendordep', library: 'xrpVendordep', linkage: 'shared'
                     lib project: ':wpilibc', library: 'wpilibc', linkage: 'shared'
-                    lib project: ':drivers', library: 'drivers', linkage: 'shared'
                     lib project: ':apriltag', library: 'apriltag', linkage: 'shared'
-                    lib project: ':fields', library: 'fields', linkage: 'shared'
                     lib project: ':wpimath', library: 'wpimath', linkage: 'shared'
                     project(':ntcore').addNtcoreDependency(binary, 'shared')
                     lib project: ':cscore', library: 'cscore', linkage: 'shared'
-                    nativeUtils.useRequiredLibrary(binary, 'mrclib')
-                    lib project: ':hal', library: 'hal', linkage: 'shared'
+                    project(':hal').addHalDependency(binary, 'shared')
                     lib project: ':cameraserver', library: 'cameraserver', linkage: 'shared'
                     lib project: ':wpinet', library: 'wpinet', linkage: 'shared'
                     lib project: ':wpiutil', library: 'wpiutil', linkage: 'shared'
+                    if (binary.targetPlatform.name == nativeUtils.wpi.platforms.roborio) {
+                        nativeUtils.useRequiredLibrary(binary, 'ni_link_libraries', 'ni_runtime_libraries')
+                    }
                     if (binary.targetPlatform.name == getCurrentArch()) {
                         simModules.each {
                             lib project: ":simulation:$it", library: it, linkage: 'shared'
@@ -164,21 +159,21 @@ model {
             "${key}"(NativeExecutableSpec) {
                 targetBuildTypes 'debug'
                 binaries.all { binary ->
-                    lib project: ':commandsv2', library: 'commandsv2', linkage: 'shared'
+                    lib project: ':wpilibNewCommands', library: 'wpilibNewCommands', linkage: 'shared'
                     lib project: ':romiVendordep', library: 'romiVendordep', linkage: 'shared'
                     lib project: ':xrpVendordep', library: 'xrpVendordep', linkage: 'shared'
                     lib project: ':wpilibc', library: 'wpilibc', linkage: 'shared'
-                    lib project: ':drivers', library: 'drivers', linkage: 'shared'
                     lib project: ':apriltag', library: 'apriltag', linkage: 'shared'
-                    lib project: ':fields', library: 'fields', linkage: 'shared'
                     lib project: ':wpimath', library: 'wpimath', linkage: 'shared'
                     project(':ntcore').addNtcoreDependency(binary, 'shared')
                     lib project: ':cscore', library: 'cscore', linkage: 'shared'
-                    nativeUtils.useRequiredLibrary(binary, 'mrclib')
-                    lib project: ':hal', library: 'hal', linkage: 'shared'
+                    project(':hal').addHalDependency(binary, 'shared')
                     lib project: ':cameraserver', library: 'cameraserver', linkage: 'shared'
                     lib project: ':wpinet', library: 'wpinet', linkage: 'shared'
                     lib project: ':wpiutil', library: 'wpiutil', linkage: 'shared'
+                    if (binary.targetPlatform.name == nativeUtils.wpi.platforms.roborio) {
+                        nativeUtils.useRequiredLibrary(binary, 'ni_link_libraries', 'ni_runtime_libraries')
+                    }
                 }
                 sources {
                     cpp {
@@ -198,21 +193,21 @@ model {
             "snippets${key}"(NativeExecutableSpec) {
                 targetBuildTypes 'debug'
                 binaries.all { binary ->
-                    lib project: ':commandsv2', library: 'commandsv2', linkage: 'shared'
+                    lib project: ':wpilibNewCommands', library: 'wpilibNewCommands', linkage: 'shared'
                     lib project: ':romiVendordep', library: 'romiVendordep', linkage: 'shared'
                     lib project: ':xrpVendordep', library: 'xrpVendordep', linkage: 'shared'
                     lib project: ':wpilibc', library: 'wpilibc', linkage: 'shared'
-                    lib project: ':drivers', library: 'drivers', linkage: 'shared'
                     lib project: ':apriltag', library: 'apriltag', linkage: 'shared'
-                    lib project: ':fields', library: 'fields', linkage: 'shared'
                     lib project: ':wpimath', library: 'wpimath', linkage: 'shared'
                     project(':ntcore').addNtcoreDependency(binary, 'shared')
                     lib project: ':cscore', library: 'cscore', linkage: 'shared'
-                    nativeUtils.useRequiredLibrary(binary, 'mrclib')
-                    lib project: ':hal', library: 'hal', linkage: 'shared'
+                    project(':hal').addHalDependency(binary, 'shared')
                     lib project: ':cameraserver', library: 'cameraserver', linkage: 'shared'
                     lib project: ':wpinet', library: 'wpinet', linkage: 'shared'
                     lib project: ':wpiutil', library: 'wpiutil', linkage: 'shared'
+                    if (binary.targetPlatform.name == nativeUtils.wpi.platforms.roborio) {
+                        nativeUtils.useRequiredLibrary(binary, 'ni_link_libraries', 'ni_runtime_libraries')
+                    }
                     if (binary.targetPlatform.name == getCurrentArch()) {
                         simModules.each {
                             lib project: ":simulation:$it", library: it, linkage: 'shared'
@@ -287,7 +282,7 @@ model {
             if (testFolder.exists()) {
                 "snippets${key}Test"(GoogleTestTestSuiteSpec) {
                     for (NativeComponentSpec c : $.components) {
-                        if (c.name == "snippets${key}") {
+                        if (c.name == key) {
                             testing c
                             break
                         }
@@ -295,20 +290,20 @@ model {
                     sources {
                         cpp {
                             source {
-                                srcDirs "src/test/cpp/snippets/${key}/cpp"
+                                srcDirs "src/test/cpp/examples/${key}/cpp"
                                 include '**/*.cpp'
                             }
                             exportedHeaders {
-                                srcDirs "src/test/cpp/snippets/${key}/include"
+                                srcDirs "src/test/cpp/examples/${key}/include"
                             }
                         }
                         c {
                             source {
-                                srcDirs "src/test/cpp/snippets/${key}/c"
+                                srcDirs "src/test/cpp/examples/${key}/c"
                                 include '**/*.c'
                             }
                             exportedHeaders {
-                                srcDirs "src/test/cpp/snippets/${key}/include"
+                                srcDirs "src/test/cpp/examples/${key}/include"
                             }
                         }
                     }
@@ -318,25 +313,25 @@ model {
     }
     binaries {
         withType(GoogleTestTestSuiteBinarySpec) {
-            lib project: ':commandsv2', library: 'commandsv2', linkage: 'shared'
+            lib project: ':wpilibNewCommands', library: 'wpilibNewCommands', linkage: 'shared'
             lib project: ':romiVendordep', library: 'romiVendordep', linkage: 'shared'
             lib project: ':xrpVendordep', library: 'xrpVendordep', linkage: 'shared'
             lib project: ':wpilibc', library: 'wpilibc', linkage: 'shared'
-            lib project: ':drivers', library: 'drivers', linkage: 'shared'
             lib project: ':apriltag', library: 'apriltag', linkage: 'shared'
-            lib project: ':fields', library: 'fields', linkage: 'shared'
             lib project: ':wpimath', library: 'wpimath', linkage: 'shared'
             project(':ntcore').addNtcoreDependency(it, 'shared')
             lib project: ':cscore', library: 'cscore', linkage: 'shared'
-            nativeUtils.useRequiredLibrary(it, 'mrclib')
-            lib project: ':hal', library: 'hal', linkage: 'shared'
+            project(':hal').addHalDependency(it, 'shared')
             lib project: ':cameraserver', library: 'cameraserver', linkage: 'shared'
             lib project: ':wpinet', library: 'wpinet', linkage: 'shared'
             lib project: ':wpiutil', library: 'wpiutil', linkage: 'shared'
+            if (it.targetPlatform.name == nativeUtils.wpi.platforms.roborio) {
+                nativeUtils.useRequiredLibrary(it, 'ni_link_libraries', 'ni_runtime_libraries')
+            }
             nativeUtils.useRequiredLibrary(it, 'opencv_shared')
 
-            it.cppCompiler.define('RUNNING_WPILIB_TESTS')
-            it.cCompiler.define('RUNNING_WPILIB_TESTS')
+            it.cppCompiler.define('RUNNING_FRC_TESTS')
+            it.cCompiler.define('RUNNING_FRC_TESTS')
         }
     }
 }
@@ -371,7 +366,7 @@ model {
                 // Get the appropriate binary and create the run task.
                 component.binaries.each { binary ->
                     if (binary.targetPlatform.name == getCurrentArch() && binary.buildType.name == "debug") {
-                        project.tasks.register("run${component.name}", Exec) {
+                        project.tasks.create("run${component.name}", Exec) {
                             // Add simulation modules to HALSIM_EXTENSIONS environment variable.
                             def setupEnv = {
                                 String extensions = ""

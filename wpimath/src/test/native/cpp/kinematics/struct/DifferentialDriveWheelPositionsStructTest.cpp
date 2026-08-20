@@ -2,27 +2,26 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include <catch2/catch_test_macros.hpp>
+#include <gtest/gtest.h>
 
-#include "wpi/math/kinematics/DifferentialDriveWheelPositions.hpp"
+#include "frc/kinematics/DifferentialDriveWheelPositions.h"
 
-using namespace wpi::math;
+using namespace frc;
 
 namespace {
 
-using StructType =
-    wpi::util::Struct<wpi::math::DifferentialDriveWheelPositions>;
+using StructType = wpi::Struct<frc::DifferentialDriveWheelPositions>;
 const DifferentialDriveWheelPositions kExpectedData{
     DifferentialDriveWheelPositions{1.74_m, 35.04_m}};
 }  // namespace
 
-TEST_CASE("DifferentialDriveWheelPositionsStructTest Roundtrip", "[wpimath]") {
+TEST(DifferentialDriveWheelPositionsStructTest, Roundtrip) {
   uint8_t buffer[StructType::GetSize()];
   std::memset(buffer, 0, StructType::GetSize());
   StructType::Pack(buffer, kExpectedData);
 
   DifferentialDriveWheelPositions unpacked_data = StructType::Unpack(buffer);
 
-  CHECK(kExpectedData.left.value() == unpacked_data.left.value());
-  CHECK(kExpectedData.right.value() == unpacked_data.right.value());
+  EXPECT_EQ(kExpectedData.left.value(), unpacked_data.left.value());
+  EXPECT_EQ(kExpectedData.right.value(), unpacked_data.right.value());
 }

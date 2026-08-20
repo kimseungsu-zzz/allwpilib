@@ -2,28 +2,27 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/glass/networktables/NTMotorController.hpp"
+#include "glass/networktables/NTMotorController.h"
 
-#include <format>
 #include <utility>
 
-#include "wpi/util/StringExtras.hpp"
+#include <fmt/format.h>
+#include <wpi/StringExtras.h>
 
-using namespace wpi::glass;
+using namespace glass;
 
 NTMotorControllerModel::NTMotorControllerModel(std::string_view path)
-    : NTMotorControllerModel(wpi::nt::NetworkTableInstance::GetDefault(),
-                             path) {}
+    : NTMotorControllerModel(nt::NetworkTableInstance::GetDefault(), path) {}
 
-NTMotorControllerModel::NTMotorControllerModel(
-    wpi::nt::NetworkTableInstance inst, std::string_view path)
+NTMotorControllerModel::NTMotorControllerModel(nt::NetworkTableInstance inst,
+                                               std::string_view path)
     : m_inst{inst},
-      m_value{inst.GetDoubleTopic(std::format("{}/Value", path)).GetEntry(0)},
-      m_name{inst.GetStringTopic(std::format("{}/.name", path)).Subscribe("")},
-      m_controllable{inst.GetBooleanTopic(std::format("{}/.controllable", path))
+      m_value{inst.GetDoubleTopic(fmt::format("{}/Value", path)).GetEntry(0)},
+      m_name{inst.GetStringTopic(fmt::format("{}/.name", path)).Subscribe("")},
+      m_controllable{inst.GetBooleanTopic(fmt::format("{}/.controllable", path))
                          .Subscribe(false)},
-      m_valueData{std::format("NT_SpdCtrl:{}", path)},
-      m_nameValue{wpi::util::rsplit(path, '/').second} {}
+      m_valueData{fmt::format("NT_SpdCtrl:{}", path)},
+      m_nameValue{wpi::rsplit(path, '/').second} {}
 
 void NTMotorControllerModel::SetPercent(double value) {
   m_value.Set(value);

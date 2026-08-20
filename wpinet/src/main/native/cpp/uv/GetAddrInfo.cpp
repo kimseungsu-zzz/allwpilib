@@ -2,16 +2,17 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/net/uv/GetAddrInfo.hpp"
+#include "wpinet/uv/GetAddrInfo.h"
 
 #include <functional>
 #include <memory>
 #include <utility>
 
-#include "wpi/net/uv/Loop.hpp"
-#include "wpi/util/SmallString.hpp"
+#include <wpi/SmallString.h>
 
-namespace wpi::net::uv {
+#include "wpinet/uv/Loop.h"
+
+namespace wpi::uv {
 
 GetAddrInfoReq::GetAddrInfoReq() {
   error = [this](Error err) { GetLoop().error(err); };
@@ -23,8 +24,8 @@ void GetAddrInfo(Loop& loop, const std::shared_ptr<GetAddrInfoReq>& req,
   if (loop.IsClosing()) {
     return;
   }
-  wpi::util::SmallString<128> nodeStr{node};
-  wpi::util::SmallString<128> serviceStr{service};
+  SmallString<128> nodeStr{node};
+  SmallString<128> serviceStr{service};
   int err = uv_getaddrinfo(
       loop.GetRaw(), req->GetRaw(),
       [](uv_getaddrinfo_t* req, int status, addrinfo* res) {
@@ -55,4 +56,4 @@ void GetAddrInfo(Loop& loop, std::function<void(const addrinfo&)> callback,
   GetAddrInfo(loop, req, node, service, hints);
 }
 
-}  // namespace wpi::net::uv
+}  // namespace wpi::uv

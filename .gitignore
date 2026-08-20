@@ -239,6 +239,11 @@ ipch/
 # compile_commands
 compile_commands.json
 
+# clang configuration and clangd cache
+.clang
+.clangd
+.cache/
+
 imgui.ini
 
 # Bazel
@@ -253,11 +258,3 @@ bazel_auth.rc
 
 # Meson
 .meson-subproject*
-
-# Copybara user config
-shared/bazel/copybara/.copybara.json
-
-# Nix files
-shell.nix
-flake.nix
-flake.lock

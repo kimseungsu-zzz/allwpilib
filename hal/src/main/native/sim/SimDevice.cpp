@@ -2,23 +2,23 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/hal/SimDevice.hpp"
+#include "hal/SimDevice.h"
 
-#include <format>
+#include <fmt/format.h>
 
-#include "HALInitializer.hpp"
-#include "mockdata/SimDeviceDataInternal.hpp"
+#include "HALInitializer.h"
+#include "mockdata/SimDeviceDataInternal.h"
 
-using namespace wpi::hal;
+using namespace hal;
 
-namespace wpi::hal::init {
+namespace hal::init {
 void InitializeSimDevice() {}
-}  // namespace wpi::hal::init
+}  // namespace hal::init
 
 extern "C" {
 
 HAL_SimDeviceHandle HAL_CreateSimDevice(const char* name) {
-  wpi::hal::init::CheckInit();
+  hal::init::CheckInit();
   return SimSimDeviceData->CreateDevice(name);
 }
 
@@ -68,13 +68,13 @@ void HAL_ResetSimValue(HAL_SimValueHandle handle) {
   SimSimDeviceData->ResetValue(handle);
 }
 
-wpi::hal::SimDevice::SimDevice(const char* name, int index) {
-  m_handle = HAL_CreateSimDevice(std::format("{}[{}]", name, index).c_str());
+hal::SimDevice::SimDevice(const char* name, int index) {
+  m_handle = HAL_CreateSimDevice(fmt::format("{}[{}]", name, index).c_str());
 }
 
-wpi::hal::SimDevice::SimDevice(const char* name, int index, int channel) {
+hal::SimDevice::SimDevice(const char* name, int index, int channel) {
   m_handle = HAL_CreateSimDevice(
-      std::format("{}[{},{}]", name, index, channel).c_str());
+      fmt::format("{}[{},{}]", name, index, channel).c_str());
 }
 
 }  // extern "C"

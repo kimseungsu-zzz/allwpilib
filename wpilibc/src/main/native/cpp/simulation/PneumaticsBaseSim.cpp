@@ -2,30 +2,30 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/simulation/PneumaticsBaseSim.hpp"
+#include "frc/simulation/PneumaticsBaseSim.h"
 
 #include <memory>
 
-#include "wpi/hardware/pneumatic/PneumaticsModuleType.hpp"
-#include "wpi/simulation/CTREPCMSim.hpp"
-#include "wpi/simulation/REVPHSim.hpp"
-#include "wpi/system/Errors.hpp"
+#include "frc/Errors.h"
+#include "frc/PneumaticsModuleType.h"
+#include "frc/simulation/CTREPCMSim.h"
+#include "frc/simulation/REVPHSim.h"
 
-using namespace wpi;
-using namespace wpi::sim;
+using namespace frc;
+using namespace frc::sim;
 
 std::shared_ptr<PneumaticsBaseSim> PneumaticsBaseSim::GetForType(
     int module, PneumaticsModuleType type) {
   switch (type) {
-    case PneumaticsModuleType::REV_PH:
+    case PneumaticsModuleType::REVPH:
       return std::make_shared<REVPHSim>(module);
 
-    case PneumaticsModuleType::CTRE_PCM:
+    case PneumaticsModuleType::CTREPCM:
       return std::make_shared<CTREPCMSim>(module);
 
     default:
-      throw WPILIB_MakeError(err::InvalidParameter, "{}",
-                             static_cast<int>(module));
+      throw FRC_MakeError(err::InvalidParameter, "{}",
+                          static_cast<int>(module));
   }
 }
 

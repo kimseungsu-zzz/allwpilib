@@ -1,32 +1,22 @@
 [
   {
-    "name": "Command v2 Robot",
-    "description": "Command v2, with explanatory comments and example code.",
+    "name": "Command Robot",
+    "description": "Command-based, with explanatory comments and example code.",
     "tags": [
-      "Commandv2"
+      "Command"
     ],
-    "foldername": "commandv2",
+    "foldername": "commandbased",
     "gradlebase": "cpp",
     "commandversion": 2
   },
   {
-    "name": "Command v2 Robot Skeleton (Advanced)",
-    "description": "Skeleton (stub) code for Command v2, without explanatory comments and example code.",
+    "name": "Command Robot Skeleton (Advanced)",
+    "description": "Skeleton (stub) code for Command-based, without explanatory comments and example code.",
     "tags": [
-      "Commandv2",
+      "Command",
       "Skeleton"
     ],
-    "foldername": "commandv2skeleton",
-    "gradlebase": "cpp",
-    "commandversion": 2
-  },
-  {
-    "name": "OpMode Robot",
-    "description": "OpMode style, with explanatory comments and example code.",
-    "tags": [
-      "OpMode"
-    ],
-    "foldername": "opmode",
+    "foldername": "commandbasedskeleton",
     "gradlebase": "cpp",
     "commandversion": 2
   },
@@ -87,10 +77,10 @@
     "name": "Romi - Command Robot",
     "description": "Romi - Command style",
     "tags": [
-      "Commandv2",
+      "Command",
       "Romi"
     ],
-    "foldername": "commandv2",
+    "foldername": "commandbased",
     "gradlebase": "cppromi",
     "commandversion": 2,
     "extravendordeps": [
@@ -115,10 +105,10 @@
     "name": "XRP - Command Robot",
     "description": "XRP - Command style",
     "tags": [
-      "Commandv2",
+      "Command",
       "XRP"
     ],
-    "foldername": "commandv2",
+    "foldername": "commandbased",
     "gradlebase": "cppxrp",
     "commandversion": 2,
     "extravendordeps": [

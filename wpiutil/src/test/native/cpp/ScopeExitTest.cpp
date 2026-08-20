@@ -4,41 +4,37 @@
 
 #include <utility>
 
-#include <catch2/catch_template_test_macros.hpp>
-#include <catch2/catch_test_macros.hpp>
-#include <catch2/matchers/catch_matchers_floating_point.hpp>
-#include <catch2/matchers/catch_matchers_range_equals.hpp>
-#include <catch2/matchers/catch_matchers_vector.hpp>
+#include <gtest/gtest.h>
 
-#include "wpi/util/scope"
+#include "wpi/scope"
 
-TEST_CASE("ScopeExitTest ScopeExit", "[wpiutil]") {
+TEST(ScopeExitTest, ScopeExit) {
   int exitCount = 0;
 
   {
-    wpi::util::scope_exit exit{[&] { ++exitCount; }};
+    wpi::scope_exit exit{[&] { ++exitCount; }};
 
-    CHECK(0 == exitCount);
+    EXPECT_EQ(0, exitCount);
   }
 
-  CHECK(1 == exitCount);
+  EXPECT_EQ(1, exitCount);
 }
 
-TEST_CASE("ScopeExitTest Release", "[wpiutil]") {
+TEST(ScopeExitTest, Release) {
   int exitCount = 0;
 
   {
-    wpi::util::scope_exit exit1{[&] { ++exitCount; }};
-    wpi::util::scope_exit exit2 = std::move(exit1);
+    wpi::scope_exit exit1{[&] { ++exitCount; }};
+    wpi::scope_exit exit2 = std::move(exit1);
     // NOLINTNEXTLINE(clang-analyzer-cplusplus.Move)
-    wpi::util::scope_exit exit3 = std::move(exit1);
-    CHECK(0 == exitCount);
+    wpi::scope_exit exit3 = std::move(exit1);
+    EXPECT_EQ(0, exitCount);
   }
-  CHECK(1 == exitCount);
+  EXPECT_EQ(1, exitCount);
 
   {
-    wpi::util::scope_exit exit{[&] { ++exitCount; }};
+    wpi::scope_exit exit{[&] { ++exitCount; }};
     exit.release();
   }
-  CHECK(1 == exitCount);
+  EXPECT_EQ(1, exitCount);
 }

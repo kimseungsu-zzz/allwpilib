@@ -2,49 +2,49 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/drivers/motor/PWMVictorSPX.hpp"
-#include "wpi/driverstation/Joystick.hpp"
-#include "wpi/framework/TimedRobot.hpp"
-#include "wpi/hardware/discrete/DigitalInput.hpp"
+#include <frc/DigitalInput.h>
+#include <frc/Encoder.h>
+#include <frc/Joystick.h>
+#include <frc/TimedRobot.h>
+#include <frc/motorcontrol/PWMVictorSPX.h>
 
 /**
- * Limit Switch snippets for wpilib-docs.
+ * Limit Switch snippets for frc-docs.
  * https://docs.wpilib.org/en/stable/docs/software/hardware-apis/sensors/limit-switch.html
  */
-class Robot : public wpi::TimedRobot {
+class Robot : public frc::TimedRobot {
  public:
-  void TeleopPeriodic() override { SetMotorVelocity(joystick.GetRawAxis(2)); }
-  void SetMotorVelocity(double velocity) {
-    if (velocity > 0) {
-      if (toplimitSwitch.Get()) {
+  void TeleopPeriodic() override { SetMotorSpeed(m_joystick.GetRawAxis(2)); }
+  void SetMotorSpeed(double speed) {
+    if (speed > 0) {
+      if (m_toplimitSwitch.Get()) {
         // We are going up and top limit is tripped so stop
-        motor.SetThrottle(0);
+        m_motor.Set(0);
       } else {
-        // We are going up but top limit is not tripped so go at commanded
-        // velocity
-        motor.SetThrottle(velocity);
+        // We are going up but top limit is not tripped so go at commanded speed
+        m_motor.Set(speed);
       }
     } else {
-      if (bottomlimitSwitch.Get()) {
+      if (m_bottomlimitSwitch.Get()) {
         // We are going down and bottom limit is tripped so stop
-        motor.SetThrottle(0);
+        m_motor.Set(0);
       } else {
         // We are going down but bottom limit is not tripped so go at commanded
-        // velocity
-        motor.SetThrottle(velocity);
+        // speed
+        m_motor.Set(speed);
       }
     }
   }
 
  private:
-  wpi::DigitalInput toplimitSwitch{0};
-  wpi::DigitalInput bottomlimitSwitch{1};
-  wpi::PWMVictorSPX motor{0};
-  wpi::Joystick joystick{0};
+  frc::DigitalInput m_toplimitSwitch{0};
+  frc::DigitalInput m_bottomlimitSwitch{1};
+  frc::PWMVictorSPX m_motor{0};
+  frc::Joystick m_joystick{0};
 };
 
-#ifndef RUNNING_WPILIB_TESTS
+#ifndef RUNNING_FRC_TESTS
 int main() {
-  return wpi::StartRobot<Robot>();
+  return frc::StartRobot<Robot>();
 }
 #endif

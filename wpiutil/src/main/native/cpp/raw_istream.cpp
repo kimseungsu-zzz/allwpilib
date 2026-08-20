@@ -4,7 +4,7 @@
 
 #define _CRT_NONSTDC_NO_WARNINGS
 
-#include "wpi/util/raw_istream.hpp"
+#include "wpi/raw_istream.h"
 
 #ifdef _WIN32
 #include <io.h>
@@ -16,8 +16,8 @@
 #include <cstring>
 #include <string_view>
 
-#include "wpi/util/SmallVector.hpp"
-#include "wpi/util/fs.hpp"
+#include "wpi/SmallVector.h"
+#include "wpi/fs.h"
 
 #if defined(_MSC_VER)
 #ifndef STDIN_FILENO
@@ -31,7 +31,7 @@
 #endif
 #endif
 
-using namespace wpi::util;
+using namespace wpi;
 
 std::string_view raw_istream::getline(SmallVectorImpl<char>& buf, int maxLen) {
   buf.clear();

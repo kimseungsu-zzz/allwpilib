@@ -2,19 +2,15 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/util/priority_mutex.hpp"
+#include <wpi/priority_mutex.h>  // NOLINT(build/include_order)
 
 #include <atomic>
 #include <condition_variable>
 #include <thread>
 
-#include <catch2/catch_template_test_macros.hpp>
-#include <catch2/catch_test_macros.hpp>
-#include <catch2/matchers/catch_matchers_floating_point.hpp>
-#include <catch2/matchers/catch_matchers_range_equals.hpp>
-#include <catch2/matchers/catch_matchers_vector.hpp>
+#include <gtest/gtest.h>
 
-namespace wpi::util {
+namespace wpi {
 
 #ifdef WPI_HAVE_PRIORITY_MUTEX
 
@@ -53,16 +49,16 @@ void SetProcessorAffinity(int32_t core_id) {
   CPU_SET(core_id, &cpuset);
 
   pthread_t current_thread = pthread_self();
-  REQUIRE(pthread_setaffinity_np(current_thread, sizeof(cpu_set_t), &cpuset) ==
-          0);
+  ASSERT_EQ(pthread_setaffinity_np(current_thread, sizeof(cpu_set_t), &cpuset),
+            0);
 }
 
 void SetThreadRealtimePriorityOrDie(int32_t priority) {
   struct sched_param param;
   // Set real-time priority for this thread
   param.sched_priority = priority + sched_get_priority_min(SCHED_RR);
-  UNSCOPED_INFO(": Failed to set scheduler priority.");
-  REQUIRE(pthread_setschedparam(pthread_self(), SCHED_RR, &param) == 0);
+  ASSERT_EQ(pthread_setschedparam(pthread_self(), SCHED_RR, &param), 0)
+      << ": Failed to set scheduler priority.";
 }
 
 // This thread holds the mutex and spins until signaled to release it and stop.
@@ -226,47 +222,47 @@ class InversionTestRunner {
 // TODO: Fix roborio permissions to run as root.
 
 // Priority inversion test.
-TEST_CASE("MutexTest DISABLED_PriorityInversion", "[wpiutil][.]") {
+TEST(MutexTest, DISABLED_PriorityInversion) {
   InversionTestRunner<priority_mutex> runner;
   std::thread runner_thread(std::ref(runner));
   runner_thread.join();
-  CHECK(runner.success());
+  EXPECT_TRUE(runner.success());
 }
 
 // Verify that the non-priority inversion mutex doesn't pass the test.
-TEST_CASE("MutexTest DISABLED_StdMutexPriorityInversion", "[wpiutil][.]") {
+TEST(MutexTest, DISABLED_StdMutexPriorityInversion) {
   InversionTestRunner<std::mutex> runner;
   std::thread runner_thread(std::ref(runner));
   runner_thread.join();
-  CHECK_FALSE(runner.success());
+  EXPECT_FALSE(runner.success());
 }
 
 // Smoke test to make sure that mutexes lock and unlock.
-TEST_CASE("MutexTest TryLock", "[wpiutil]") {
+TEST(MutexTest, TryLock) {
   priority_mutex m;
   m.lock();
-  CHECK_FALSE(m.try_lock());
+  EXPECT_FALSE(m.try_lock());
   m.unlock();
-  CHECK(m.try_lock());
+  EXPECT_TRUE(m.try_lock());
 }
 
 // Priority inversion test.
-TEST_CASE("MutexTest DISABLED_ReentrantPriorityInversion", "[wpiutil][.]") {
+TEST(MutexTest, DISABLED_ReentrantPriorityInversion) {
   InversionTestRunner<priority_recursive_mutex> runner;
   std::thread runner_thread(std::ref(runner));
   runner_thread.join();
-  CHECK(runner.success());
+  EXPECT_TRUE(runner.success());
 }
 
 // Smoke test to make sure that mutexes lock and unlock.
-TEST_CASE("MutexTest ReentrantTryLock", "[wpiutil]") {
+TEST(MutexTest, ReentrantTryLock) {
   priority_recursive_mutex m;
   m.lock();
-  CHECK(m.try_lock());
+  EXPECT_TRUE(m.try_lock());
   m.unlock();
-  CHECK(m.try_lock());
+  EXPECT_TRUE(m.try_lock());
 }
 
 #endif  // WPI_HAVE_PRIORITY_MUTEX
 
-}  // namespace wpi::util
+}  // namespace wpi

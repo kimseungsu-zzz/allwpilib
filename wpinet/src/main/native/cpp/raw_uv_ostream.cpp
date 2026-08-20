@@ -2,11 +2,11 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/net/raw_uv_ostream.hpp"
+#include "wpinet/raw_uv_ostream.h"
 
 #include <cstring>
 
-using namespace wpi::net;
+using namespace wpi;
 
 void raw_uv_ostream::write_impl(const char* data, size_t len) {
   while (len > 0) {

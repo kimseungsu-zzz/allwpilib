@@ -2,14 +2,15 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/sysid/SysIdRoutineLog.hpp"
+#include "frc/sysid/SysIdRoutineLog.h"
 
-#include <format>
 #include <string>
 
-#include "wpi/system/DataLogManager.hpp"
+#include <fmt/format.h>
 
-using namespace wpi::sysid;
+#include "frc/DataLogManager.h"
+
+using namespace frc::sysid;
 
 SysIdRoutineLog::SysIdRoutineLog(std::string_view logName)
     : m_logName(logName) {}
@@ -26,10 +27,10 @@ SysIdRoutineLog::MotorLog& SysIdRoutineLog::MotorLog::value(
   auto& motorEntries = (*m_logEntries)[m_motorName];
 
   if (!motorEntries.contains(name)) {
-    wpi::log::DataLog& log = wpi::DataLogManager::GetLog();
+    wpi::log::DataLog& log = frc::DataLogManager::GetLog();
 
     motorEntries[name] = wpi::log::DoubleLogEntry(
-        log, std::format("{}-{}-{}", name, m_motorName, m_logName), unit);
+        log, fmt::format("{}-{}-{}", name, m_motorName, m_logName), unit);
   }
 
   motorEntries[name].Append(value);
@@ -43,8 +44,8 @@ SysIdRoutineLog::MotorLog SysIdRoutineLog::Motor(std::string_view motorName) {
 void SysIdRoutineLog::RecordState(State state) {
   if (!m_stateInitialized) {
     m_state =
-        wpi::log::StringLogEntry{wpi::DataLogManager::GetLog(),
-                                 std::format("sysid-test-state-{}", m_logName)};
+        wpi::log::StringLogEntry{frc::DataLogManager::GetLog(),
+                                 fmt::format("sysid-test-state-{}", m_logName)};
     m_stateInitialized = true;
   }
   m_state.Append(StateEnumToString(state));
@@ -52,15 +53,15 @@ void SysIdRoutineLog::RecordState(State state) {
 
 std::string SysIdRoutineLog::StateEnumToString(State state) {
   switch (state) {
-    case State::QUASISTATIC_FORWARD:
+    case State::kQuasistaticForward:
       return "quasistatic-forward";
-    case State::QUASISTATIC_REVERSE:
+    case State::kQuasistaticReverse:
       return "quasistatic-reverse";
-    case State::DYNAMIC_FORWARD:
+    case State::kDynamicForward:
       return "dynamic-forward";
-    case State::DYNAMIC_REVERSE:
+    case State::kDynamicReverse:
       return "dynamic-reverse";
-    case State::NONE:
+    case State::kNone:
       return "none";
     default:
       return "none";

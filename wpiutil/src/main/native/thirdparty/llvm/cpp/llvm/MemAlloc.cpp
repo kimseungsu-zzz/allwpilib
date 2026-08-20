@@ -6,25 +6,22 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "wpi/util/MemAlloc.hpp"
+#include "wpi/MemAlloc.h"
 #include <new>
 
 // These are out of line to have __cpp_aligned_new not affect ABI.
 
 LLVM_ATTRIBUTE_RETURNS_NONNULL LLVM_ATTRIBUTE_RETURNS_NOALIAS void *
-wpi::util::allocate_buffer(size_t Size, size_t Alignment) {
-  void *Result = ::operator new(Size,
+wpi::allocate_buffer(size_t Size, size_t Alignment) {
+  return ::operator new(Size
 #ifdef __cpp_aligned_new
-                                std::align_val_t(Alignment),
+                        ,
+                        std::align_val_t(Alignment)
 #endif
-                                std::nothrow);
-  if (Result == nullptr) {
-    report_bad_alloc_error("Buffer allocation failed");
-  }
-  return Result;
+  );
 }
 
-void wpi::util::deallocate_buffer(void *Ptr, size_t Size, size_t Alignment) {
+void wpi::deallocate_buffer(void *Ptr, size_t Size, size_t Alignment) {
   ::operator delete(Ptr
 #ifdef __cpp_sized_deallocation
                     ,

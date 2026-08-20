@@ -4,64 +4,67 @@
 
 #include <jni.h>
 
-#include "HALUtil.hpp"
-#include "org_wpilib_hardware_hal_CTREPCMJNI.h"
-#include "wpi/hal/CTREPCM.h"
-#include "wpi/util/jni_util.hpp"
+#include <wpi/jni_util.h>
 
-using namespace wpi::hal;
+#include "HALUtil.h"
+#include "edu_wpi_first_hal_CTREPCMJNI.h"
+#include "hal/CTREPCM.h"
+#include "hal/Ports.h"
+#include "hal/handles/HandlesInternal.h"
+
+using namespace hal;
 
 extern "C" {
 
 /*
- * Class:     org_wpilib_hardware_hal_CTREPCMJNI
+ * Class:     edu_wpi_first_hal_CTREPCMJNI
  * Method:    initialize
- * Signature: (II)I
+ * Signature: (I)I
  */
 JNIEXPORT jint JNICALL
-Java_org_wpilib_hardware_hal_CTREPCMJNI_initialize
-  (JNIEnv* env, jclass, jint busId, jint module)
+Java_edu_wpi_first_hal_CTREPCMJNI_initialize
+  (JNIEnv* env, jclass, jint module)
 {
   int32_t status = 0;
-  auto stack = wpi::util::java::GetJavaStackTrace(env, "org.wpilib");
-  auto handle = HAL_InitializeCTREPCM(busId, module, stack.c_str(), &status);
+  auto stack = wpi::java::GetJavaStackTrace(env, "edu.wpi.first");
+  auto handle = HAL_InitializeCTREPCM(module, stack.c_str(), &status);
   CheckStatusForceThrow(env, status);
   return handle;
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_CTREPCMJNI
+ * Class:     edu_wpi_first_hal_CTREPCMJNI
  * Method:    free
  * Signature: (I)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_hardware_hal_CTREPCMJNI_free
+Java_edu_wpi_first_hal_CTREPCMJNI_free
   (JNIEnv* env, jclass, jint handle)
 {
-  if (handle != HAL_INVALID_HANDLE) {
+  if (handle != HAL_kInvalidHandle) {
     HAL_FreeCTREPCM(handle);
   }
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_CTREPCMJNI
+ * Class:     edu_wpi_first_hal_CTREPCMJNI
  * Method:    checkSolenoidChannel
  * Signature: (I)Z
  */
 JNIEXPORT jboolean JNICALL
-Java_org_wpilib_hardware_hal_CTREPCMJNI_checkSolenoidChannel
+Java_edu_wpi_first_hal_CTREPCMJNI_checkSolenoidChannel
   (JNIEnv*, jclass, jint channel)
 {
   return HAL_CheckCTREPCMSolenoidChannel(channel);
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_CTREPCMJNI
+ * Class:     edu_wpi_first_hal_CTREPCMJNI
  * Method:    getCompressor
  * Signature: (I)Z
  */
 JNIEXPORT jboolean JNICALL
-Java_org_wpilib_hardware_hal_CTREPCMJNI_getCompressor
+Java_edu_wpi_first_hal_CTREPCMJNI_getCompressor
   (JNIEnv* env, jclass, jint handle)
 {
   int32_t status = 0;
@@ -71,12 +74,12 @@ Java_org_wpilib_hardware_hal_CTREPCMJNI_getCompressor
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_CTREPCMJNI
+ * Class:     edu_wpi_first_hal_CTREPCMJNI
  * Method:    setClosedLoopControl
  * Signature: (IZ)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_hardware_hal_CTREPCMJNI_setClosedLoopControl
+Java_edu_wpi_first_hal_CTREPCMJNI_setClosedLoopControl
   (JNIEnv* env, jclass, jint handle, jboolean enabled)
 {
   int32_t status = 0;
@@ -85,12 +88,12 @@ Java_org_wpilib_hardware_hal_CTREPCMJNI_setClosedLoopControl
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_CTREPCMJNI
+ * Class:     edu_wpi_first_hal_CTREPCMJNI
  * Method:    getClosedLoopControl
  * Signature: (I)Z
  */
 JNIEXPORT jboolean JNICALL
-Java_org_wpilib_hardware_hal_CTREPCMJNI_getClosedLoopControl
+Java_edu_wpi_first_hal_CTREPCMJNI_getClosedLoopControl
   (JNIEnv* env, jclass, jint handle)
 {
   int32_t status = 0;
@@ -100,12 +103,12 @@ Java_org_wpilib_hardware_hal_CTREPCMJNI_getClosedLoopControl
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_CTREPCMJNI
+ * Class:     edu_wpi_first_hal_CTREPCMJNI
  * Method:    getPressureSwitch
  * Signature: (I)Z
  */
 JNIEXPORT jboolean JNICALL
-Java_org_wpilib_hardware_hal_CTREPCMJNI_getPressureSwitch
+Java_edu_wpi_first_hal_CTREPCMJNI_getPressureSwitch
   (JNIEnv* env, jclass, jint handle)
 {
   int32_t status = 0;
@@ -115,12 +118,12 @@ Java_org_wpilib_hardware_hal_CTREPCMJNI_getPressureSwitch
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_CTREPCMJNI
+ * Class:     edu_wpi_first_hal_CTREPCMJNI
  * Method:    getCompressorCurrent
  * Signature: (I)D
  */
 JNIEXPORT jdouble JNICALL
-Java_org_wpilib_hardware_hal_CTREPCMJNI_getCompressorCurrent
+Java_edu_wpi_first_hal_CTREPCMJNI_getCompressorCurrent
   (JNIEnv* env, jclass, jint handle)
 {
   int32_t status = 0;
@@ -130,12 +133,12 @@ Java_org_wpilib_hardware_hal_CTREPCMJNI_getCompressorCurrent
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_CTREPCMJNI
+ * Class:     edu_wpi_first_hal_CTREPCMJNI
  * Method:    getCompressorCurrentTooHighFault
  * Signature: (I)Z
  */
 JNIEXPORT jboolean JNICALL
-Java_org_wpilib_hardware_hal_CTREPCMJNI_getCompressorCurrentTooHighFault
+Java_edu_wpi_first_hal_CTREPCMJNI_getCompressorCurrentTooHighFault
   (JNIEnv* env, jclass, jint handle)
 {
   int32_t status = 0;
@@ -145,12 +148,12 @@ Java_org_wpilib_hardware_hal_CTREPCMJNI_getCompressorCurrentTooHighFault
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_CTREPCMJNI
+ * Class:     edu_wpi_first_hal_CTREPCMJNI
  * Method:    getCompressorCurrentTooHighStickyFault
  * Signature: (I)Z
  */
 JNIEXPORT jboolean JNICALL
-Java_org_wpilib_hardware_hal_CTREPCMJNI_getCompressorCurrentTooHighStickyFault
+Java_edu_wpi_first_hal_CTREPCMJNI_getCompressorCurrentTooHighStickyFault
   (JNIEnv* env, jclass, jint handle)
 {
   int32_t status = 0;
@@ -161,12 +164,12 @@ Java_org_wpilib_hardware_hal_CTREPCMJNI_getCompressorCurrentTooHighStickyFault
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_CTREPCMJNI
+ * Class:     edu_wpi_first_hal_CTREPCMJNI
  * Method:    getCompressorShortedFault
  * Signature: (I)Z
  */
 JNIEXPORT jboolean JNICALL
-Java_org_wpilib_hardware_hal_CTREPCMJNI_getCompressorShortedFault
+Java_edu_wpi_first_hal_CTREPCMJNI_getCompressorShortedFault
   (JNIEnv* env, jclass, jint handle)
 {
   int32_t status = 0;
@@ -176,12 +179,12 @@ Java_org_wpilib_hardware_hal_CTREPCMJNI_getCompressorShortedFault
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_CTREPCMJNI
+ * Class:     edu_wpi_first_hal_CTREPCMJNI
  * Method:    getCompressorShortedStickyFault
  * Signature: (I)Z
  */
 JNIEXPORT jboolean JNICALL
-Java_org_wpilib_hardware_hal_CTREPCMJNI_getCompressorShortedStickyFault
+Java_edu_wpi_first_hal_CTREPCMJNI_getCompressorShortedStickyFault
   (JNIEnv* env, jclass, jint handle)
 {
   int32_t status = 0;
@@ -191,12 +194,12 @@ Java_org_wpilib_hardware_hal_CTREPCMJNI_getCompressorShortedStickyFault
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_CTREPCMJNI
+ * Class:     edu_wpi_first_hal_CTREPCMJNI
  * Method:    getCompressorNotConnectedFault
  * Signature: (I)Z
  */
 JNIEXPORT jboolean JNICALL
-Java_org_wpilib_hardware_hal_CTREPCMJNI_getCompressorNotConnectedFault
+Java_edu_wpi_first_hal_CTREPCMJNI_getCompressorNotConnectedFault
   (JNIEnv* env, jclass, jint handle)
 {
   int32_t status = 0;
@@ -206,12 +209,12 @@ Java_org_wpilib_hardware_hal_CTREPCMJNI_getCompressorNotConnectedFault
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_CTREPCMJNI
+ * Class:     edu_wpi_first_hal_CTREPCMJNI
  * Method:    getCompressorNotConnectedStickyFault
  * Signature: (I)Z
  */
 JNIEXPORT jboolean JNICALL
-Java_org_wpilib_hardware_hal_CTREPCMJNI_getCompressorNotConnectedStickyFault
+Java_edu_wpi_first_hal_CTREPCMJNI_getCompressorNotConnectedStickyFault
   (JNIEnv* env, jclass, jint handle)
 {
   int32_t status = 0;
@@ -222,12 +225,12 @@ Java_org_wpilib_hardware_hal_CTREPCMJNI_getCompressorNotConnectedStickyFault
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_CTREPCMJNI
+ * Class:     edu_wpi_first_hal_CTREPCMJNI
  * Method:    getSolenoids
  * Signature: (I)I
  */
 JNIEXPORT jint JNICALL
-Java_org_wpilib_hardware_hal_CTREPCMJNI_getSolenoids
+Java_edu_wpi_first_hal_CTREPCMJNI_getSolenoids
   (JNIEnv* env, jclass, jint handle)
 {
   int32_t status = 0;
@@ -237,12 +240,12 @@ Java_org_wpilib_hardware_hal_CTREPCMJNI_getSolenoids
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_CTREPCMJNI
+ * Class:     edu_wpi_first_hal_CTREPCMJNI
  * Method:    setSolenoids
  * Signature: (III)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_hardware_hal_CTREPCMJNI_setSolenoids
+Java_edu_wpi_first_hal_CTREPCMJNI_setSolenoids
   (JNIEnv* env, jclass, jint handle, jint mask, jint value)
 {
   int32_t status = 0;
@@ -251,12 +254,12 @@ Java_org_wpilib_hardware_hal_CTREPCMJNI_setSolenoids
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_CTREPCMJNI
+ * Class:     edu_wpi_first_hal_CTREPCMJNI
  * Method:    getSolenoidDisabledList
  * Signature: (I)I
  */
 JNIEXPORT jint JNICALL
-Java_org_wpilib_hardware_hal_CTREPCMJNI_getSolenoidDisabledList
+Java_edu_wpi_first_hal_CTREPCMJNI_getSolenoidDisabledList
   (JNIEnv* env, jclass, jint handle)
 {
   int32_t status = 0;
@@ -266,12 +269,12 @@ Java_org_wpilib_hardware_hal_CTREPCMJNI_getSolenoidDisabledList
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_CTREPCMJNI
+ * Class:     edu_wpi_first_hal_CTREPCMJNI
  * Method:    getSolenoidVoltageFault
  * Signature: (I)Z
  */
 JNIEXPORT jboolean JNICALL
-Java_org_wpilib_hardware_hal_CTREPCMJNI_getSolenoidVoltageFault
+Java_edu_wpi_first_hal_CTREPCMJNI_getSolenoidVoltageFault
   (JNIEnv* env, jclass, jint handle)
 {
   int32_t status = 0;
@@ -281,12 +284,12 @@ Java_org_wpilib_hardware_hal_CTREPCMJNI_getSolenoidVoltageFault
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_CTREPCMJNI
+ * Class:     edu_wpi_first_hal_CTREPCMJNI
  * Method:    getSolenoidVoltageStickyFault
  * Signature: (I)Z
  */
 JNIEXPORT jboolean JNICALL
-Java_org_wpilib_hardware_hal_CTREPCMJNI_getSolenoidVoltageStickyFault
+Java_edu_wpi_first_hal_CTREPCMJNI_getSolenoidVoltageStickyFault
   (JNIEnv* env, jclass, jint handle)
 {
   int32_t status = 0;
@@ -296,12 +299,12 @@ Java_org_wpilib_hardware_hal_CTREPCMJNI_getSolenoidVoltageStickyFault
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_CTREPCMJNI
+ * Class:     edu_wpi_first_hal_CTREPCMJNI
  * Method:    clearAllStickyFaults
  * Signature: (I)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_hardware_hal_CTREPCMJNI_clearAllStickyFaults
+Java_edu_wpi_first_hal_CTREPCMJNI_clearAllStickyFaults
   (JNIEnv* env, jclass, jint handle)
 {
   int32_t status = 0;
@@ -310,12 +313,12 @@ Java_org_wpilib_hardware_hal_CTREPCMJNI_clearAllStickyFaults
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_CTREPCMJNI
+ * Class:     edu_wpi_first_hal_CTREPCMJNI
  * Method:    fireOneShot
  * Signature: (II)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_hardware_hal_CTREPCMJNI_fireOneShot
+Java_edu_wpi_first_hal_CTREPCMJNI_fireOneShot
   (JNIEnv* env, jclass, jint handle, jint index)
 {
   int32_t status = 0;
@@ -324,12 +327,12 @@ Java_org_wpilib_hardware_hal_CTREPCMJNI_fireOneShot
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_CTREPCMJNI
+ * Class:     edu_wpi_first_hal_CTREPCMJNI
  * Method:    setOneShotDuration
  * Signature: (III)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_hardware_hal_CTREPCMJNI_setOneShotDuration
+Java_edu_wpi_first_hal_CTREPCMJNI_setOneShotDuration
   (JNIEnv* env, jclass, jint handle, jint index, jint durMs)
 {
   int32_t status = 0;

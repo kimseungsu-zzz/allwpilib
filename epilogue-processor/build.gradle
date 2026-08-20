@@ -2,7 +2,7 @@ ext {
     useJava = true
     useCpp = false
     baseId = 'epilogue-processor'
-    groupId = 'org.wpilib.epilogue'
+    groupId = 'edu.wpi.first.epilogue'
 
     devMain = ''
 }
@@ -11,7 +11,7 @@ apply from: "${rootDir}/shared/java/javacommon.gradle"
 
 dependencies {
     implementation(project(':epilogue-runtime'))
-    api project(':commandsv2')
+    api project(':wpilibNewCommands')
 
-    testImplementation libs.compile.testing
+    testImplementation 'com.google.testing.compile:compile-testing:+'
 }

@@ -2,84 +2,74 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include <catch2/catch_test_macros.hpp>
-#include <catch2/matchers/catch_matchers_floating_point.hpp>
+#include <gtest/gtest.h>
+#include <hal/HAL.h>
 
-#include "wpi/hardware/pneumatic/DoubleSolenoid.hpp"
-#include "wpi/hardware/pneumatic/PneumaticsControlModule.hpp"
-#include "wpi/hardware/pneumatic/Solenoid.hpp"
+#include "frc/DoubleSolenoid.h"
+#include "frc/PneumaticsControlModule.h"
+#include "frc/Solenoid.h"
 
-namespace wpi {
+namespace frc {
 
-TEST_CASE("DoubleSolenoidREVTest ValidInitialization", "[wpilibc]") {
-  DoubleSolenoid solenoid{CANBus::CAN_S0, 3,
-                          wpi::PneumaticsModuleType::CTRE_PCM, 2, 3};
-  solenoid.Set(DoubleSolenoid::REVERSE);
-  CHECK(DoubleSolenoid::REVERSE == solenoid.Get());
+TEST(DoubleSolenoidREVTest, ValidInitialization) {
+  DoubleSolenoid solenoid{3, frc::PneumaticsModuleType::CTREPCM, 2, 3};
+  solenoid.Set(DoubleSolenoid::kReverse);
+  EXPECT_EQ(DoubleSolenoid::kReverse, solenoid.Get());
 
-  solenoid.Set(DoubleSolenoid::FORWARD);
-  CHECK(DoubleSolenoid::FORWARD == solenoid.Get());
+  solenoid.Set(DoubleSolenoid::kForward);
+  EXPECT_EQ(DoubleSolenoid::kForward, solenoid.Get());
 
-  solenoid.Set(DoubleSolenoid::OFF);
-  CHECK(DoubleSolenoid::OFF == solenoid.Get());
+  solenoid.Set(DoubleSolenoid::kOff);
+  EXPECT_EQ(DoubleSolenoid::kOff, solenoid.Get());
 }
 
-TEST_CASE("DoubleSolenoidREVTest ThrowForwardPortAlreadyInitialized",
-          "[wpilibc]") {
+TEST(DoubleSolenoidREVTest, ThrowForwardPortAlreadyInitialized) {
   // Single solenoid that is reused for forward port
-  Solenoid solenoid{CANBus::CAN_S0, 5, wpi::PneumaticsModuleType::CTRE_PCM, 2};
-  CHECK_THROWS_AS(DoubleSolenoid(CANBus::CAN_S0, 5,
-                                 wpi::PneumaticsModuleType::CTRE_PCM, 2, 3),
-                  std::runtime_error);
+  Solenoid solenoid{5, frc::PneumaticsModuleType::CTREPCM, 2};
+  EXPECT_THROW(DoubleSolenoid(5, frc::PneumaticsModuleType::CTREPCM, 2, 3),
+               std::runtime_error);
 }
 
-TEST_CASE("DoubleSolenoidREVTest ThrowReversePortAlreadyInitialized",
-          "[wpilibc]") {
+TEST(DoubleSolenoidREVTest, ThrowReversePortAlreadyInitialized) {
   // Single solenoid that is reused for forward port
-  Solenoid solenoid{CANBus::CAN_S0, 6, wpi::PneumaticsModuleType::CTRE_PCM, 3};
-  CHECK_THROWS_AS(DoubleSolenoid(CANBus::CAN_S0, 6,
-                                 wpi::PneumaticsModuleType::CTRE_PCM, 2, 3),
-                  std::runtime_error);
+  Solenoid solenoid{6, frc::PneumaticsModuleType::CTREPCM, 3};
+  EXPECT_THROW(DoubleSolenoid(6, frc::PneumaticsModuleType::CTREPCM, 2, 3),
+               std::runtime_error);
 }
 
-TEST_CASE("DoubleSolenoidREVTest ThrowBothPortsAlreadyInitialized",
-          "[wpilibc]") {
-  PneumaticsControlModule pcm{CANBus::CAN_S0, 6};
+TEST(DoubleSolenoidREVTest, ThrowBothPortsAlreadyInitialized) {
+  PneumaticsControlModule pcm{6};
   // Single solenoid that is reused for forward port
-  Solenoid solenoid0(CANBus::CAN_S0, 6, wpi::PneumaticsModuleType::CTRE_PCM, 2);
-  Solenoid solenoid1(CANBus::CAN_S0, 6, wpi::PneumaticsModuleType::CTRE_PCM, 3);
-  CHECK_THROWS_AS(DoubleSolenoid(CANBus::CAN_S0, 6,
-                                 wpi::PneumaticsModuleType::CTRE_PCM, 2, 3),
-                  std::runtime_error);
+  Solenoid solenoid0(6, frc::PneumaticsModuleType::CTREPCM, 2);
+  Solenoid solenoid1(6, frc::PneumaticsModuleType::CTREPCM, 3);
+  EXPECT_THROW(DoubleSolenoid(6, frc::PneumaticsModuleType::CTREPCM, 2, 3),
+               std::runtime_error);
 }
 
-TEST_CASE("DoubleSolenoidREVTest Toggle", "[wpilibc]") {
-  DoubleSolenoid solenoid{CANBus::CAN_S0, 4,
-                          wpi::PneumaticsModuleType::CTRE_PCM, 2, 3};
+TEST(DoubleSolenoidREVTest, Toggle) {
+  DoubleSolenoid solenoid{4, frc::PneumaticsModuleType::CTREPCM, 2, 3};
   // Bootstrap it into reverse
-  solenoid.Set(DoubleSolenoid::REVERSE);
+  solenoid.Set(DoubleSolenoid::kReverse);
 
   solenoid.Toggle();
-  CHECK(DoubleSolenoid::FORWARD == solenoid.Get());
+  EXPECT_EQ(DoubleSolenoid::kForward, solenoid.Get());
 
   solenoid.Toggle();
-  CHECK(DoubleSolenoid::REVERSE == solenoid.Get());
+  EXPECT_EQ(DoubleSolenoid::kReverse, solenoid.Get());
 
   // Of shouldn't do anything on toggle
-  solenoid.Set(DoubleSolenoid::OFF);
+  solenoid.Set(DoubleSolenoid::kOff);
   solenoid.Toggle();
-  CHECK(DoubleSolenoid::OFF == solenoid.Get());
+  EXPECT_EQ(DoubleSolenoid::kOff, solenoid.Get());
 }
 
-TEST_CASE("DoubleSolenoidREVTest InvalidForwardPort", "[wpilibc]") {
-  CHECK_THROWS_AS(DoubleSolenoid(CANBus::CAN_S0, 0,
-                                 wpi::PneumaticsModuleType::CTRE_PCM, 100, 1),
-                  std::runtime_error);
+TEST(DoubleSolenoidREVTest, InvalidForwardPort) {
+  EXPECT_THROW(DoubleSolenoid(0, frc::PneumaticsModuleType::CTREPCM, 100, 1),
+               std::runtime_error);
 }
 
-TEST_CASE("DoubleSolenoidREVTest InvalidReversePort", "[wpilibc]") {
-  CHECK_THROWS_AS(DoubleSolenoid(CANBus::CAN_S0, 0,
-                                 wpi::PneumaticsModuleType::CTRE_PCM, 0, 100),
-                  std::runtime_error);
+TEST(DoubleSolenoidREVTest, InvalidReversePort) {
+  EXPECT_THROW(DoubleSolenoid(0, frc::PneumaticsModuleType::CTREPCM, 0, 100),
+               std::runtime_error);
 }
-}  // namespace wpi
+}  // namespace frc

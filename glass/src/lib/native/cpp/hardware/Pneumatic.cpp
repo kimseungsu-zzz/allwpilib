@@ -2,29 +2,28 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/glass/hardware/Pneumatic.hpp"
+#include "glass/hardware/Pneumatic.h"
 
 #include <cstdio>
 #include <cstring>
 #include <string>
 
 #include <imgui.h>
+#include <wpi/SmallVector.h>
+#include <wpi/StringExtras.h>
 
-#include "wpi/glass/Context.hpp"
-#include "wpi/glass/DataSource.hpp"
-#include "wpi/glass/Storage.hpp"
-#include "wpi/glass/other/DeviceTree.hpp"
-#include "wpi/glass/support/ExtraGuiWidgets.hpp"
-#include "wpi/glass/support/NameSetting.hpp"
-#include "wpi/util/SmallVector.hpp"
-#include "wpi/util/StringExtras.hpp"
+#include "glass/Context.h"
+#include "glass/DataSource.h"
+#include "glass/Storage.h"
+#include "glass/other/DeviceTree.h"
+#include "glass/support/ExtraGuiWidgets.h"
+#include "glass/support/NameSetting.h"
 
-using namespace wpi::glass;
+using namespace glass;
 
-bool wpi::glass::DisplayPneumaticControlSolenoids(PneumaticControlModel* model,
-                                                  int index,
-                                                  bool outputsEnabled) {
-  wpi::util::SmallVector<int, 16> channels;
+bool glass::DisplayPneumaticControlSolenoids(PneumaticControlModel* model,
+                                             int index, bool outputsEnabled) {
+  wpi::SmallVector<int, 16> channels;
   model->ForEachSolenoid([&](SolenoidModel& solenoid, int j) {
     if (auto data = solenoid.GetOutputData()) {
       if (j >= static_cast<int>(channels.size())) {
@@ -49,19 +48,19 @@ bool wpi::glass::DisplayPneumaticControlSolenoids(PneumaticControlModel* model,
   std::string& name = GetStorage().GetString("name");
   char label[128];
   if (!name.empty()) {
-    wpi::util::format_to_n_c_str(label, sizeof(label), "{} [{}]###header", name,
-                                 index);
+    wpi::format_to_n_c_str(label, sizeof(label), "{} [{}]###header", name,
+                           index);
   } else {
-    wpi::util::format_to_n_c_str(label, sizeof(label), "{}[{}]###header",
-                                 model->GetName(), index);
+    wpi::format_to_n_c_str(label, sizeof(label), "{}[{}]###header",
+                           model->GetName(), index);
   }
 
   // header
   bool open = CollapsingHeader(label);
 
-  ImGui::SetNextItemAllowOverlap();
   PopupEditName("header", &name);
 
+  ImGui::SetItemAllowOverlap();
   ImGui::SameLine();
 
   // show channels as LED indicators
@@ -88,9 +87,9 @@ bool wpi::glass::DisplayPneumaticControlSolenoids(PneumaticControlModel* model,
   return true;
 }
 
-void wpi::glass::DisplayPneumaticControlsSolenoids(
-    PneumaticControlsModel* model, bool outputsEnabled,
-    std::string_view noneMsg) {
+void glass::DisplayPneumaticControlsSolenoids(PneumaticControlsModel* model,
+                                              bool outputsEnabled,
+                                              std::string_view noneMsg) {
   bool hasAny = false;
   model->ForEachPneumaticControl(
       [&](PneumaticControlModel& pneumaticControl, int i) {
@@ -106,13 +105,13 @@ void wpi::glass::DisplayPneumaticControlsSolenoids(
   }
 }
 
-void wpi::glass::DisplayCompressorDevice(CompressorModel* model, int index,
-                                         bool outputsEnabled) {
+void glass::DisplayCompressorDevice(CompressorModel* model, int index,
+                                    bool outputsEnabled) {
   if (!model || !model->Exists()) {
     return;
   }
   char name[32];
-  wpi::util::format_to_n_c_str(name, sizeof(name), "Compressor[{}]", index);
+  wpi::format_to_n_c_str(name, sizeof(name), "Compressor[{}]", index);
 
   if (BeginDevice(name)) {
     // output enabled
@@ -155,8 +154,8 @@ void wpi::glass::DisplayCompressorDevice(CompressorModel* model, int index,
   }
 }
 
-void wpi::glass::DisplayCompressorsDevice(PneumaticControlsModel* model,
-                                          bool outputsEnabled) {
+void glass::DisplayCompressorsDevice(PneumaticControlsModel* model,
+                                     bool outputsEnabled) {
   model->ForEachPneumaticControl(
       [&](PneumaticControlModel& pneumaticControl, int i) {
         DisplayCompressorDevice(pneumaticControl.GetCompressor(), i,

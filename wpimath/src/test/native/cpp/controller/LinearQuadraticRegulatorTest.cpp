@@ -2,22 +2,20 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/math/controller/LinearQuadraticRegulator.hpp"
+#include <cmath>
 
-#include <catch2/catch_test_macros.hpp>
+#include <gtest/gtest.h>
 
-#include "wpi/math/TestAssertions.hpp"
-#include "wpi/math/linalg/EigenCore.hpp"
-#include "wpi/math/system/DCMotor.hpp"
-#include "wpi/math/system/LinearSystem.hpp"
-#include "wpi/math/system/Models.hpp"
-#include "wpi/units/length.hpp"
-#include "wpi/units/mass.hpp"
-#include "wpi/units/time.hpp"
+#include "frc/EigenCore.h"
+#include "frc/controller/LinearQuadraticRegulator.h"
+#include "frc/system/LinearSystem.h"
+#include "frc/system/plant/DCMotor.h"
+#include "frc/system/plant/LinearSystemId.h"
+#include "units/time.h"
 
-namespace wpi::math {
+namespace frc {
 
-TEST_CASE("LinearQuadraticRegulatorTest ElevatorGains", "[wpimath]") {
+TEST(LinearQuadraticRegulatorTest, ElevatorGains) {
   LinearSystem<2, 1, 1> plant = [] {
     auto motors = DCMotor::Vex775Pro(2);
 
@@ -30,17 +28,16 @@ TEST_CASE("LinearQuadraticRegulatorTest ElevatorGains", "[wpimath]") {
     // Gear ratio
     constexpr double G = 40.0 / 40.0;
 
-    return wpi::math::Models::ElevatorFromPhysicalConstants(motors, m, r, G)
-        .Slice(0);
+    return frc::LinearSystemId::ElevatorSystem(motors, m, r, G).Slice(0);
   }();
   Matrixd<1, 2> K =
       LinearQuadraticRegulator<2, 1>{plant, {0.02, 0.4}, {12.0}, 5_ms}.K();
 
-  CHECK_NEAR(522.87006795347486, K(0, 0), 1e-6);
-  CHECK_NEAR(38.239878385020411, K(0, 1), 1e-6);
+  EXPECT_NEAR(522.87006795347486, K(0, 0), 1e-6);
+  EXPECT_NEAR(38.239878385020411, K(0, 1), 1e-6);
 }
 
-TEST_CASE("LinearQuadraticRegulatorTest ArmGains", "[wpimath]") {
+TEST(LinearQuadraticRegulatorTest, ArmGains) {
   LinearSystem<2, 1, 1> plant = [] {
     auto motors = DCMotor::Vex775Pro(2);
 
@@ -53,8 +50,8 @@ TEST_CASE("LinearQuadraticRegulatorTest ArmGains", "[wpimath]") {
     // Gear ratio
     constexpr double G = 100.0;
 
-    return wpi::math::Models::SingleJointedArmFromPhysicalConstants(
-               motors, 1.0 / 3.0 * m * r * r, G)
+    return frc::LinearSystemId::SingleJointedArmSystem(motors,
+                                                       1.0 / 3.0 * m * r * r, G)
         .Slice(0);
   }();
 
@@ -62,11 +59,11 @@ TEST_CASE("LinearQuadraticRegulatorTest ArmGains", "[wpimath]") {
       LinearQuadraticRegulator<2, 1>{plant, {0.01745, 0.08726}, {12.0}, 5_ms}
           .K();
 
-  CHECK_NEAR(19.339349883583761, K(0, 0), 1e-6);
-  CHECK_NEAR(3.3542559517421582, K(0, 1), 1e-6);
+  EXPECT_NEAR(19.339349883583761, K(0, 0), 1e-6);
+  EXPECT_NEAR(3.3542559517421582, K(0, 1), 1e-6);
 }
 
-TEST_CASE("LinearQuadraticRegulatorTest FourMotorElevator", "[wpimath]") {
+TEST(LinearQuadraticRegulatorTest, FourMotorElevator) {
   LinearSystem<2, 1, 1> plant = [] {
     auto motors = DCMotor::Vex775Pro(4);
 
@@ -79,14 +76,13 @@ TEST_CASE("LinearQuadraticRegulatorTest FourMotorElevator", "[wpimath]") {
     // Gear ratio
     constexpr double G = 14.67;
 
-    return wpi::math::Models::ElevatorFromPhysicalConstants(motors, m, r, G)
-        .Slice(0);
+    return frc::LinearSystemId::ElevatorSystem(motors, m, r, G).Slice(0);
   }();
   Matrixd<1, 2> K =
       LinearQuadraticRegulator<2, 1>{plant, {0.1, 0.2}, {12.0}, 20_ms}.K();
 
-  CHECK_NEAR(10.38, K(0, 0), 1e-1);
-  CHECK_NEAR(0.69, K(0, 1), 1e-1);
+  EXPECT_NEAR(10.38, K(0, 0), 1e-1);
+  EXPECT_NEAR(0.69, K(0, 1), 1e-1);
 }
 
 /**
@@ -107,7 +103,7 @@ template <int States, int Inputs>
 Matrixd<Inputs, States> GetImplicitModelFollowingK(
     const Matrixd<States, States>& A, const Matrixd<States, Inputs>& B,
     const Matrixd<States, States>& Q, const Matrixd<Inputs, Inputs>& R,
-    const Matrixd<States, States>& Aref, wpi::units::second_t dt) {
+    const Matrixd<States, States>& Aref, units::second_t dt) {
   // Discretize real dynamics
   Matrixd<States, States> discA;
   Matrixd<States, Inputs> discB;
@@ -126,8 +122,7 @@ Matrixd<Inputs, States> GetImplicitModelFollowingK(
       .K();
 }
 
-TEST_CASE("LinearQuadraticRegulatorTest MatrixOverloadsWithSingleIntegrator",
-          "[wpimath]") {
+TEST(LinearQuadraticRegulatorTest, MatrixOverloadsWithSingleIntegrator) {
   Matrixd<2, 2> A{Matrixd<2, 2>::Zero()};
   Matrixd<2, 2> B{Matrixd<2, 2>::Identity()};
   Matrixd<2, 2> Q{Matrixd<2, 2>::Identity()};
@@ -135,22 +130,21 @@ TEST_CASE("LinearQuadraticRegulatorTest MatrixOverloadsWithSingleIntegrator",
 
   // QR overload
   Matrixd<2, 2> K = LinearQuadraticRegulator<2, 2>{A, B, Q, R, 5_ms}.K();
-  CHECK_NEAR(0.99750312499512261, K(0, 0), 1e-10);
-  CHECK_NEAR(0.0, K(0, 1), 1e-10);
-  CHECK_NEAR(0.0, K(1, 0), 1e-10);
-  CHECK_NEAR(0.99750312499512261, K(1, 1), 1e-10);
+  EXPECT_NEAR(0.99750312499512261, K(0, 0), 1e-10);
+  EXPECT_NEAR(0.0, K(0, 1), 1e-10);
+  EXPECT_NEAR(0.0, K(1, 0), 1e-10);
+  EXPECT_NEAR(0.99750312499512261, K(1, 1), 1e-10);
 
   // QRN overload
   Matrixd<2, 2> N{Matrixd<2, 2>::Identity()};
   Matrixd<2, 2> Kimf = LinearQuadraticRegulator<2, 2>{A, B, Q, R, N, 5_ms}.K();
-  CHECK_NEAR(1.0, Kimf(0, 0), 1e-10);
-  CHECK_NEAR(0.0, Kimf(0, 1), 1e-10);
-  CHECK_NEAR(0.0, Kimf(1, 0), 1e-10);
-  CHECK_NEAR(1.0, Kimf(1, 1), 1e-10);
+  EXPECT_NEAR(1.0, Kimf(0, 0), 1e-10);
+  EXPECT_NEAR(0.0, Kimf(0, 1), 1e-10);
+  EXPECT_NEAR(0.0, Kimf(1, 0), 1e-10);
+  EXPECT_NEAR(1.0, Kimf(1, 1), 1e-10);
 }
 
-TEST_CASE("LinearQuadraticRegulatorTest MatrixOverloadsWithDoubleIntegrator",
-          "[wpimath]") {
+TEST(LinearQuadraticRegulatorTest, MatrixOverloadsWithDoubleIntegrator) {
   double Kv = 3.02;
   double Ka = 0.642;
 
@@ -161,17 +155,17 @@ TEST_CASE("LinearQuadraticRegulatorTest MatrixOverloadsWithDoubleIntegrator",
 
   // QR overload
   Matrixd<1, 2> K = LinearQuadraticRegulator<2, 1>{A, B, Q, R, 5_ms}.K();
-  CHECK_NEAR(1.9960017786537287, K(0, 0), 1e-10);
-  CHECK_NEAR(0.51182128351092726, K(0, 1), 1e-10);
+  EXPECT_NEAR(1.9960017786537287, K(0, 0), 1e-10);
+  EXPECT_NEAR(0.51182128351092726, K(0, 1), 1e-10);
 
   // QRN overload
   Matrixd<2, 2> Aref{{0, 1}, {0, -Kv / (Ka * 5.0)}};
   Matrixd<1, 2> Kimf = GetImplicitModelFollowingK<2, 1>(A, B, Q, R, Aref, 5_ms);
-  CHECK_NEAR(0.0, Kimf(0, 0), 1e-10);
-  CHECK_NEAR(-6.9190500116751458e-05, Kimf(0, 1), 1e-10);
+  EXPECT_NEAR(0.0, Kimf(0, 0), 1e-10);
+  EXPECT_NEAR(-6.9190500116751458e-05, Kimf(0, 1), 1e-10);
 }
 
-TEST_CASE("LinearQuadraticRegulatorTest LatencyCompensate", "[wpimath]") {
+TEST(LinearQuadraticRegulatorTest, LatencyCompensate) {
   LinearSystem<2, 1, 1> plant = [] {
     auto motors = DCMotor::Vex775Pro(4);
 
@@ -184,51 +178,14 @@ TEST_CASE("LinearQuadraticRegulatorTest LatencyCompensate", "[wpimath]") {
     // Gear ratio
     constexpr double G = 14.67;
 
-    return wpi::math::Models::ElevatorFromPhysicalConstants(motors, m, r, G)
-        .Slice(0);
+    return frc::LinearSystemId::ElevatorSystem(motors, m, r, G).Slice(0);
   }();
   LinearQuadraticRegulator<2, 1> controller{plant, {0.1, 0.2}, {12.0}, 20_ms};
 
   controller.LatencyCompensate(plant, 20_ms, 10_ms);
 
-  CHECK_NEAR(8.97115941, controller.K(0, 0), 1e-3);
-  CHECK_NEAR(0.07904881, controller.K(0, 1), 1e-3);
+  EXPECT_NEAR(8.97115941, controller.K(0, 0), 1e-3);
+  EXPECT_NEAR(0.07904881, controller.K(0, 1), 1e-3);
 }
 
-TEST_CASE("LinearQuadraticRegulatorTest AtReference", "[wpimath]") {
-  LinearSystem<2, 1, 1> plant = [] {
-    auto motors = DCMotor::Vex775Pro(2);
-
-    // Carriage mass
-    constexpr auto m = 5_kg;
-
-    // Radius of pulley
-    constexpr auto r = 0.0181864_m;
-
-    // Gear ratio
-    constexpr double G = 40.0 / 40.0;
-
-    return wpi::math::Models::ElevatorFromPhysicalConstants(motors, m, r, G)
-        .Slice(0);
-  }();
-  LinearQuadraticRegulator<2, 1> controller{plant, {0.02, 0.4}, {12.0}, 5_ms};
-
-  // Default tolerance is zero; with zero error the controller is at reference.
-  controller.Calculate(Vectord<2>{0.0, 0.0}, Vectord<2>{0.0, 0.0});
-  CHECK(controller.AtReference());
-
-  controller.SetTolerance(Vectord<2>{0.1, 0.2});
-
-  // The error is r - x, so with r = 0 the error is -x.
-  controller.Calculate(Vectord<2>{0.05, 0.1}, Vectord<2>{0.0, 0.0});
-  CHECK(controller.AtReference());
-
-  controller.Calculate(Vectord<2>{0.2, 0.1}, Vectord<2>{0.0, 0.0});
-  CHECK_FALSE(controller.AtReference());
-
-  // Error exactly at the tolerance boundary is considered at reference.
-  controller.Calculate(Vectord<2>{0.1, 0.2}, Vectord<2>{0.0, 0.0});
-  CHECK(controller.AtReference());
-}
-
-}  // namespace wpi::math
+}  // namespace frc

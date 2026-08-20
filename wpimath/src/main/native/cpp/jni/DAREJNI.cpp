@@ -4,27 +4,27 @@
 
 #include <jni.h>
 
-#include <format>
 #include <stdexcept>
 #include <string>
 
-#include "Exceptions.hpp"
-#include "org_wpilib_math_jni_DAREJNI.h"
-#include "wpi/math/fmt/Eigen.hpp"
-#include "wpi/math/linalg/DARE.hpp"
-#include "wpi/util/jni_util.hpp"
+#include <wpi/jni_util.h>
 
-using namespace wpi::util::java;
+#include "Exceptions.h"
+#include "edu_wpi_first_math_jni_DAREJNI.h"
+#include "frc/DARE.h"
+#include "frc/fmt/Eigen.h"
+
+using namespace wpi::java;
 
 extern "C" {
 
 /*
- * Class:     org_wpilib_math_jni_DAREJNI
+ * Class:     edu_wpi_first_math_jni_DAREJNI
  * Method:    dareNoPrecondABQR
  * Signature: ([D[D[D[DII[D)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_math_jni_DAREJNI_dareNoPrecondABQR
+Java_edu_wpi_first_math_jni_DAREJNI_dareNoPrecondABQR
   (JNIEnv* env, jclass, jdoubleArray A, jdoubleArray B, jdoubleArray Q,
    jdoubleArray R, jint states, jint inputs, jdoubleArray S)
 {
@@ -46,20 +46,20 @@ Java_org_wpilib_math_jni_DAREJNI_dareNoPrecondABQR
                                  Eigen::RowMajor>>
       Rmat{nativeR.data(), inputs, inputs};
 
-  auto result = wpi::math::DARE<Eigen::Dynamic, Eigen::Dynamic>(
-                    Amat, Bmat, Qmat, Rmat, false)
-                    .value();
+  auto result =
+      frc::DARE<Eigen::Dynamic, Eigen::Dynamic>(Amat, Bmat, Qmat, Rmat, false)
+          .value();
 
   env->SetDoubleArrayRegion(S, 0, states * states, result.data());
 }
 
 /*
- * Class:     org_wpilib_math_jni_DAREJNI
+ * Class:     edu_wpi_first_math_jni_DAREJNI
  * Method:    dareNoPrecondABQRN
  * Signature: ([D[D[D[D[DII[D)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_math_jni_DAREJNI_dareNoPrecondABQRN
+Java_edu_wpi_first_math_jni_DAREJNI_dareNoPrecondABQRN
   (JNIEnv* env, jclass, jdoubleArray A, jdoubleArray B, jdoubleArray Q,
    jdoubleArray R, jdoubleArray N, jint states, jint inputs, jdoubleArray S)
 {
@@ -85,20 +85,20 @@ Java_org_wpilib_math_jni_DAREJNI_dareNoPrecondABQRN
                                  Eigen::RowMajor>>
       Nmat{nativeN.data(), states, inputs};
 
-  auto result = wpi::math::DARE<Eigen::Dynamic, Eigen::Dynamic>(
-                    Amat, Bmat, Qmat, Rmat, Nmat, false)
+  auto result = frc::DARE<Eigen::Dynamic, Eigen::Dynamic>(Amat, Bmat, Qmat,
+                                                          Rmat, Nmat, false)
                     .value();
 
   env->SetDoubleArrayRegion(S, 0, states * states, result.data());
 }
 
 /*
- * Class:     org_wpilib_math_jni_DAREJNI
+ * Class:     edu_wpi_first_math_jni_DAREJNI
  * Method:    dareABQR
  * Signature: ([D[D[D[DII[D)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_math_jni_DAREJNI_dareABQR
+Java_edu_wpi_first_math_jni_DAREJNI_dareABQR
   (JNIEnv* env, jclass, jdoubleArray A, jdoubleArray B, jdoubleArray Q,
    jdoubleArray R, jint states, jint inputs, jdoubleArray S)
 {
@@ -120,34 +120,34 @@ Java_org_wpilib_math_jni_DAREJNI_dareABQR
                                  Eigen::RowMajor>>
       Rmat{nativeR.data(), inputs, inputs};
 
-  if (auto result = wpi::math::DARE<Eigen::Dynamic, Eigen::Dynamic>(
-          Amat, Bmat, Qmat, Rmat)) {
+  if (auto result =
+          frc::DARE<Eigen::Dynamic, Eigen::Dynamic>(Amat, Bmat, Qmat, Rmat)) {
     env->SetDoubleArrayRegion(S, 0, states * states, result.value().data());
     // K = (BᵀSB + R)⁻¹BᵀSA
-  } else if (result.error() == wpi::math::DAREError::QNotSymmetric ||
-             result.error() == wpi::math::DAREError::QNotPositiveSemidefinite) {
+  } else if (result.error() == frc::DAREError::QNotSymmetric ||
+             result.error() == frc::DAREError::QNotPositiveSemidefinite) {
     illegalArgEx.Throw(
-        env, std::format("{}\n\nQ =\n{}\n", to_string(result.error()), Qmat));
-  } else if (result.error() == wpi::math::DAREError::RNotSymmetric ||
-             result.error() == wpi::math::DAREError::RNotPositiveDefinite) {
+        env, fmt::format("{}\n\nQ =\n{}\n", to_string(result.error()), Qmat));
+  } else if (result.error() == frc::DAREError::RNotSymmetric ||
+             result.error() == frc::DAREError::RNotPositiveDefinite) {
     illegalArgEx.Throw(
-        env, std::format("{}\n\nR =\n{}\n", to_string(result.error()), Rmat));
-  } else if (result.error() == wpi::math::DAREError::ABNotStabilizable) {
-    illegalArgEx.Throw(env, std::format("{}\n\nA =\n{}\nB =\n{}\n",
+        env, fmt::format("{}\n\nR =\n{}\n", to_string(result.error()), Rmat));
+  } else if (result.error() == frc::DAREError::ABNotStabilizable) {
+    illegalArgEx.Throw(env, fmt::format("{}\n\nA =\n{}\nB =\n{}\n",
                                         to_string(result.error()), Amat, Bmat));
-  } else if (result.error() == wpi::math::DAREError::ACNotDetectable) {
-    illegalArgEx.Throw(env, std::format("{}\n\nA =\n{}\nQ =\n{}\n",
+  } else if (result.error() == frc::DAREError::ACNotDetectable) {
+    illegalArgEx.Throw(env, fmt::format("{}\n\nA =\n{}\nQ =\n{}\n",
                                         to_string(result.error()), Amat, Qmat));
   }
 }
 
 /*
- * Class:     org_wpilib_math_jni_DAREJNI
+ * Class:     edu_wpi_first_math_jni_DAREJNI
  * Method:    dareABQRN
  * Signature: ([D[D[D[D[DII[D)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_math_jni_DAREJNI_dareABQRN
+Java_edu_wpi_first_math_jni_DAREJNI_dareABQRN
   (JNIEnv* env, jclass, jdoubleArray A, jdoubleArray B, jdoubleArray Q,
    jdoubleArray R, jdoubleArray N, jint states, jint inputs, jdoubleArray S)
 {
@@ -173,26 +173,26 @@ Java_org_wpilib_math_jni_DAREJNI_dareABQRN
                                  Eigen::RowMajor>>
       Nmat{nativeN.data(), states, inputs};
 
-  if (auto result = wpi::math::DARE<Eigen::Dynamic, Eigen::Dynamic>(
-          Amat, Bmat, Qmat, Rmat, Nmat)) {
+  if (auto result = frc::DARE<Eigen::Dynamic, Eigen::Dynamic>(Amat, Bmat, Qmat,
+                                                              Rmat, Nmat)) {
     env->SetDoubleArrayRegion(S, 0, states * states, result.value().data());
-  } else if (result.error() == wpi::math::DAREError::QNotSymmetric ||
-             result.error() == wpi::math::DAREError::QNotPositiveSemidefinite) {
+  } else if (result.error() == frc::DAREError::QNotSymmetric ||
+             result.error() == frc::DAREError::QNotPositiveSemidefinite) {
     illegalArgEx.Throw(
-        env, std::format("{}\n\nQ =\n{}\n", to_string(result.error()), Qmat));
-  } else if (result.error() == wpi::math::DAREError::RNotSymmetric ||
-             result.error() == wpi::math::DAREError::RNotPositiveDefinite) {
+        env, fmt::format("{}\n\nQ =\n{}\n", to_string(result.error()), Qmat));
+  } else if (result.error() == frc::DAREError::RNotSymmetric ||
+             result.error() == frc::DAREError::RNotPositiveDefinite) {
     illegalArgEx.Throw(
-        env, std::format("{}\n\nR =\n{}\n", to_string(result.error()), Rmat));
-  } else if (result.error() == wpi::math::DAREError::ABNotStabilizable) {
+        env, fmt::format("{}\n\nR =\n{}\n", to_string(result.error()), Rmat));
+  } else if (result.error() == frc::DAREError::ABNotStabilizable) {
     illegalArgEx.Throw(
         env,
-        std::format("{}\n\nA =\n{}\nB =\n{}\n", to_string(result.error()),
+        fmt::format("{}\n\nA =\n{}\nB =\n{}\n", to_string(result.error()),
                     Amat - Bmat * Rmat.llt().solve(Nmat.transpose()), Bmat));
-  } else if (result.error() == wpi::math::DAREError::ACNotDetectable) {
+  } else if (result.error() == frc::DAREError::ACNotDetectable) {
     auto R_llt = Rmat.llt();
     illegalArgEx.Throw(
-        env, std::format("{}\n\nA =\n{}\nQ =\n{}\n", to_string(result.error()),
+        env, fmt::format("{}\n\nA =\n{}\nQ =\n{}\n", to_string(result.error()),
                          Amat - Bmat * R_llt.solve(Nmat.transpose()),
                          Qmat - Nmat * R_llt.solve(Nmat.transpose())));
   }

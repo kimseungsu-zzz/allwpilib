@@ -2,7 +2,7 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/glass/other/Plot.hpp"
+#include "glass/other/Plot.h"
 
 #include <stdint.h>
 
@@ -15,7 +15,8 @@
 #include <utility>
 #include <vector>
 
-#include "wpi/util/StringExtras.hpp"
+#include <fmt/format.h>
+#include <wpi/StringExtras.h>
 
 #if defined(__GNUC__)
 #pragma GCC diagnostic ignored "-Wformat-nonliteral"
@@ -25,23 +26,21 @@
 #include <imgui_stdlib.h>
 #include <implot.h>
 #include <implot_internal.h>
+#include <wpi/Signal.h>
+#include <wpi/SmallString.h>
+#include <wpi/SmallVector.h>
+#include <wpi/timestamp.h>
 
-#include "wpi/glass/ContextInternal.hpp"
-#include "wpi/glass/DataSource.hpp"
-#include "wpi/glass/Storage.hpp"
-#include "wpi/glass/support/ColorSetting.hpp"
-#include "wpi/glass/support/EnumSetting.hpp"
-#include "wpi/glass/support/ExtraGuiWidgets.hpp"
-#include "wpi/util/Signal.h"
-#include "wpi/util/timestamp.hpp"
+#include "glass/Context.h"
+#include "glass/DataSource.h"
+#include "glass/Storage.h"
+#include "glass/support/ColorSetting.h"
+#include "glass/support/EnumSetting.h"
+#include "glass/support/ExtraGuiWidgets.h"
 
-using namespace wpi::glass;
+using namespace glass;
 
 static constexpr int kAxisCount = 3;
-
-static double GetTimestampDisplayOffsetSeconds() {
-  return static_cast<double>(GetTimestampDisplayOffset()) * 1.0e-6;
-}
 
 namespace {
 class PlotView;
@@ -82,15 +81,14 @@ class PlotSeries {
  private:
   bool IsDigital() const {
     return m_digital.GetValue() == kDigital ||
-           (m_digital.GetValue() == kAuto && m_source && m_digitalSource);
+           (m_digital.GetValue() == kAuto && m_source && m_source->IsDigital());
   }
   void AppendValue(double value, int64_t time);
 
   // source linkage
   DataSource* m_source = nullptr;
-  bool m_digitalSource = false;
-  wpi::util::sig::ScopedConnection m_sourceCreatedConn;
-  wpi::util::sig::ScopedConnection m_newValueConn;
+  wpi::sig::ScopedConnection m_sourceCreatedConn;
+  wpi::sig::ScopedConnection m_newValueConn;
   std::string& m_id;
 
   // user settings
@@ -181,8 +179,6 @@ class Plot {
   };
   std::vector<PlotAxis> m_axis;
   ImPlotRange m_xaxisRange;  // read from plot, used for lockPrevX
-  int64_t m_timeOffset = 0;
-  bool m_timeOffsetValid = false;
 };
 
 class PlotView : public View {
@@ -213,9 +209,9 @@ PlotSeries::PlotSeries(Storage& storage)
       m_color{storage.GetFloatArray("color", kDefaultColor)},
       m_marker{storage.GetString("marker"),
                0,
-               {"None", "Auto", "Circle", "Square", "Diamond", "Up", "Down",
-                "Left", "Right", "Cross", "Plus", "Asterisk"}},
-      m_weight{storage.GetFloat("weight", 1.0f)},
+               {"None", "Circle", "Square", "Diamond", "Up", "Down", "Left",
+                "Right", "Cross", "Plus", "Asterisk"}},
+      m_weight{storage.GetFloat("weight", IMPLOT_AUTO)},
       m_digital{
           storage.GetString("digital"), kAuto, {"Auto", "Digital", "Analog"}},
       m_digitalBitHeight{storage.GetInt("digitalBitHeight", 8)},
@@ -258,43 +254,15 @@ void PlotSeries::CheckSource() {
 void PlotSeries::SetSource(DataSource* source) {
   m_source = source;
 
-  if (auto s = dynamic_cast<BooleanSource*>(source)) {
-    m_digitalSource = true;
+  // add initial value
+  AppendValue(source->GetValue(), 0);
 
-    // add initial value
-    AppendValue(s->GetValue(), 0);
-
-    m_newValueConn = s->valueChanged.connect_connection(
-        [this](bool value, int64_t time) { AppendValue(value, time); });
-  } else if (auto s = dynamic_cast<DoubleSource*>(source)) {
-    m_digitalSource = false;
-
-    // add initial value
-    AppendValue(s->GetValue(), 0);
-
-    m_newValueConn = s->valueChanged.connect_connection(
-        [this](double value, int64_t time) { AppendValue(value, time); });
-  } else if (auto s = dynamic_cast<FloatSource*>(source)) {
-    m_digitalSource = false;
-
-    // add initial value
-    AppendValue(s->GetValue(), 0);
-
-    m_newValueConn = s->valueChanged.connect_connection(
-        [this](double value, int64_t time) { AppendValue(value, time); });
-  } else if (auto s = dynamic_cast<IntegerSource*>(source)) {
-    m_digitalSource = false;
-
-    // add initial value
-    AppendValue(s->GetValue(), 0);
-
-    m_newValueConn = s->valueChanged.connect_connection(
-        [this](int64_t value, int64_t time) { AppendValue(value, time); });
-  }
+  m_newValueConn = source->valueChanged.connect_connection(
+      [this](double value, int64_t time) { AppendValue(value, time); });
 }
 
 void PlotSeries::AppendValue(double value, int64_t timeUs) {
-  double time = (timeUs != 0 ? timeUs : wpi::util::Now()) * 1.0e-6;
+  double time = (timeUs != 0 ? timeUs : wpi::Now()) * 1.0e-6;
   if (IsDigital()) {
     if (m_size < kMaxSize) {
       m_data[m_size] = ImPlotPoint{time, value};
@@ -352,9 +320,8 @@ PlotSeries::Action PlotSeries::EmitPlot(PlotView& view, double now, size_t i,
   CheckSource();
 
   char label[128];
-  wpi::util::format_to_n_c_str(label, sizeof(label), "{}###name{}_{}",
-                               GetName(), static_cast<int>(i),
-                               static_cast<int>(plotIndex));
+  wpi::format_to_n_c_str(label, sizeof(label), "{}###name{}_{}", GetName(),
+                         static_cast<int>(i), static_cast<int>(plotIndex));
 
   int size = m_size;
   int offset = m_offset;
@@ -363,18 +330,17 @@ PlotSeries::Action PlotSeries::EmitPlot(PlotView& view, double now, size_t i,
   // we handle the offset logic ourselves to avoid wrap issues with size + 1
   struct GetterData {
     double now;
-    double timeOffset;
+    double zeroTime;
     ImPlotPoint* data;
     int size;
     int offset;
   };
-  GetterData getterData = {now, GetTimestampDisplayOffsetSeconds(), m_data,
-                           size, offset};
+  GetterData getterData = {now, GetZeroTime() * 1.0e-6, m_data, size, offset};
   auto getter = [](int idx, void* data) {
     auto d = static_cast<GetterData*>(data);
     if (idx == d->size) {
       return ImPlotPoint{
-          d->now - d->timeOffset,
+          d->now - d->zeroTime,
           d->data[d->offset == 0 ? d->size - 1 : d->offset - 1].y};
     }
     ImPlotPoint* point;
@@ -383,18 +349,18 @@ PlotSeries::Action PlotSeries::EmitPlot(PlotView& view, double now, size_t i,
     } else {
       point = &d->data[d->offset + idx - d->size];
     }
-    return ImPlotPoint{point->x - d->timeOffset, point->y};
+    return ImPlotPoint{point->x - d->zeroTime, point->y};
   };
 
   if (m_color.GetColorFloat()[3] == IMPLOT_AUTO) {
     SetColor(ImPlot::GetColormapColor(i));
   }
-  ImPlotSpec spec{ImPlotProp_LineColor, m_color.GetColor(),
-                  ImPlotProp_LineWeight, m_weight};
+  ImPlot::SetNextLineStyle(m_color.GetColor(), m_weight);
   if (IsDigital()) {
-    spec.SetProp(ImPlotProp_Size, m_digitalBitHeight);
-    ImPlot::PushStyleVar(ImPlotStyleVar_DigitalSpacing, m_digitalBitGap);
-    ImPlot::PlotDigitalG(label, getter, &getterData, size + 1, spec);
+    ImPlot::PushStyleVar(ImPlotStyleVar_DigitalBitHeight, m_digitalBitHeight);
+    ImPlot::PushStyleVar(ImPlotStyleVar_DigitalBitGap, m_digitalBitGap);
+    ImPlot::PlotDigitalG(label, getter, &getterData, size + 1);
+    ImPlot::PopStyleVar();
     ImPlot::PopStyleVar();
   } else {
     if (ImPlot::GetCurrentPlot()->YAxis(m_yAxis).Enabled) {
@@ -402,8 +368,8 @@ PlotSeries::Action PlotSeries::EmitPlot(PlotView& view, double now, size_t i,
     } else {
       ImPlot::SetAxis(ImAxis_Y1);
     }
-    spec.SetProp(ImPlotProp_Marker, m_marker.GetValue() - 2);
-    ImPlot::PlotLineG(label, getter, &getterData, size + 1, spec);
+    ImPlot::SetNextMarkerStyle(m_marker.GetValue() - 1);
+    ImPlot::PlotLineG(label, getter, &getterData, size + 1);
   }
 
   // DND source for PlotSeries
@@ -555,18 +521,9 @@ Plot::Plot(Storage& storage)
 }
 
 void Plot::DragDropAccept(PlotView& view, size_t i, int yAxis) {
-  // accept any of double/float/boolean/integer sources
-  DataSource* source = AcceptDragDropPayload<DoubleSource>();
-  if (!source) {
-    source = AcceptDragDropPayload<FloatSource>();
-  }
-  if (!source) {
-    source = AcceptDragDropPayload<BooleanSource>();
-  }
-  if (!source) {
-    source = AcceptDragDropPayload<IntegerSource>();
-  }
-  if (source) {
+  if (const ImGuiPayload* payload =
+          ImGui::AcceptDragDropPayload("DataSource")) {
+    auto source = *static_cast<DataSource**>(payload->Data);
     // don't add duplicates unless it's onto a different Y axis
     auto it =
         std::find_if(m_series.begin(), m_series.end(), [=](const auto& elem) {
@@ -622,26 +579,8 @@ void Plot::EmitPlot(PlotView& view, double now, bool paused, size_t i) {
   }
 
   char label[128];
-  wpi::util::format_to_n_c_str(label, sizeof(label), "{}###plot{}", m_name,
-                               static_cast<int>(i));
-
-  int64_t timeOffsetUs = GetTimestampDisplayOffset();
-  double timeOffset = static_cast<double>(timeOffsetUs) * 1.0e-6;
-  bool timeOffsetChanged = false;
-  if (m_timeOffsetValid) {
-    if (timeOffsetUs != m_timeOffset) {
-      double offsetDelta = (static_cast<double>(m_timeOffset) -
-                            static_cast<double>(timeOffsetUs)) *
-                           1.0e-6;
-      m_xaxisRange.Min += offsetDelta;
-      m_xaxisRange.Max += offsetDelta;
-      m_timeOffset = timeOffsetUs;
-      timeOffsetChanged = true;
-    }
-  } else {
-    m_timeOffset = timeOffsetUs;
-    m_timeOffsetValid = true;
-  }
+  wpi::format_to_n_c_str(label, sizeof(label), "{}###plot{}", m_name,
+                         static_cast<int>(i));
 
   ImPlotFlags plotFlags = (m_legend ? 0 : ImPlotFlags_NoLegend) |
                           (m_crosshairs ? ImPlotFlags_Crosshairs : 0) |
@@ -669,15 +608,10 @@ void Plot::EmitPlot(PlotView& view, double now, bool paused, size_t i) {
                               ImGuiCond_Always);
     } else {
       // also force-pause plots if overall timing is paused
-      double displayNow = now - timeOffset;
-      if (timeOffsetChanged && (paused || m_paused)) {
-        ImPlot::SetupAxisLimits(ImAxis_X1, m_xaxisRange.Min, m_xaxisRange.Max,
-                                ImGuiCond_Always);
-      } else {
-        ImPlot::SetupAxisLimits(
-            ImAxis_X1, displayNow - m_viewTime, displayNow,
-            (paused || m_paused) ? ImGuiCond_Once : ImGuiCond_Always);
-      }
+      double zeroTime = GetZeroTime() * 1.0e-6;
+      ImPlot::SetupAxisLimits(
+          ImAxis_X1, now - zeroTime - m_viewTime, now - zeroTime,
+          (paused || m_paused) ? ImGuiCond_Once : ImGuiCond_Always);
     }
 
     // setup y axes
@@ -892,7 +826,7 @@ void PlotView::Display() {
     }
   }
 
-  double now = wpi::util::Now() * 1.0e-6;
+  double now = wpi::Now() * 1.0e-6;
   for (size_t i = 0; i < m_plots.size(); ++i) {
     ImGui::PushID(i);
     m_plots[i]->EmitPlot(*this, now, m_provider->IsPaused(), i);
@@ -1003,16 +937,15 @@ void PlotView::Settings() {
 
     char name[64];
     if (!plot->GetName().empty()) {
-      wpi::util::format_to_n_c_str(name, sizeof(name), "{}",
-                                   plot->GetName().c_str());
+      wpi::format_to_n_c_str(name, sizeof(name), "{}", plot->GetName().c_str());
     } else {
-      wpi::util::format_to_n_c_str(name, sizeof(name), "Plot {}",
-                                   static_cast<int>(i));
+      wpi::format_to_n_c_str(name, sizeof(name), "Plot {}",
+                             static_cast<int>(i));
     }
 
     char label[90];
-    wpi::util::format_to_n_c_str(label, sizeof(label), "{}###header{}", name,
-                                 static_cast<int>(i));
+    wpi::format_to_n_c_str(label, sizeof(label), "{}###header{}", name,
+                           static_cast<int>(i));
 
     bool open = ImGui::CollapsingHeader(label);
 
@@ -1081,8 +1014,7 @@ void PlotProvider::DisplayMenu() {
     char id[32];
     size_t numWindows = m_windows.size();
     for (size_t i = 0; i <= numWindows; ++i) {
-      wpi::util::format_to_n_c_str(id, sizeof(id), "Plot <{}>",
-                                   static_cast<int>(i));
+      wpi::format_to_n_c_str(id, sizeof(id), "Plot <{}>", static_cast<int>(i));
 
       bool match = false;
       for (size_t j = 0; j < numWindows; ++j) {

@@ -2,15 +2,16 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/simulation/CTREPCMSim.hpp"
+#include "frc/simulation/CTREPCMSim.h"
 
 #include <memory>
 
-#include "wpi/hal/simulation/CTREPCMData.h"
-#include "wpi/util/SensorUtil.hpp"
+#include <hal/simulation/CTREPCMData.h>
 
-using namespace wpi;
-using namespace wpi::sim;
+#include "frc/SensorUtil.h"
+
+using namespace frc;
+using namespace frc::sim;
 
 CTREPCMSim::CTREPCMSim()
     : PneumaticsBaseSim{SensorUtil::GetDefaultCTREPCMModule()} {}

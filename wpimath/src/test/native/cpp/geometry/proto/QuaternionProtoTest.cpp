@@ -2,28 +2,28 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include <catch2/catch_test_macros.hpp>
+#include <gtest/gtest.h>
+#include <wpi/SmallVector.h>
 
-#include "wpi/math/geometry/Quaternion.hpp"
-#include "wpi/util/SmallVector.hpp"
+#include "frc/geometry/Quaternion.h"
 
-using namespace wpi::math;
+using namespace frc;
 
 namespace {
 
 const Quaternion kExpectedData = Quaternion{1.1, 0.191, 35.04, 19.1};
 }  // namespace
 
-TEST_CASE("QuaternionProtoTest Roundtrip", "[wpimath]") {
-  wpi::util::ProtobufMessage<decltype(kExpectedData)> message;
-  wpi::util::SmallVector<uint8_t, 64> buf;
+TEST(QuaternionProtoTest, Roundtrip) {
+  wpi::ProtobufMessage<decltype(kExpectedData)> message;
+  wpi::SmallVector<uint8_t, 64> buf;
 
-  REQUIRE(message.Pack(buf, kExpectedData));
+  ASSERT_TRUE(message.Pack(buf, kExpectedData));
   auto unpacked_data = message.Unpack(buf);
-  REQUIRE(unpacked_data.has_value());
+  ASSERT_TRUE(unpacked_data.has_value());
 
-  CHECK(kExpectedData.W() == unpacked_data->W());
-  CHECK(kExpectedData.X() == unpacked_data->X());
-  CHECK(kExpectedData.Y() == unpacked_data->Y());
-  CHECK(kExpectedData.Z() == unpacked_data->Z());
+  EXPECT_EQ(kExpectedData.W(), unpacked_data->W());
+  EXPECT_EQ(kExpectedData.X(), unpacked_data->X());
+  EXPECT_EQ(kExpectedData.Y(), unpacked_data->Y());
+  EXPECT_EQ(kExpectedData.Z(), unpacked_data->Z());
 }

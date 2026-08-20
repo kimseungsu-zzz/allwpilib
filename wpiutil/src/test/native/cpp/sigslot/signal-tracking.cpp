@@ -31,22 +31,16 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
  */
 
-// clang-format off
-#include "wpi/util/Signal.h"
-// clang-format on
+#include "wpi/Signal.h"  // NOLINT(build/include_order)
 
 #include <cmath>
 #include <memory>
 #include <sstream>
 #include <string>
 
-#include <catch2/catch_template_test_macros.hpp>
-#include <catch2/catch_test_macros.hpp>
-#include <catch2/matchers/catch_matchers_floating_point.hpp>
-#include <catch2/matchers/catch_matchers_range_equals.hpp>
-#include <catch2/matchers/catch_matchers_vector.hpp>
+#include <gtest/gtest.h>
 
-using namespace wpi::util::sig;
+using namespace wpi::sig;
 
 namespace {
 
@@ -77,9 +71,9 @@ static_assert(trait::is_callable_v<trait::typelist<int>, decltype(&s::f1),
 
 }  // namespace
 
-namespace wpi::util {
+namespace wpi {
 
-TEST_CASE("SignalTest TrackShared", "[wpiutil][sigslot]") {
+TEST(SignalTest, TrackShared) {
   sum = 0;
   Signal<int> sig;
 
@@ -91,18 +85,18 @@ TEST_CASE("SignalTest TrackShared", "[wpiutil][sigslot]") {
   sig.connect(&s::f2, w2);
 
   sig(1);
-  REQUIRE(sum == 3);
+  ASSERT_EQ(sum, 3);
 
   s1.reset();
   sig(1);
-  REQUIRE(sum == 5);
+  ASSERT_EQ(sum, 5);
 
   s2.reset();
   sig(1);
-  REQUIRE(sum == 5);
+  ASSERT_EQ(sum, 5);
 }
 
-TEST_CASE("SignalTest TrackOther", "[wpiutil][sigslot]") {
+TEST(SignalTest, TrackOther) {
   sum = 0;
   Signal<int> sig;
 
@@ -114,18 +108,18 @@ TEST_CASE("SignalTest TrackOther", "[wpiutil][sigslot]") {
   sig.connect(o1(), w2);
 
   sig(1);
-  REQUIRE(sum == 3);
+  ASSERT_EQ(sum, 3);
 
   d1.reset();
   sig(1);
-  REQUIRE(sum == 5);
+  ASSERT_EQ(sum, 5);
 
   d2.reset();
   sig(1);
-  REQUIRE(sum == 5);
+  ASSERT_EQ(sum, 5);
 }
 
-TEST_CASE("SignalTest TrackOverloadedFunctionObject", "[wpiutil][sigslot]") {
+TEST(SignalTest, TrackOverloadedFunctionObject) {
   sum = 0;
   Signal<int> sig;
   Signal<double> sig1;
@@ -133,24 +127,24 @@ TEST_CASE("SignalTest TrackOverloadedFunctionObject", "[wpiutil][sigslot]") {
   auto d1 = std::make_shared<dummy>();
   sig.connect(oo{}, d1);
   sig(1);
-  REQUIRE(sum == 1);
+  ASSERT_EQ(sum, 1);
 
   d1.reset();
   sig(1);
-  REQUIRE(sum == 1);
+  ASSERT_EQ(sum, 1);
 
   auto d2 = std::make_shared<dummy>();
   std::weak_ptr<dummy> w2 = d2;
   sig1.connect(oo{}, w2);
   sig1(1);
-  REQUIRE(sum == 5);
+  ASSERT_EQ(sum, 5);
 
   d2.reset();
   sig1(1);
-  REQUIRE(sum == 5);
+  ASSERT_EQ(sum, 5);
 }
 
-TEST_CASE("SignalTest TrackGenericLambda", "[wpiutil][sigslot]") {
+TEST(SignalTest, TrackGenericLambda) {
   std::stringstream s;
 
   auto f = [&](auto a, auto... args) {
@@ -175,13 +169,13 @@ TEST_CASE("SignalTest TrackGenericLambda", "[wpiutil][sigslot]") {
   sig1(1);
   sig2("foo");
   sig3(4.1);
-  REQUIRE(s.str() == "1foo4.1");
+  ASSERT_EQ(s.str(), "1foo4.1");
 
   d1.reset();
   sig1(2);
   sig2("bar");
   sig3(3.0);
-  REQUIRE(s.str() == "1foo4.1");
+  ASSERT_EQ(s.str(), "1foo4.1");
 }
 
-}  // namespace wpi::util
+}  // namespace wpi

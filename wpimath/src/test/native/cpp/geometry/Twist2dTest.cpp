@@ -2,77 +2,71 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/math/geometry/Twist2d.hpp"
-
+#include <cmath>
 #include <numbers>
 
-#include <Eigen/Core>
-#include <catch2/catch_test_macros.hpp>
+#include <gtest/gtest.h>
 
-#include "wpi/math/TestAssertions.hpp"
-#include "wpi/math/geometry/Pose2d.hpp"
-#include "wpi/math/geometry/Rotation2d.hpp"
-#include "wpi/units/angle.hpp"
-#include "wpi/units/length.hpp"
+#include "frc/geometry/Pose2d.h"
 
-using namespace wpi::math;
+using namespace frc;
 
-TEST_CASE("Twist2dTest Straight", "[wpimath]") {
+TEST(Twist2dTest, Straight) {
   const Twist2d straight{5_m, 0_m, 0_rad};
-  const auto straightTransform = straight.Exp();
+  const auto straightPose = Pose2d{}.Exp(straight);
 
-  CHECK_DOUBLE_EQ(5.0, straightTransform.X().value());
-  CHECK_DOUBLE_EQ(0.0, straightTransform.Y().value());
-  CHECK_DOUBLE_EQ(0.0, straightTransform.Rotation().Radians().value());
+  EXPECT_DOUBLE_EQ(5.0, straightPose.X().value());
+  EXPECT_DOUBLE_EQ(0.0, straightPose.Y().value());
+  EXPECT_DOUBLE_EQ(0.0, straightPose.Rotation().Radians().value());
 }
 
-TEST_CASE("Twist2dTest QuarterCircle", "[wpimath]") {
+TEST(Twist2dTest, QuarterCircle) {
   const Twist2d quarterCircle{5_m / 2.0 * std::numbers::pi, 0_m,
-                              wpi::units::radian_t{std::numbers::pi / 2.0}};
-  const auto quarterCircleTransform = quarterCircle.Exp();
+                              units::radian_t{std::numbers::pi / 2.0}};
+  const auto quarterCirclePose = Pose2d{}.Exp(quarterCircle);
 
-  CHECK_DOUBLE_EQ(5.0, quarterCircleTransform.X().value());
-  CHECK_DOUBLE_EQ(5.0, quarterCircleTransform.Y().value());
-  CHECK_DOUBLE_EQ(90.0, quarterCircleTransform.Rotation().Degrees().value());
+  EXPECT_DOUBLE_EQ(5.0, quarterCirclePose.X().value());
+  EXPECT_DOUBLE_EQ(5.0, quarterCirclePose.Y().value());
+  EXPECT_DOUBLE_EQ(90.0, quarterCirclePose.Rotation().Degrees().value());
 }
 
-TEST_CASE("Twist2dTest DiagonalNoDtheta", "[wpimath]") {
+TEST(Twist2dTest, DiagonalNoDtheta) {
   const Twist2d diagonal{2_m, 2_m, 0_deg};
-  const auto diagonalTransform = diagonal.Exp();
+  const auto diagonalPose = Pose2d{}.Exp(diagonal);
 
-  CHECK_DOUBLE_EQ(2.0, diagonalTransform.X().value());
-  CHECK_DOUBLE_EQ(2.0, diagonalTransform.Y().value());
-  CHECK_DOUBLE_EQ(0.0, diagonalTransform.Rotation().Degrees().value());
+  EXPECT_DOUBLE_EQ(2.0, diagonalPose.X().value());
+  EXPECT_DOUBLE_EQ(2.0, diagonalPose.Y().value());
+  EXPECT_DOUBLE_EQ(0.0, diagonalPose.Rotation().Degrees().value());
 }
 
-TEST_CASE("Twist2dTest Equality", "[wpimath]") {
+TEST(Twist2dTest, Equality) {
   const Twist2d one{5_m, 1_m, 3_rad};
   const Twist2d two{5_m, 1_m, 3_rad};
-  CHECK(one == two);
+  EXPECT_TRUE(one == two);
 }
 
-TEST_CASE("Twist2dTest Inequality", "[wpimath]") {
+TEST(Twist2dTest, Inequality) {
   const Twist2d one{5_m, 1_m, 3_rad};
   const Twist2d two{5_m, 1.2_m, 3_rad};
-  CHECK(one != two);
+  EXPECT_TRUE(one != two);
 }
 
-TEST_CASE("Twist2dTest Pose2dLog", "[wpimath]") {
+TEST(Twist2dTest, Pose2dLog) {
   const Pose2d end{5_m, 5_m, 90_deg};
   const Pose2d start;
 
-  const auto twist = (end - start).Log();
+  const auto twist = start.Log(end);
 
-  Twist2d expected{wpi::units::meter_t{5.0 / 2.0 * std::numbers::pi}, 0_m,
-                   wpi::units::radian_t{std::numbers::pi / 2.0}};
-  CHECK(expected == twist);
+  Twist2d expected{units::meter_t{5.0 / 2.0 * std::numbers::pi}, 0_m,
+                   units::radian_t{std::numbers::pi / 2.0}};
+  EXPECT_EQ(expected, twist);
 
   // Make sure computed twist gives back original end pose
-  const auto reapplied = start + twist.Exp();
-  CHECK(end == reapplied);
+  const auto reapplied = start.Exp(twist);
+  EXPECT_EQ(end, reapplied);
 }
 
-TEST_CASE("Twist2dTest Constexpr", "[wpimath]") {
+TEST(Twist2dTest, Constexpr) {
   constexpr Twist2d defaultCtor;
   constexpr Twist2d componentCtor{1_m, 2_m, 3_rad};
   constexpr auto multiplied = componentCtor * 2;

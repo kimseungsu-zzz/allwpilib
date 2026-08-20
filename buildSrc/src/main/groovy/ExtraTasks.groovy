@@ -60,7 +60,7 @@ class ExtraTasks implements Plugin<Project> {
                 task.description = 'Uber task to compile all native code for this project'
                 binaries.each { binary ->
                     if (binary instanceof NativeBinarySpec && binary.buildable) {
-                        binary.tasks.withType(AbstractNativeSourceCompileTask).configureEach { compileTask ->
+                        binary.tasks.withType(AbstractNativeSourceCompileTask) { compileTask ->
                             task.dependsOn compileTask
                         }
                     }
@@ -77,7 +77,7 @@ class ExtraTasks implements Plugin<Project> {
                 task.description = 'Uber task to run all native tests for project'
                 binaries.each { binary ->
                     if (binary instanceof GoogleTestTestSuiteBinarySpec && binary.buildable) {
-                        binary.tasks.withType(RunTestExecutable).configureEach { testTask ->
+                        binary.tasks.withType(RunTestExecutable) { testTask ->
                             task.dependsOn testTask
                         }
                     }

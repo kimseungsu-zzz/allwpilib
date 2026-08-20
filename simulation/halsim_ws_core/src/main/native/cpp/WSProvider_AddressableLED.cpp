@@ -2,21 +2,21 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/halsim/ws_core/WSProvider_AddressableLED.hpp"
+#include "WSProvider_AddressableLED.h"
 
-#include <utility>
+#include <vector>
 
-#include "wpi/hal/Ports.h"
-#include "wpi/hal/simulation/AddressableLEDData.h"
+#include <hal/Ports.h>
+#include <hal/simulation/AddressableLEDData.h>
 
-#define REGISTER(halsim, jsonid, ctype, haltype)                         \
-  HALSIM_RegisterAddressableLED##halsim##Callback(                       \
-      m_channel,                                                         \
-      [](const char* name, void* param, const struct HAL_Value* value) { \
-        static_cast<HALSimWSProviderAddressableLED*>(param)              \
-            ->ProcessHalCallback(wpi::util::json::object(                \
-                jsonid, static_cast<ctype>(value->data.v_##haltype)));   \
-      },                                                                 \
+#define REGISTER(halsim, jsonid, ctype, haltype)                          \
+  HALSIM_RegisterAddressableLED##halsim##Callback(                        \
+      m_channel,                                                          \
+      [](const char* name, void* param, const struct HAL_Value* value) {  \
+        static_cast<HALSimWSProviderAddressableLED*>(param)               \
+            ->ProcessHalCallback(                                         \
+                {{jsonid, static_cast<ctype>(value->data.v_##haltype)}}); \
+      },                                                                  \
       this, true)
 namespace wpilibws {
 void HALSimWSProviderAddressableLED::Initialize(
@@ -31,10 +31,12 @@ HALSimWSProviderAddressableLED::~HALSimWSProviderAddressableLED() {
 
 void HALSimWSProviderAddressableLED::RegisterCallbacks() {
   m_initCbKey = REGISTER(Initialized, "<init", bool, boolean);
-  m_startCbKey = REGISTER(Start, "<start", int32_t, int);
+  m_outputPortCbKey = REGISTER(OutputPort, "<output_port", int32_t, int);
   m_lengthCbKey = REGISTER(Length, "<length", int32_t, int);
+  m_runningCbKey = REGISTER(Running, "<running", bool, boolean);
 
   m_dataCbKey = HALSIM_RegisterAddressableLEDDataCallback(
+      0,
       [](const char* name, void* param, const unsigned char* buffer,
          unsigned int count) {
         auto provider = static_cast<HALSimWSProviderAddressableLED*>(param);
@@ -43,17 +45,15 @@ void HALSimWSProviderAddressableLED::RegisterCallbacks() {
         const HAL_AddressableLEDData* data =
             reinterpret_cast<const HAL_AddressableLEDData*>(buffer);
 
-        auto jsonData = wpi::util::json::array();
+        std::vector<wpi::json> jsonData;
 
         for (size_t i = 0; i < numLeds; ++i) {
-          jsonData.emplace_back(
-              wpi::util::json::object("r", static_cast<int64_t>(data[i].r), "g",
-                                      static_cast<int64_t>(data[i].g), "b",
-                                      static_cast<int64_t>(data[i].b)));
+          jsonData.push_back(
+              {{"r", data[i].r}, {"g", data[i].g}, {"b", data[i].b}});
         }
 
-        wpi::util::json payload;
-        payload["<data"] = std::move(jsonData);
+        wpi::json payload;
+        payload["<data"] = jsonData;
 
         provider->ProcessHalCallback(payload);
       },
@@ -66,13 +66,15 @@ void HALSimWSProviderAddressableLED::CancelCallbacks() {
 
 void HALSimWSProviderAddressableLED::DoCancelCallbacks() {
   HALSIM_CancelAddressableLEDInitializedCallback(m_channel, m_initCbKey);
-  HALSIM_CancelAddressableLEDStartCallback(m_channel, m_startCbKey);
+  HALSIM_CancelAddressableLEDOutputPortCallback(m_channel, m_outputPortCbKey);
   HALSIM_CancelAddressableLEDLengthCallback(m_channel, m_lengthCbKey);
-  HALSIM_CancelAddressableLEDDataCallback(m_dataCbKey);
+  HALSIM_CancelAddressableLEDRunningCallback(m_channel, m_runningCbKey);
+  HALSIM_CancelAddressableLEDDataCallback(m_channel, m_dataCbKey);
 
   m_initCbKey = 0;
-  m_startCbKey = 0;
+  m_outputPortCbKey = 0;
   m_lengthCbKey = 0;
+  m_runningCbKey = 0;
   m_dataCbKey = 0;
 }
 }  // namespace wpilibws

@@ -2,18 +2,17 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/halsim/ws_core/WSProvider_SimDevice.hpp"
+#include "WSProvider_SimDevice.h"
 
 #include <algorithm>
 #include <cmath>
-#include <format>
 #include <memory>
 #include <string>
 #include <utility>
 
-#include "wpi/hal/SimDevice.h"
-#include "wpi/hal/simulation/SimDeviceData.h"
-#include "wpi/util/StringExtras.hpp"
+#include <fmt/format.h>
+#include <hal/Ports.h>
+#include <wpi/StringExtras.h>
 
 namespace wpilibws {
 
@@ -61,60 +60,54 @@ void HALSimWSProviderSimDevice::CancelCallbacks() {
   m_simValueChangedCbKeys.clear();
 }
 
-void HALSimWSProviderSimDevice::OnNetValueChanged(const wpi::util::json& json) {
+void HALSimWSProviderSimDevice::OnNetValueChanged(const wpi::json& json) {
+  auto it = json.cbegin();
+  auto end = json.cend();
+
   std::shared_lock lock(m_vhLock);
-  for (auto&& [key, jvalue] : json.get_object()) {
-    auto vd = m_valueHandles.find(key);
+  for (; it != end; ++it) {
+    auto vd = m_valueHandles.find(it.key());
     if (vd != m_valueHandles.end()) {
       HAL_Value value;
       value.type = vd->second.valueType;
       switch (value.type) {
         case HAL_BOOLEAN:
-          if (jvalue.is_bool()) {
-            value.data.v_boolean = jvalue.get_bool() ? 1 : 0;
-          }
+          value.data.v_boolean = static_cast<bool>(it.value()) ? 1 : 0;
           break;
         case HAL_DOUBLE:
-          if (jvalue.is_number()) {
-            value.data.v_double = jvalue.get_number();
-            value.data.v_double -= vd->second.doubleOffset;
-          }
+          value.data.v_double = it.value();
+          value.data.v_double -= vd->second.doubleOffset;
           break;
         case HAL_ENUM: {
-          if (jvalue.is_string()) {
+          if (it->is_string()) {
             auto& options = vd->second.options;
-            auto& str = jvalue.get_string();
+            auto& str = it.value().get_ref<const std::string&>();
             auto optionIt =
                 std::find_if(options.begin(), options.end(),
                              [&](const std::string& v) { return v == str; });
             if (optionIt != options.end()) {
               value.data.v_enum = optionIt - options.begin();
             }
-          } else if (jvalue.is_float() || jvalue.is_double()) {
+          } else if (it->is_number()) {
             auto& values = vd->second.optionValues;
-            double num = jvalue.get_number();
+            double num = it.value();
             auto valueIt = std::find_if(
                 values.begin(), values.end(),
                 [&](double v) { return std::fabs(v - num) < 1e-4; });
             if (valueIt != values.end()) {
               value.data.v_enum = valueIt - values.begin();
             }
-          } else if (jvalue.is_int()) {
-            value.data.v_enum = jvalue.get_int();
           }
+          value.data.v_enum = it.value();
           break;
         }
         case HAL_INT:
-          if (jvalue.is_int()) {
-            value.data.v_int = jvalue.get_int();
-            value.data.v_int -= vd->second.intOffset;
-          }
+          value.data.v_int = it.value();
+          value.data.v_int -= vd->second.intOffset;
           break;
         case HAL_LONG:
-          if (jvalue.is_int()) {
-            value.data.v_long = jvalue.get_int();
-            value.data.v_long -= vd->second.intOffset;
-          }
+          value.data.v_long = it.value();
+          value.data.v_long -= vd->second.intOffset;
           break;
         default:
           break;
@@ -139,20 +132,20 @@ void HALSimWSProviderSimDevice::OnValueCreated(const char* name,
   const char* prefix = "";
   if (name[0] != '<' && name[0] != '>') {
     switch (direction) {
-      case HAL_SIM_VALUE_INPUT:
+      case HAL_SimValueInput:
         prefix = ">";
         break;
-      case HAL_SIM_VALUE_OUTPUT:
+      case HAL_SimValueOutput:
         prefix = "<";
         break;
-      case HAL_SIM_VALUE_BIDIR:
+      case HAL_SimValueBidir:
         prefix = "<>";
         break;
       default:
         break;
     }
   }
-  std::string key = std::format("{}{}", prefix, name);
+  std::string key = fmt::format("{}{}", prefix, name);
   SimDeviceValueData data;
   data.device = this;
   data.handle = handle;
@@ -199,31 +192,29 @@ void HALSimWSProviderSimDevice::OnValueChanged(SimDeviceValueData* valueData,
   if (ws) {
     switch (value->type) {
       case HAL_BOOLEAN:
-        ProcessHalCallback(wpi::util::json::object(
-            valueData->key, static_cast<bool>(value->data.v_boolean)));
+        ProcessHalCallback(
+            {{valueData->key, static_cast<bool>(value->data.v_boolean)}});
         break;
       case HAL_DOUBLE:
-        ProcessHalCallback(wpi::util::json::object(
-            valueData->key, value->data.v_double + valueData->doubleOffset));
+        ProcessHalCallback(
+            {{valueData->key, value->data.v_double + valueData->doubleOffset}});
         break;
       case HAL_ENUM: {
         int v = value->data.v_enum;
         if (v >= 0 && v < static_cast<int>(valueData->optionValues.size())) {
-          ProcessHalCallback(wpi::util::json::object(
-              valueData->key, valueData->optionValues[v]));
+          ProcessHalCallback({{valueData->key, valueData->optionValues[v]}});
         } else if (v >= 0 && v < static_cast<int>(valueData->options.size())) {
-          ProcessHalCallback(
-              wpi::util::json::object(valueData->key, valueData->options[v]));
+          ProcessHalCallback({{valueData->key, valueData->options[v]}});
         }
         break;
       }
       case HAL_INT:
-        ProcessHalCallback(wpi::util::json::object(
-            valueData->key, value->data.v_int + valueData->intOffset));
+        ProcessHalCallback(
+            {{valueData->key, value->data.v_int + valueData->intOffset}});
         break;
       case HAL_LONG:
-        ProcessHalCallback(wpi::util::json::object(
-            valueData->key, value->data.v_long + valueData->intOffset));
+        ProcessHalCallback(
+            {{valueData->key, value->data.v_long + valueData->intOffset}});
         break;
       default:
         break;
@@ -258,14 +249,11 @@ void HALSimWSProviderSimDevice::OnValueReset(SimDeviceValueData* valueData,
   }
 }
 
-void HALSimWSProviderSimDevice::ProcessHalCallback(
-    const wpi::util::json& payload) {
+void HALSimWSProviderSimDevice::ProcessHalCallback(const wpi::json& payload) {
   auto ws = m_ws.lock();
   if (ws) {
-    auto netValue = wpi::util::json::object();
-    netValue["type"] = m_type;
-    netValue["device"] = m_deviceId;
-    netValue["data"] = payload;
+    wpi::json netValue = {
+        {"type", m_type}, {"device", m_deviceId}, {"data", payload}};
     ws->OnSimValueChanged(netValue);
   }
 }
@@ -277,15 +265,15 @@ HALSimWSProviderSimDevices::~HALSimWSProviderSimDevices() {
 void HALSimWSProviderSimDevices::DeviceCreatedCallback(
     const char* name, HAL_SimDeviceHandle handle) {
   // Map "Accel:Foo" -> type=Accel, device=Foo
-  auto [type, id] = wpi::util::split(name, ':');
+  auto [type, id] = wpi::split(name, ':');
   std::shared_ptr<HALSimWSProviderSimDevice> dev;
   if (id.empty()) {
-    auto key = std::format("SimDevice/{}", type);
+    auto key = fmt::format("SimDevice/{}", type);
     dev = std::make_shared<HALSimWSProviderSimDevice>(handle, key, "SimDevice",
                                                       type);
     m_providers.Add(key, dev);
   } else {
-    auto key = std::format("{}/{}", type, id);
+    auto key = fmt::format("{}/{}", type, id);
     dev = std::make_shared<HALSimWSProviderSimDevice>(handle, key, type, id);
     m_providers.Add(key, dev);
   }
@@ -300,7 +288,7 @@ void HALSimWSProviderSimDevices::DeviceFreedCallback(
   m_providers.Delete(name);
 }
 
-void HALSimWSProviderSimDevices::Initialize(wpi::net::uv::Loop& loop) {
+void HALSimWSProviderSimDevices::Initialize(wpi::uv::Loop& loop) {
   m_deviceCreatedCbKey = HALSIM_RegisterSimDeviceCreatedCallback(
       "", this, HALSimWSProviderSimDevices::DeviceCreatedCallbackStatic, 1);
   m_deviceFreedCbKey = HALSIM_RegisterSimDeviceFreedCallback(

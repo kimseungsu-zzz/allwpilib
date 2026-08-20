@@ -2,18 +2,17 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
+#include <uv.h>
 #include <ws2tcpip.h>
 
 #include <string>
 #include <vector>
 
-#include <uv.h>
-
-#include "wpi/cs/cscore_cpp.hpp"
+#include "cscore_cpp.h"
 
 #pragma comment(lib, "Ws2_32.lib")
 
-namespace wpi::cs {
+namespace cs {
 
 std::vector<std::string> GetNetworkInterfaces() {
   uv_interface_address_t* adrs;
@@ -43,4 +42,4 @@ std::vector<std::string> GetNetworkInterfaces() {
   return addresses;
 }
 
-}  // namespace wpi::cs
+}  // namespace cs

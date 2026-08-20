@@ -2,8 +2,7 @@ import org.gradle.internal.os.OperatingSystem
 
 ext {
     nativeName = 'cscore'
-    devMain = 'org.wpilib.cscore.DevMain'
-    nativeTestSuiteName = "${nativeName}Test"
+    devMain = 'edu.wpi.first.cscore.DevMain'
 }
 
 // Removed because having the objective-cpp plugin added breaks
@@ -23,7 +22,8 @@ model {
 
             enableCheckTask true
             javaCompileTasks << compileJava
-            jniCrossCompileOptions << JniCrossCompileOptions(nativeUtils.wpi.platforms.systemcore)
+            jniCrossCompileOptions << JniCrossCompileOptions(nativeUtils.wpi.platforms.roborio)
+            jniCrossCompileOptions << JniCrossCompileOptions(nativeUtils.wpi.platforms.linuxarm32)
             jniCrossCompileOptions << JniCrossCompileOptions(nativeUtils.wpi.platforms.linuxarm64)
 
             sources {
@@ -71,7 +71,7 @@ ext {
     sharedCvConfigs = [cscore    : [],
         cscoreBase: [],
         cscoreDev : [],
-        (nativeTestSuiteName): [],
+        cscoreTest: [],
         cscoreJNIShared: []]
     staticCvConfigs = [cscoreJNI: [],
         cscoreJNICvStatic: []]
@@ -146,7 +146,6 @@ examplesTree.list(new FilenameFilter() {
         }
 
 apply from: "${rootDir}/shared/opencv.gradle"
-apply from: "${rootDir}/shared/libsdlgpu.gradle"
 
 Action<List<String>> symbolFilter = { symbols ->
     symbols.removeIf({ !it.startsWith('CS_') })
@@ -173,7 +172,7 @@ model {
     components {
         examplesMap.each { key, value ->
             if (key == "usbviewer") {
-                if (!project.hasProperty('onlylinuxsystemcore')) {
+                if (!project.hasProperty('onlylinuxathena')) {
                     "${key}"(NativeExecutableSpec) {
                         targetBuildTypes 'debug'
                         binaries.all {
@@ -182,11 +181,23 @@ model {
                             lib project: ':wpigui', library: 'wpigui', linkage: 'static'
                             lib library: 'cscore', linkage: 'shared'
                             lib project: ':thirdparty:imgui_suite', library: 'imguiSuite', linkage: 'static'
-                            if (it.targetPlatform.name == nativeUtils.wpi.platforms.systemcore) {
+                            if (it.targetPlatform.name == nativeUtils.wpi.platforms.roborio) {
                                 it.buildable = false
                                 return
                             }
-                            project.addLibSdlGpuDependency(it)
+                            if (it.targetPlatform.operatingSystem.isWindows()) {
+                                it.linker.args << 'Gdi32.lib' << 'Shell32.lib' << 'd3d11.lib' << 'd3dcompiler.lib'
+                            } else if (it.targetPlatform.operatingSystem.isMacOsX()) {
+                                it.linker.args << '-framework' << 'Metal' << '-framework' << 'MetalKit' << '-framework' << 'Cocoa' << '-framework' << 'IOKit' << '-framework' << 'CoreFoundation' << '-framework' << 'CoreVideo' << '-framework' << 'QuartzCore'
+                            } else {
+                                it.linker.args << '-lX11'
+                                if (it.targetPlatform.name.startsWith('linuxarm')) {
+                                    it.linker.args << '-lGL'
+                                }
+                            }
+                            if (it.targetPlatform.name == nativeUtils.wpi.platforms.roborio) {
+                                nativeUtils.useRequiredLibrary(it, 'ni_link_libraries', 'ni_runtime_libraries')
+                            }
                         }
                         sources.cpp.source {
                             srcDirs 'examples/' + "${key}"
@@ -201,6 +212,9 @@ model {
                         lib project: ':wpiutil', library: 'wpiutil', linkage: 'shared'
                         lib project: ':wpinet', library: 'wpinet', linkage: 'shared'
                         lib library: 'cscore', linkage: 'shared'
+                        if (it.targetPlatform.name == nativeUtils.wpi.platforms.roborio) {
+                            nativeUtils.useRequiredLibrary(it, 'ni_link_libraries', 'ni_runtime_libraries')
+                        }
                     }
                     sources.cpp.source {
                         srcDirs 'examples/' + "${key}"

@@ -4,48 +4,61 @@
 
 #ifndef SLEIPNIR_DISABLE_DIAGNOSTICS
 #include <cstdio>
-#include <format>
-#include <print>
 #include <system_error>
 #include <utility>
+
+#if __has_include(<fmt/base.h>)
+#include <fmt/base.h>
+#else
+#include <fmt/core.h>
+#endif
+
 #endif
 
 namespace slp {
 
 #ifndef SLEIPNIR_DISABLE_DIAGNOSTICS
 
-/// Wrapper around std::print() that squelches write failure exceptions.
+/**
+ * Wrapper around fmt::print() that squelches write failure exceptions.
+ */
 template <typename... T>
-void print(std::format_string<T...> fmt, T&&... args) {
+inline void print(fmt::format_string<T...> fmt, T&&... args) {
   try {
-    std::print(fmt, std::forward<T>(args)...);
+    fmt::print(fmt, std::forward<T>(args)...);
   } catch (const std::system_error&) {
   }
 }
 
-/// Wrapper around std::print() that squelches write failure exceptions.
+/**
+ * Wrapper around fmt::print() that squelches write failure exceptions.
+ */
 template <typename... T>
-void print(std::FILE* f, std::format_string<T...> fmt, T&&... args) {
+inline void print(std::FILE* f, fmt::format_string<T...> fmt, T&&... args) {
   try {
-    std::print(f, fmt, std::forward<T>(args)...);
+    fmt::print(f, fmt, std::forward<T>(args)...);
   } catch (const std::system_error&) {
   }
 }
 
-/// Wrapper around std::println() that squelches write failure exceptions.
+/**
+ * Wrapper around fmt::println() that squelches write failure exceptions.
+ */
 template <typename... T>
-void println(std::format_string<T...> fmt, T&&... args) {
+inline void println(fmt::format_string<T...> fmt, T&&... args) {
   try {
-    std::println(fmt, std::forward<T>(args)...);
+    fmt::println(fmt, std::forward<T>(args)...);
   } catch (const std::system_error&) {
   }
 }
 
-/// Wrapper around std::println() that squelches write failure exceptions.
+/**
+ * Wrapper around fmt::println() that squelches write failure exceptions.
+ */
 template <typename... T>
-void println(std::FILE* f, std::format_string<T...> fmt, T&&... args) {
+inline void println(std::FILE* f, fmt::format_string<T...> fmt, T&&... args) {
   try {
-    std::println(f, fmt, std::forward<T>(args)...);
+    fmt::println(f, fmt, std::forward<T>(args)...);
   } catch (const std::system_error&) {
   }
 }
@@ -53,10 +66,10 @@ void println(std::FILE* f, std::format_string<T...> fmt, T&&... args) {
 #else
 
 template <typename... Args>
-void print([[maybe_unused]] Args&&... args) {}
+inline void print([[maybe_unused]] Args&&... args) {}
 
 template <typename... Args>
-void println([[maybe_unused]] Args&&... args) {}
+inline void println([[maybe_unused]] Args&&... args) {}
 
 #endif
 

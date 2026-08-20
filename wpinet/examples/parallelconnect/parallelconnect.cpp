@@ -5,13 +5,14 @@
 #include <cstdio>
 #include <memory>
 
-#include "wpi/net/EventLoopRunner.hpp"
-#include "wpi/net/ParallelTcpConnector.hpp"
-#include "wpi/net/uv/Error.hpp"
-#include "wpi/net/uv/Tcp.hpp"
-#include "wpi/util/Logger.hpp"
+#include <wpi/Logger.h>
 
-namespace uv = wpi::net::uv;
+#include "wpinet/EventLoopRunner.h"
+#include "wpinet/ParallelTcpConnector.h"
+#include "wpinet/uv/Error.h"
+#include "wpinet/uv/Tcp.h"
+
+namespace uv = wpi::uv;
 
 static void logfunc(unsigned int level, const char* file, unsigned int line,
                     const char* msg) {
@@ -19,13 +20,13 @@ static void logfunc(unsigned int level, const char* file, unsigned int line,
 }
 
 int main() {
-  wpi::util::Logger logger{logfunc, 0};
+  wpi::Logger logger{logfunc, 0};
 
   // Kick off the event loop on a separate thread
-  wpi::net::EventLoopRunner loop;
-  std::shared_ptr<wpi::net::ParallelTcpConnector> connect;
+  wpi::EventLoopRunner loop;
+  std::shared_ptr<wpi::ParallelTcpConnector> connect;
   loop.ExecAsync([&](uv::Loop& loop) {
-    connect = wpi::net::ParallelTcpConnector::Create(
+    connect = wpi::ParallelTcpConnector::Create(
         loop, uv::Timer::Time{2000}, logger, [&](uv::Tcp& tcp) {
           std::fputs("Got connection, accepting!\n", stdout);
           tcp.StartRead();
@@ -40,8 +41,10 @@ int main() {
             connect->Disconnected();
           });
         });
-    connect->SetServers(
-        {{{"robot.local", 8080}, {"10.2.94.2", 8080}, {"127.0.0.1", 8080}}});
+    connect->SetServers({{{"roborio-294-frc.local", 8080},
+                          {"roborio-294-frc.frc-field.local", 8080},
+                          {"10.2.94.2", 8080},
+                          {"127.0.0.1", 8080}}});
   });
 
   // wait for a keypress to terminate

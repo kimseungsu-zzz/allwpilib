@@ -2,19 +2,19 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "../PortsInternal.hpp"
-#include "DIODataInternal.hpp"
+#include "../PortsInternal.h"
+#include "DIODataInternal.h"
 
-using namespace wpi::hal;
+using namespace hal;
 
-namespace wpi::hal::init {
+namespace hal::init {
 void InitializeDIOData() {
   static DIOData sdd[kNumDigitalChannels];
-  ::wpi::hal::SimDIOData = sdd;
+  ::hal::SimDIOData = sdd;
 }
-}  // namespace wpi::hal::init
+}  // namespace hal::init
 
-DIOData* wpi::hal::SimDIOData;
+DIOData* hal::SimDIOData;
 void DIOData::ResetData() {
   initialized.Reset(false);
   simDevice = 0;

@@ -15,7 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "wpi/util/MemoryBuffer.hpp"
+#include "wpi/MemoryBuffer.h"
 
 #ifdef _MSC_VER
 // no matching operator delete
@@ -46,19 +46,19 @@
 #include <new>
 #include <system_error>
 
-#include "wpi/util/Errc.hpp"
-#include "wpi/util/Errno.hpp"
-#include "wpi/util/MappedFileRegion.hpp"
-#include "wpi/util/MathExtras.hpp"
-#include "wpi/util/SmallVector.hpp"
-#include "wpi/util/SmallVectorMemoryBuffer.hpp"
-#include "wpi/util/fs.hpp"
+#include "wpi/Errc.h"
+#include "wpi/Errno.h"
+#include "wpi/MappedFileRegion.h"
+#include "wpi/MathExtras.h"
+#include "wpi/SmallVector.h"
+#include "wpi/SmallVectorMemoryBuffer.h"
+#include "wpi/fs.h"
 
 #ifdef _WIN32
-#include "wpi/util/WindowsError.hpp"
+#include "wpi/WindowsError.h"
 #endif
 
-using namespace wpi::util;
+using namespace wpi;
 
 //===----------------------------------------------------------------------===//
 // MemoryBuffer implementation itself.
@@ -172,14 +172,14 @@ std::unique_ptr<MemoryBuffer> MemoryBuffer::GetFileSlice(
 namespace {
 
 template <typename MB>
-constexpr auto MAP_MODE = MappedFileRegion::MapMode::READ_ONLY;
+constexpr auto kMapMode = MappedFileRegion::kReadOnly;
 template <>
-constexpr auto MAP_MODE<MemoryBuffer> = MappedFileRegion::MapMode::READ_ONLY;
+constexpr auto kMapMode<MemoryBuffer> = MappedFileRegion::kReadOnly;
 template <>
-constexpr auto MAP_MODE<WritableMemoryBuffer> = MappedFileRegion::MapMode::PRIV;
+constexpr auto kMapMode<WritableMemoryBuffer> = MappedFileRegion::kPriv;
 template <>
-constexpr auto MAP_MODE<WriteThroughMemoryBuffer> =
-    MappedFileRegion::MapMode::READ_WRITE;
+constexpr auto kMapMode<WriteThroughMemoryBuffer> =
+    MappedFileRegion::kReadWrite;
 
 /// Memory maps a file descriptor using MappedFileRegion.
 ///
@@ -204,7 +204,7 @@ class MemoryBufferMMapFile : public MB {
   MemoryBufferMMapFile(fs::file_t f, uint64_t len, uint64_t offset,
                        std::error_code& ec)
       : m_mfr(f, getLegalMapSize(len, offset), getLegalMapOffset(offset),
-              MAP_MODE<MB>, ec) {
+              kMapMode<MB>, ec) {
     if (!ec) {
       const uint8_t* Start = getStart(len, offset);
       MemoryBuffer::Init(Start, Start + len);
@@ -259,12 +259,12 @@ static std::unique_ptr<WritableMemoryBuffer> GetMemoryBufferForStream(
   return GetMemBufferCopyImpl(buffer, bufferName, ec);
 }
 
-std::expected<std::unique_ptr<MemoryBuffer>, std::error_code>
+wpi::expected<std::unique_ptr<MemoryBuffer>, std::error_code>
 MemoryBuffer::GetFile(std::string_view filename, int64_t fileSize) {
   std::error_code ec;
   auto ret = GetFileAux<MemoryBuffer>(filename, ec, fileSize, fileSize, 0);
   if (ec) {
-    return std::unexpected{ec};
+    return wpi::unexpected{ec};
   }
   return ret;
 }
@@ -362,7 +362,7 @@ static std::unique_ptr<WriteThroughMemoryBuffer> GetReadWriteFile(
 
       LARGE_INTEGER fileSizeWin;
       if (!GetFileSizeEx(f, &fileSizeWin)) {
-        ec = wpi::util::mapWindowsError(GetLastError());
+        ec = wpi::mapWindowsError(GetLastError());
         return nullptr;
       }
       fileSize = fileSizeWin.QuadPart;

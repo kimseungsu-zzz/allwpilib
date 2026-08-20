@@ -24,12 +24,30 @@ def fileCheck = { parsedJson, folder ->
     }
 }
 
+task checkTemplates(type: Task) {
+    doLast {
+        def parsedJson = new groovy.json.JsonSlurper().parseText(templateFile.text)
+        fileCheck(parsedJson, templateDirectory)
+        parsedJson.each {
+            assert it.name != null
+            assert it.description != null
+            assert it.tags != null
+            assert it.foldername != null
+            assert it.gradlebase != null
+            assert it.commandversion != null
+            if (it.gradlebase == 'java') {
+                assert it.mainclass != null
+            }
+        }
+    }
+}
+
 def tagList = [
         /* --- Categories --- */
         // On-RIO image processing
-        "Vision",  "AprilTags",
+        "Vision",
         // Command-based
-        "Commandv2", "Commandv3",
+        "Command-based",
         // Romi
         "Romi",
         // XRP
@@ -46,7 +64,7 @@ def tagList = [
         "Swerve Drive",
 
         /* --- Telemetry --- */
-        "SmartDashboard", "Shuffleboard", "Sendable", "DataLog", "Driver Station",
+        "SmartDashboard", "Shuffleboard", "Sendable", "DataLog",
 
         /* --- Controls --- */
         "Exponential Profile", "PID", "State-Space", "LTVUnicycleController", "Path Following",
@@ -54,43 +72,19 @@ def tagList = [
         "LQR", "Pose Estimator",
 
         /* --- Hardware --- */
-        "Analog", "Gyro", "Pneumatics", "I2C", "Duty Cycle", "PDP",
+        "Analog", "Ultrasonic", "Gyro", "Pneumatics", "I2C", "Duty Cycle", "PDP", "DMA", "Relay",
         "AddressableLEDs", "HAL", "Encoder", "Smart Motor Controller", "Digital Input",
-        "Digital Output", "Accelerometer", "IMU",
+        "Digital Output", "Accelerometer",
 
         /* --- HID --- */
-        "Gamepad", "Joystick",
-
-        /* --- RobotBase --- */
-        "Timed", "Timeslice", "RobotBase", "Educational", "OpMode",
+        "XboxController", "PS4Controller", "PS5Controller", "Joystick",
 
         /* --- Misc --- */
         /* (try to keep this section minimal) */
-        "EventLoop", "Mechanism2d", "Preferences", "Skeleton",
-
-        "FTC", "ExpansionHub", "OpModes"
+        "EventLoop", "AprilTags", "Mechanism2d", "Preferences",
 ]
 
-tasks.register('checkTemplates') {
-    doLast {
-        def parsedJson = new groovy.json.JsonSlurper().parseText(templateFile.text)
-        fileCheck(parsedJson, templateDirectory)
-        parsedJson.each {
-            assert it.name != null
-            assert it.description != null
-            assert it.tags != null
-            assert it.tags.findAll { !tagList.contains(it) }.empty
-            assert it.foldername != null
-            assert it.gradlebase != null
-            assert it.commandversion != null
-            if (it.gradlebase == 'java') {
-                assert it.robotclass != null
-            }
-        }
-    }
-}
-
-tasks.register('checkExamples') {
+task checkExamples(type: Task) {
     doLast {
         def parsedJson = new groovy.json.JsonSlurper().parseText(exampleFile.text)
         fileCheck(parsedJson, exampleDirectory)
@@ -103,13 +97,13 @@ tasks.register('checkExamples') {
             assert it.gradlebase != null
             assert it.commandversion != null
             if (it.gradlebase == 'java') {
-                assert it.robotclass != null
+                assert it.mainclass != null
             }
         }
     }
 }
 
-tasks.register('checkSnippets') {
+task checkSnippets(type: Task) {
     doLast {
         def parsedJson = new groovy.json.JsonSlurper().parseText(snippetsFile.text)
         fileCheck(parsedJson, snippetsDirectory)
@@ -121,13 +115,13 @@ tasks.register('checkSnippets') {
             assert it.foldername != null
             assert it.gradlebase != null
             if (it.gradlebase == 'java') {
-                assert it.robotclass != null
+                assert it.mainclass != null
             }
         }
     }
 }
 
-tasks.register('checkCommands') {
+task checkCommands(type: Task) {
     def isCppCommands = project.isCppCommands;
     doLast {
         def parsedJson = new groovy.json.JsonSlurper().parseText(commandFile.text)

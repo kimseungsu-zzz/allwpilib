@@ -2,72 +2,31 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/glass/Context.hpp"
+#include "glass/Context.h"
 
 #include <filesystem>
-#include <format>
 #include <memory>
 #include <string>
-#include <string_view>
 #include <utility>
 
+#include <fmt/format.h>
 #include <imgui.h>
 #include <imgui_internal.h>
 #include <imgui_stdlib.h>
+#include <wpi/MemoryBuffer.h>
+#include <wpi/StringExtras.h>
+#include <wpi/fs.h>
+#include <wpi/json.h>
+#include <wpi/raw_ostream.h>
+#include <wpi/timestamp.h>
+#include <wpigui.h>
+#include <wpigui_internal.h>
 
-#include "wpi/glass/ContextInternal.hpp"
-#include "wpi/gui/wpigui.hpp"
-#include "wpi/gui/wpigui_internal.hpp"
-#include "wpi/util/MemoryBuffer.hpp"
-#include "wpi/util/StringExtras.hpp"
-#include "wpi/util/fs.hpp"
-#include "wpi/util/json.hpp"
-#include "wpi/util/raw_ostream.hpp"
-#include "wpi/util/timestamp.hpp"
+#include "glass/ContextInternal.h"
 
-using namespace wpi::glass;
+using namespace glass;
 
-Context* wpi::glass::gContext;
-
-static constexpr std::string_view TIMESTAMP_DISPLAY_MODE_KEY =
-    "timestampDisplayMode";
-
-static TimestampDisplayMode TimestampDisplayModeFromString(
-    std::string_view mode) {
-  if (mode == TIMESTAMP_DISPLAY_MODE_LOCAL || mode == "actual") {
-    return TimestampDisplayMode::LOCAL;
-  }
-  if (mode == TIMESTAMP_DISPLAY_MODE_SERVER) {
-    return TimestampDisplayMode::SERVER;
-  }
-  return TimestampDisplayMode::SERVER_ZERO_START;
-}
-
-static uint64_t GetTimestampDisplayStartTime(Context* ctx) {
-  if (ctx->timestampDisplayStartTimeOverride) {
-    return ctx->timestampDisplayStartTime;
-  }
-  return wpi::util::GetProgramStartTime();
-}
-
-static int64_t GetTimestampDisplayOffset(Context* ctx) {
-  switch (ctx->timestampDisplayMode) {
-    case TimestampDisplayMode::LOCAL:
-      return 0;
-    case TimestampDisplayMode::SERVER:
-      return ctx->timestampDisplayServerTimeOffset
-                 ? -*ctx->timestampDisplayServerTimeOffset
-                 : 0;
-    case TimestampDisplayMode::SERVER_ZERO_START:
-      if (ctx->timestampDisplayServerStartTime) {
-        return *ctx->timestampDisplayServerStartTime -
-               ctx->timestampDisplayServerTimeOffset.value_or(0);
-      }
-      return static_cast<int64_t>(GetTimestampDisplayStartTime(ctx));
-    default:
-      return 0;
-  }
-}
+Context* glass::gContext;
 
 static void WorkspaceResetImpl() {
   // call reset functions
@@ -98,7 +57,7 @@ static void WorkspaceInit() {
   }
 }
 
-static bool JsonToWindow(const wpi::util::json& jfile, const char* filename) {
+static bool JsonToWindow(const wpi::json& jfile, const char* filename) {
   if (!jfile.is_object()) {
     ImGui::LogText("%s top level is not object", filename);
     return false;
@@ -106,93 +65,99 @@ static bool JsonToWindow(const wpi::util::json& jfile, const char* filename) {
 
   // loop over JSON and generate ini format
   std::string iniStr;
-  wpi::util::raw_string_ostream ini{iniStr};
+  wpi::raw_string_ostream ini{iniStr};
 
-  for (auto&& [sect_key, sect_value] : jfile.get_object()) {
-    if (sect_key == "Docking") {
+  for (auto&& jsection : jfile.items()) {
+    if (jsection.key() == "Docking") {
       continue;
     }
-    if (!sect_value.is_object()) {
-      ImGui::LogText("%s section %s is not object", filename, sect_key.c_str());
+    if (!jsection.value().is_object()) {
+      ImGui::LogText("%s section %s is not object", filename,
+                     jsection.key().c_str());
       return false;
     }
-    for (auto&& [sub_key, sub_value] : sect_value.get_object()) {
-      if (!sub_value.is_object()) {
+    for (auto&& jsubsection : jsection.value().items()) {
+      if (!jsubsection.value().is_object()) {
         ImGui::LogText("%s section %s subsection %s is not object", filename,
-                       sect_key.c_str(), sub_key.c_str());
+                       jsection.key().c_str(), jsubsection.key().c_str());
         return false;
       }
-      ini << '[' << sect_key << "][" << sub_key << "]\n";
-      for (auto&& [key, value] : sub_value.get_object()) {
-        if (!value.is_string()) {
+      ini << '[' << jsection.key() << "][" << jsubsection.key() << "]\n";
+      for (auto&& jkv : jsubsection.value().items()) {
+        try {
+          auto& value = jkv.value().get_ref<const std::string&>();
+          ini << jkv.key() << '=' << value << "\n";
+        } catch (wpi::json::exception&) {
           ImGui::LogText("%s section %s subsection %s value %s is not string",
-                         filename, sect_key.c_str(), sub_key.c_str(),
-                         key.c_str());
+                         filename, jsection.key().c_str(),
+                         jsubsection.key().c_str(), jkv.key().c_str());
           return false;
         }
-        ini << key << '=' << value.get_string() << "\n";
       }
       ini << '\n';
     }
   }
 
   // emit Docking section last
-  if (auto docking = jfile.lookup("Docking")) {
-    for (auto&& [sub_key, sub_value] : docking->get_object()) {
-      if (!sub_value.is_array()) {
+  auto docking = jfile.find("Docking");
+  if (docking != jfile.end()) {
+    for (auto&& jsubsection : docking->items()) {
+      if (!jsubsection.value().is_array()) {
         ImGui::LogText("%s section %s subsection %s is not array", filename,
-                       "Docking", sub_key.c_str());
+                       "Docking", jsubsection.key().c_str());
         return false;
       }
-      ini << "[Docking][" << sub_key << "]\n";
-      for (auto&& value : sub_value.get_array()) {
-        if (!value.is_string()) {
+      ini << "[Docking][" << jsubsection.key() << "]\n";
+      for (auto&& jv : jsubsection.value()) {
+        try {
+          auto& value = jv.get_ref<const std::string&>();
+          ini << value << "\n";
+        } catch (wpi::json::exception&) {
           ImGui::LogText("%s section %s subsection %s value is not string",
-                         filename, "Docking", sub_key.c_str());
+                         filename, "Docking", jsubsection.key().c_str());
           return false;
         }
-        ini << value.get_string() << "\n";
       }
       ini << '\n';
     }
   }
+
+  ini.flush();
 
   ImGui::LoadIniSettingsFromMemory(iniStr.data(), iniStr.size());
   return true;
 }
 
 static bool LoadWindowStorageImpl(const std::string& filename) {
-  auto fileBuffer = wpi::util::MemoryBuffer::GetFile(filename);
+  auto fileBuffer = wpi::MemoryBuffer::GetFile(filename);
   if (!fileBuffer) {
     ImGui::LogText("error opening %s: %s", filename.c_str(),
                    fileBuffer.error().message().c_str());
     return false;
   }
-  auto buffer = fileBuffer.value()->GetCharBuffer();
-  auto j = wpi::util::json::parse({buffer.data(), buffer.size()});
-  if (j) {
-    return JsonToWindow(*j, filename.c_str());
-  } else {
-    ImGui::LogText("Error loading %s: %s", filename.c_str(), j.error());
+  try {
+    return JsonToWindow(wpi::json::parse(fileBuffer.value()->GetCharBuffer()),
+                        filename.c_str());
+  } catch (wpi::json::parse_error& e) {
+    ImGui::LogText("Error loading %s: %s", filename.c_str(), e.what());
     return false;
   }
 }
 
 static bool LoadStorageRootImpl(Context* ctx, const std::string& filename,
                                 std::string_view rootName) {
-  auto fileBuffer = wpi::util::MemoryBuffer::GetFile(filename);
+  auto fileBuffer = wpi::MemoryBuffer::GetFile(filename);
   if (!fileBuffer) {
     ImGui::LogText("error opening %s: %s", filename.c_str(),
                    fileBuffer.error().message().c_str());
     return false;
   }
   auto [it, createdStorage] = ctx->storageRoots.try_emplace(rootName);
-  auto buffer = fileBuffer.value()->GetCharBuffer();
-  auto j = wpi::util::json::parse({buffer.data(), buffer.size()});
-  if (j) {
-    it->second.FromJson(*j, filename.c_str());
-  } else {
-    ImGui::LogText("Error loading %s: %s", filename.c_str(), j.error());
+  try {
+    it->second.FromJson(wpi::json::parse(fileBuffer.value()->GetCharBuffer()),
+                        filename.c_str());
+  } catch (wpi::json::parse_error& e) {
+    ImGui::LogText("Error loading %s: %s", filename.c_str(), e.what());
     if (createdStorage) {
       ctx->storageRoots.erase(it);
     }
@@ -208,10 +173,10 @@ static bool LoadStorageImpl(Context* ctx, std::string_view dir,
     std::string filename;
     auto& rootName = root.first;
     if (rootName.empty()) {
-      filename = (fs::path{dir} / std::format("{}.json", name)).string();
+      filename = (fs::path{dir} / fmt::format("{}.json", name)).string();
     } else {
       filename =
-          (fs::path{dir} / std::format("{}-{}.json", name, rootName)).string();
+          (fs::path{dir} / fmt::format("{}-{}.json", name, rootName)).string();
     }
     if (!LoadStorageRootImpl(ctx, filename, rootName)) {
       rv = false;
@@ -222,7 +187,7 @@ static bool LoadStorageImpl(Context* ctx, std::string_view dir,
   return rv;
 }
 
-static wpi::util::json WindowToJson() {
+static wpi::json WindowToJson() {
   size_t iniLen;
   const char* iniData = ImGui::SaveIniSettingsToMemory(&iniLen);
   std::string_view ini{iniData, iniLen};
@@ -237,32 +202,30 @@ static wpi::util::json WindowToJson() {
   //   }
   // }
 
-  wpi::util::json out = wpi::util::json::object();
-  wpi::util::json* curSection = nullptr;
+  wpi::json out = wpi::json::object();
+  wpi::json* curSection = nullptr;
   while (!ini.empty()) {
     std::string_view line;
-    std::tie(line, ini) = wpi::util::split(ini, '\n');
-    line = wpi::util::trim(line);
+    std::tie(line, ini) = wpi::split(ini, '\n');
+    line = wpi::trim(line);
     if (line.empty()) {
       continue;
     }
     if (line[0] == '[') {
       // new section
-      auto [section, subsection] = wpi::util::split(line, ']');
-      section =
-          wpi::util::drop_front(section);  // drop '['; ']' was dropped by split
-      subsection =
-          wpi::util::drop_back(wpi::util::drop_front(subsection));  // drop []
+      auto [section, subsection] = wpi::split(line, ']');
+      section = wpi::drop_front(section);  // drop '['; ']' was dropped by split
+      subsection = wpi::drop_back(wpi::drop_front(subsection));  // drop []
       auto& jsection = out[section];
       if (jsection.is_null()) {
-        jsection = wpi::util::json::object();
+        jsection = wpi::json::object();
       }
       curSection = &jsection[subsection];
       if (curSection->is_null()) {
         if (section == "Docking") {
-          *curSection = wpi::util::json::array();
+          *curSection = wpi::json::array();
         } else {
-          *curSection = wpi::util::json::object();
+          *curSection = wpi::json::object();
         }
       }
     } else {
@@ -270,7 +233,7 @@ static wpi::util::json WindowToJson() {
       if (!curSection) {
         continue;  // shouldn't happen, but just in case
       }
-      auto [name, value] = wpi::util::split(line, '=');
+      auto [name, value] = wpi::split(line, '=');
       if (curSection->is_object()) {
         (*curSection)[name] = value;
       } else if (curSection->is_array()) {
@@ -284,13 +247,13 @@ static wpi::util::json WindowToJson() {
 
 bool SaveWindowStorageImpl(const std::string& filename) {
   std::error_code ec;
-  wpi::util::raw_fd_ostream os{filename, ec};
+  wpi::raw_fd_ostream os{filename, ec};
   if (ec) {
     ImGui::LogText("error opening %s: %s", filename.c_str(),
                    ec.message().c_str());
     return false;
   }
-  WindowToJson().marshal(os, true);
+  WindowToJson().dump(os, 2);
   os << '\n';
   return true;
 }
@@ -298,13 +261,13 @@ bool SaveWindowStorageImpl(const std::string& filename) {
 static bool SaveStorageRootImpl(Context* ctx, const std::string& filename,
                                 const Storage& storage) {
   std::error_code ec;
-  wpi::util::raw_fd_ostream os{filename, ec};
+  wpi::raw_fd_ostream os{filename, ec};
   if (ec) {
     ImGui::LogText("error opening %s: %s", filename.c_str(),
                    ec.message().c_str());
     return false;
   }
-  storage.ToJson().marshal(os, true);
+  storage.ToJson().dump(os, 2);
   os << '\n';
   return true;
 }
@@ -321,27 +284,27 @@ static bool SaveStorageImpl(Context* ctx, std::string_view dir,
 
   // handle erasing save files on exit if requested
   if (exiting && wpi::gui::gContext->resetOnExit) {
-    fs::remove(dirPath / std::format("{}-window.json", name), ec);
+    fs::remove(dirPath / fmt::format("{}-window.json", name), ec);
     for (auto&& root : ctx->storageRoots) {
       auto& rootName = root.first;
       if (rootName.empty()) {
-        fs::remove(dirPath / std::format("{}.json", name), ec);
+        fs::remove(dirPath / fmt::format("{}.json", name), ec);
       } else {
-        fs::remove(dirPath / std::format("{}-{}.json", name, rootName), ec);
+        fs::remove(dirPath / fmt::format("{}-{}.json", name, rootName), ec);
       }
     }
   }
 
   bool rv = SaveWindowStorageImpl(
-      (dirPath / std::format("{}-window.json", name)).string());
+      (dirPath / fmt::format("{}-window.json", name)).string());
 
   for (auto&& root : ctx->storageRoots) {
     auto& rootName = root.first;
     std::string filename;
     if (rootName.empty()) {
-      filename = (dirPath / std::format("{}.json", name)).string();
+      filename = (dirPath / fmt::format("{}.json", name)).string();
     } else {
-      filename = (dirPath / std::format("{}-{}.json", name, rootName)).string();
+      filename = (dirPath / fmt::format("{}-{}.json", name, rootName)).string();
     }
     if (!SaveStorageRootImpl(ctx, filename, root.second)) {
       rv = false;
@@ -352,22 +315,15 @@ static bool SaveStorageImpl(Context* ctx, std::string_view dir,
 
 Context::Context()
     : sourceNameStorage{
-          storageRoots.try_emplace("").first->second.GetChild("sourceNames")},
-      timestampDisplayModeStorage{storageRoots[""].GetString(
-          TIMESTAMP_DISPLAY_MODE_KEY,
-          TIMESTAMP_DISPLAY_MODE_SERVER_ZERO_START)} {
+          storageRoots.try_emplace("").first->second.GetChild("sourceNames")} {
   storageStack.emplace_back(&storageRoots[""]);
-  workspaceInit.emplace_back([this] {
-    timestampDisplayMode =
-        TimestampDisplayModeFromString(timestampDisplayModeStorage);
-  });
 
   // override ImGui ini saving
   wpi::gui::ConfigureCustomSaveSettings(
       [this] { LoadStorageImpl(this, storageLoadDir, storageName); },
       [this] {
         LoadWindowStorageImpl((fs::path{storageLoadDir} /
-                               std::format("{}-window.json", storageName))
+                               fmt::format("{}-window.json", storageName))
                                   .string());
       },
       [this](bool exiting) {
@@ -379,7 +335,7 @@ Context::~Context() {
   wpi::gui::ConfigureCustomSaveSettings(nullptr, nullptr, nullptr);
 }
 
-Context* wpi::glass::CreateContext() {
+Context* glass::CreateContext() {
   Context* ctx = new Context;
   if (!gContext) {
     SetCurrentContext(ctx);
@@ -387,7 +343,7 @@ Context* wpi::glass::CreateContext() {
   return ctx;
 }
 
-void wpi::glass::DestroyContext(Context* ctx) {
+void glass::DestroyContext(Context* ctx) {
   if (!ctx) {
     ctx = gContext;
   }
@@ -397,71 +353,44 @@ void wpi::glass::DestroyContext(Context* ctx) {
   delete ctx;
 }
 
-Context* wpi::glass::GetCurrentContext() {
+Context* glass::GetCurrentContext() {
   return gContext;
 }
 
-void wpi::glass::SetCurrentContext(Context* ctx) {
+void glass::SetCurrentContext(Context* ctx) {
   gContext = ctx;
 }
 
-uint64_t wpi::glass::GetZeroTime() {
-  return GetTimestampDisplayStartTime(gContext);
+void glass::ResetTime() {
+  gContext->zeroTime = wpi::Now();
 }
 
-int64_t wpi::glass::GetTimestampDisplayOffset() {
-  return ::GetTimestampDisplayOffset(gContext);
+uint64_t glass::GetZeroTime() {
+  return gContext->zeroTime;
 }
 
-double wpi::glass::TimestampToDisplayTime(uint64_t time) {
-  return (static_cast<double>(time) -
-          static_cast<double>(GetTimestampDisplayOffset())) *
-         1.0e-6;
-}
-
-double wpi::glass::TimestampToDisplayTime(int64_t time) {
-  return (static_cast<double>(time) -
-          static_cast<double>(GetTimestampDisplayOffset())) *
-         1.0e-6;
-}
-
-double wpi::glass::ServerTimestampToDisplayTime(int64_t time) {
-  if (gContext->timestampDisplayMode ==
-      TimestampDisplayMode::SERVER_ZERO_START) {
-    if (gContext->timestampDisplayServerStartTime) {
-      time -= *gContext->timestampDisplayServerStartTime;
-    } else {
-      if (gContext->timestampDisplayServerTimeOffset) {
-        time -= *gContext->timestampDisplayServerTimeOffset;
-      }
-      time -= static_cast<int64_t>(GetTimestampDisplayStartTime(gContext));
-    }
-  }
-  return static_cast<double>(time) * 1.0e-6;
-}
-
-void wpi::glass::WorkspaceReset() {
+void glass::WorkspaceReset() {
   WorkspaceResetImpl();
   WorkspaceInit();
 }
 
-void wpi::glass::AddWorkspaceInit(std::function<void()> init) {
+void glass::AddWorkspaceInit(std::function<void()> init) {
   if (init) {
     gContext->workspaceInit.emplace_back(std::move(init));
   }
 }
 
-void wpi::glass::AddWorkspaceReset(std::function<void()> reset) {
+void glass::AddWorkspaceReset(std::function<void()> reset) {
   if (reset) {
     gContext->workspaceReset.emplace_back(std::move(reset));
   }
 }
 
-void wpi::glass::SetStorageName(std::string_view name) {
+void glass::SetStorageName(std::string_view name) {
   gContext->storageName = name;
 }
 
-void wpi::glass::SetStorageDir(std::string_view dir) {
+void glass::SetStorageDir(std::string_view dir) {
   if (dir.empty()) {
     gContext->storageLoadDir = ".";
     gContext->storageAutoSaveDir = ".";
@@ -472,38 +401,38 @@ void wpi::glass::SetStorageDir(std::string_view dir) {
   }
 }
 
-std::string wpi::glass::GetStorageDir() {
+std::string glass::GetStorageDir() {
   return gContext->storageAutoSaveDir;
 }
 
-bool wpi::glass::LoadStorage(std::string_view dir) {
+bool glass::LoadStorage(std::string_view dir) {
   SaveStorage();
   SetStorageDir(dir);
   WorkspaceResetImpl();
   LoadWindowStorageImpl((fs::path{gContext->storageLoadDir} /
-                         std::format("{}-window.json", gContext->storageName))
+                         fmt::format("{}-window.json", gContext->storageName))
                             .string());
   return LoadStorageImpl(gContext, dir, gContext->storageName);
 }
 
-bool wpi::glass::SaveStorage() {
+bool glass::SaveStorage() {
   return SaveStorageImpl(gContext, gContext->storageAutoSaveDir,
                          gContext->storageName, false);
 }
 
-bool wpi::glass::SaveStorage(std::string_view dir) {
+bool glass::SaveStorage(std::string_view dir) {
   return SaveStorageImpl(gContext, dir, gContext->storageName, false);
 }
 
-Storage& wpi::glass::GetCurStorageRoot() {
+Storage& glass::GetCurStorageRoot() {
   return *gContext->storageStack.front();
 }
 
-Storage& wpi::glass::GetStorageRoot(std::string_view rootName) {
+Storage& glass::GetStorageRoot(std::string_view rootName) {
   return gContext->storageRoots[rootName];
 }
 
-void wpi::glass::ResetStorageStack(std::string_view rootName) {
+void glass::ResetStorageStack(std::string_view rootName) {
   if (gContext->storageStack.size() != 1) {
     ImGui::LogText("resetting non-empty storage stack");
   }
@@ -511,20 +440,20 @@ void wpi::glass::ResetStorageStack(std::string_view rootName) {
   gContext->storageStack.emplace_back(&GetStorageRoot(rootName));
 }
 
-Storage& wpi::glass::GetStorage() {
+Storage& glass::GetStorage() {
   return *gContext->storageStack.back();
 }
 
-void wpi::glass::PushStorageStack(std::string_view label_id) {
+void glass::PushStorageStack(std::string_view label_id) {
   gContext->storageStack.emplace_back(
       &gContext->storageStack.back()->GetChild(label_id));
 }
 
-void wpi::glass::PushStorageStack(Storage& storage) {
+void glass::PushStorageStack(Storage& storage) {
   gContext->storageStack.emplace_back(&storage);
 }
 
-void wpi::glass::PopStorageStack() {
+void glass::PopStorageStack() {
   if (gContext->storageStack.size() <= 1) {
     ImGui::LogText("attempted to pop empty storage stack, mismatch push/pop?");
     return;  // ignore
@@ -532,28 +461,28 @@ void wpi::glass::PopStorageStack() {
   gContext->storageStack.pop_back();
 }
 
-bool wpi::glass::Begin(const char* name, bool* p_open, ImGuiWindowFlags flags) {
+bool glass::Begin(const char* name, bool* p_open, ImGuiWindowFlags flags) {
   PushStorageStack(name);
   return ImGui::Begin(name, p_open, flags);
 }
 
-void wpi::glass::End() {
+void glass::End() {
   ImGui::End();
   PopStorageStack();
 }
 
-bool wpi::glass::BeginChild(const char* str_id, const ImVec2& size, bool border,
-                            ImGuiWindowFlags flags) {
+bool glass::BeginChild(const char* str_id, const ImVec2& size, bool border,
+                       ImGuiWindowFlags flags) {
   PushStorageStack(str_id);
   return ImGui::BeginChild(str_id, size, border, flags);
 }
 
-void wpi::glass::EndChild() {
+void glass::EndChild() {
   ImGui::EndChild();
   PopStorageStack();
 }
 
-bool wpi::glass::CollapsingHeader(const char* label, ImGuiTreeNodeFlags flags) {
+bool glass::CollapsingHeader(const char* label, ImGuiTreeNodeFlags flags) {
   bool& open = GetStorage().GetChild(label).GetBool(
       "open", (flags & ImGuiTreeNodeFlags_DefaultOpen) != 0);
   ImGui::SetNextItemOpen(open);
@@ -561,7 +490,7 @@ bool wpi::glass::CollapsingHeader(const char* label, ImGuiTreeNodeFlags flags) {
   return open;
 }
 
-bool wpi::glass::TreeNodeEx(const char* label, ImGuiTreeNodeFlags flags) {
+bool glass::TreeNodeEx(const char* label, ImGuiTreeNodeFlags flags) {
   PushStorageStack(label);
   bool& open = GetStorage().GetBool(
       "open", (flags & ImGuiTreeNodeFlags_DefaultOpen) != 0);
@@ -573,35 +502,35 @@ bool wpi::glass::TreeNodeEx(const char* label, ImGuiTreeNodeFlags flags) {
   return open;
 }
 
-void wpi::glass::TreePop() {
+void glass::TreePop() {
   ImGui::TreePop();
   PopStorageStack();
 }
 
-void wpi::glass::PushID(const char* str_id) {
+void glass::PushID(const char* str_id) {
   PushStorageStack(str_id);
   ImGui::PushID(str_id);
 }
 
-void wpi::glass::PushID(const char* str_id_begin, const char* str_id_end) {
+void glass::PushID(const char* str_id_begin, const char* str_id_end) {
   PushStorageStack(std::string_view(str_id_begin, str_id_end - str_id_begin));
   ImGui::PushID(str_id_begin, str_id_end);
 }
 
-void wpi::glass::PushID(int int_id) {
+void glass::PushID(int int_id) {
   char buf[16];
-  wpi::util::format_to_n_c_str(buf, sizeof(buf), "{}", int_id);
+  wpi::format_to_n_c_str(buf, sizeof(buf), "{}", int_id);
 
   PushStorageStack(buf);
   ImGui::PushID(int_id);
 }
 
-void wpi::glass::PopID() {
+void glass::PopID() {
   ImGui::PopID();
   PopStorageStack();
 }
 
-bool wpi::glass::PopupEditName(const char* label, std::string* name) {
+bool glass::PopupEditName(const char* label, std::string* name) {
   bool rv = false;
   if (ImGui::BeginPopupContextItem(label)) {
     rv = ItemEditName(name);
@@ -611,15 +540,15 @@ bool wpi::glass::PopupEditName(const char* label, std::string* name) {
   return rv;
 }
 
-bool wpi::glass::ItemEditName(std::string* name) {
+bool glass::ItemEditName(std::string* name) {
   bool rv = false;
 
   ImGui::Text("Edit name:");
   if (ImGui::InputText("##editname", name)) {
     rv = true;
   }
-  if (ImGui::Button("Close") || ImGui::IsKeyPressed(ImGuiKey_Enter) ||
-      ImGui::IsKeyPressed(ImGuiKey_KeypadEnter)) {
+  if (ImGui::Button("Close") || ImGui::IsKeyPressedMap(ImGuiKey_Enter) ||
+      ImGui::IsKeyPressedMap(ImGuiKey_KeyPadEnter)) {
     ImGui::CloseCurrentPopup();
   }
 

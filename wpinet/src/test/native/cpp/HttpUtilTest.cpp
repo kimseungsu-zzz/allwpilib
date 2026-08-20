@@ -2,101 +2,101 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/net/HttpUtil.hpp"
+#include "wpinet/HttpUtil.h"  // NOLINT(build/include_order)
 
-#include <catch2/catch_test_macros.hpp>
+#include <gtest/gtest.h>
 
-namespace wpi::net {
+namespace wpi {
 
-TEST_CASE("HttpMultipartScannerTest ExecuteExact", "[http][multipart]") {
+TEST(HttpMultipartScannerTest, ExecuteExact) {
   HttpMultipartScanner scanner("foo");
-  CHECK(scanner.Execute("abcdefg---\r\n--foo\r\n").empty());
-  CHECK(scanner.IsDone());
-  CHECK(scanner.GetSkipped().empty());
+  EXPECT_TRUE(scanner.Execute("abcdefg---\r\n--foo\r\n").empty());
+  EXPECT_TRUE(scanner.IsDone());
+  EXPECT_TRUE(scanner.GetSkipped().empty());
 }
 
-TEST_CASE("HttpMultipartScannerTest ExecutePartial", "[http][multipart]") {
+TEST(HttpMultipartScannerTest, ExecutePartial) {
   HttpMultipartScanner scanner("foo");
-  CHECK(scanner.Execute("abcdefg--").empty());
-  CHECK_FALSE(scanner.IsDone());
-  CHECK(scanner.Execute("-\r\n").empty());
-  CHECK_FALSE(scanner.IsDone());
-  CHECK(scanner.Execute("--foo\r").empty());
-  CHECK_FALSE(scanner.IsDone());
-  CHECK(scanner.Execute("\n").empty());
-  CHECK(scanner.IsDone());
+  EXPECT_TRUE(scanner.Execute("abcdefg--").empty());
+  EXPECT_FALSE(scanner.IsDone());
+  EXPECT_TRUE(scanner.Execute("-\r\n").empty());
+  EXPECT_FALSE(scanner.IsDone());
+  EXPECT_TRUE(scanner.Execute("--foo\r").empty());
+  EXPECT_FALSE(scanner.IsDone());
+  EXPECT_TRUE(scanner.Execute("\n").empty());
+  EXPECT_TRUE(scanner.IsDone());
 }
 
-TEST_CASE("HttpMultipartScannerTest ExecuteTrailing", "[http][multipart]") {
+TEST(HttpMultipartScannerTest, ExecuteTrailing) {
   HttpMultipartScanner scanner("foo");
-  CHECK(scanner.Execute("abcdefg---\r\n--foo\r\nxyz") == "xyz");
+  EXPECT_EQ(scanner.Execute("abcdefg---\r\n--foo\r\nxyz"), "xyz");
 }
 
-TEST_CASE("HttpMultipartScannerTest ExecutePadding", "[http][multipart]") {
+TEST(HttpMultipartScannerTest, ExecutePadding) {
   HttpMultipartScanner scanner("foo");
-  CHECK(scanner.Execute("abcdefg---\r\n--foo    \r\nxyz") == "xyz");
-  CHECK(scanner.IsDone());
+  EXPECT_EQ(scanner.Execute("abcdefg---\r\n--foo    \r\nxyz"), "xyz");
+  EXPECT_TRUE(scanner.IsDone());
 }
 
-TEST_CASE("HttpMultipartScannerTest SaveSkipped", "[http][multipart]") {
+TEST(HttpMultipartScannerTest, SaveSkipped) {
   HttpMultipartScanner scanner("foo", true);
   scanner.Execute("abcdefg---\r\n--foo\r\n");
-  CHECK(scanner.GetSkipped() == "abcdefg---\r\n--foo\r\n");
+  EXPECT_EQ(scanner.GetSkipped(), "abcdefg---\r\n--foo\r\n");
 }
 
-TEST_CASE("HttpMultipartScannerTest Reset", "[http][multipart]") {
+TEST(HttpMultipartScannerTest, Reset) {
   HttpMultipartScanner scanner("foo", true);
 
   scanner.Execute("abcdefg---\r\n--foo\r\n");
-  CHECK(scanner.IsDone());
-  CHECK(scanner.GetSkipped() == "abcdefg---\r\n--foo\r\n");
+  EXPECT_TRUE(scanner.IsDone());
+  EXPECT_EQ(scanner.GetSkipped(), "abcdefg---\r\n--foo\r\n");
 
   scanner.Reset(true);
-  CHECK_FALSE(scanner.IsDone());
+  EXPECT_FALSE(scanner.IsDone());
   scanner.SetBoundary("bar");
 
   scanner.Execute("--foo\r\n--bar\r\n");
-  CHECK(scanner.IsDone());
-  CHECK(scanner.GetSkipped() == "--foo\r\n--bar\r\n");
+  EXPECT_TRUE(scanner.IsDone());
+  EXPECT_EQ(scanner.GetSkipped(), "--foo\r\n--bar\r\n");
 }
 
-TEST_CASE("HttpMultipartScannerTest WithoutDashes", "[http][multipart]") {
+TEST(HttpMultipartScannerTest, WithoutDashes) {
   HttpMultipartScanner scanner("foo", true);
 
-  CHECK(scanner.Execute("--\r\nfoo\r\n").empty());
-  CHECK(scanner.IsDone());
+  EXPECT_TRUE(scanner.Execute("--\r\nfoo\r\n").empty());
+  EXPECT_TRUE(scanner.IsDone());
 }
 
-TEST_CASE("HttpMultipartScannerTest SeqDashesDashes", "[http][multipart]") {
+TEST(HttpMultipartScannerTest, SeqDashesDashes) {
   HttpMultipartScanner scanner("foo", true);
-  CHECK(scanner.Execute("\r\n--foo\r\n").empty());
-  CHECK(scanner.IsDone());
-  CHECK(scanner.Execute("\r\n--foo\r\n").empty());
-  CHECK(scanner.IsDone());
+  EXPECT_TRUE(scanner.Execute("\r\n--foo\r\n").empty());
+  EXPECT_TRUE(scanner.IsDone());
+  EXPECT_TRUE(scanner.Execute("\r\n--foo\r\n").empty());
+  EXPECT_TRUE(scanner.IsDone());
 }
 
-TEST_CASE("HttpMultipartScannerTest SeqDashesNoDashes", "[http][multipart]") {
+TEST(HttpMultipartScannerTest, SeqDashesNoDashes) {
   HttpMultipartScanner scanner("foo", true);
-  CHECK(scanner.Execute("\r\n--foo\r\n").empty());
-  CHECK(scanner.IsDone());
-  CHECK(scanner.Execute("\r\nfoo\r\n").empty());
-  CHECK_FALSE(scanner.IsDone());
+  EXPECT_TRUE(scanner.Execute("\r\n--foo\r\n").empty());
+  EXPECT_TRUE(scanner.IsDone());
+  EXPECT_TRUE(scanner.Execute("\r\nfoo\r\n").empty());
+  EXPECT_FALSE(scanner.IsDone());
 }
 
-TEST_CASE("HttpMultipartScannerTest SeqNoDashesDashes", "[http][multipart]") {
+TEST(HttpMultipartScannerTest, SeqNoDashesDashes) {
   HttpMultipartScanner scanner("foo", true);
-  CHECK(scanner.Execute("\r\nfoo\r\n").empty());
-  CHECK(scanner.IsDone());
-  CHECK(scanner.Execute("\r\n--foo\r\n").empty());
-  CHECK_FALSE(scanner.IsDone());
+  EXPECT_TRUE(scanner.Execute("\r\nfoo\r\n").empty());
+  EXPECT_TRUE(scanner.IsDone());
+  EXPECT_TRUE(scanner.Execute("\r\n--foo\r\n").empty());
+  EXPECT_FALSE(scanner.IsDone());
 }
 
-TEST_CASE("HttpMultipartScannerTest SeqNoDashesNoDashes", "[http][multipart]") {
+TEST(HttpMultipartScannerTest, SeqNoDashesNoDashes) {
   HttpMultipartScanner scanner("foo", true);
-  CHECK(scanner.Execute("\r\nfoo\r\n").empty());
-  CHECK(scanner.IsDone());
-  CHECK(scanner.Execute("\r\nfoo\r\n").empty());
-  CHECK(scanner.IsDone());
+  EXPECT_TRUE(scanner.Execute("\r\nfoo\r\n").empty());
+  EXPECT_TRUE(scanner.IsDone());
+  EXPECT_TRUE(scanner.Execute("\r\nfoo\r\n").empty());
+  EXPECT_TRUE(scanner.IsDone());
 }
 
-}  // namespace wpi::net
+}  // namespace wpi

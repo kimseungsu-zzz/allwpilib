@@ -2,23 +2,22 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/simulation/DigitalPWMSim.hpp"
+#include "frc/simulation/DigitalPWMSim.h"  // NOLINT(build/include_order)
 
-#include <catch2/catch_test_macros.hpp>
-#include <catch2/matchers/catch_matchers_floating_point.hpp>
+#include <gtest/gtest.h>
+#include <hal/HAL.h>
 
-#include "callback_helpers/TestCallbackHelpers.hpp"
-#include "wpi/hal/HAL.h"
-#include "wpi/hardware/discrete/DigitalOutput.hpp"
+#include "callback_helpers/TestCallbackHelpers.h"
+#include "frc/DigitalOutput.h"
 
-namespace wpi::sim {
+namespace frc::sim {
 
-TEST_CASE("DigitalPWMSimTest Initialize", "[wpilibc][simulation]") {
-  HAL_Initialize();
+TEST(DigitalPWMSimTest, Initialize) {
+  HAL_Initialize(500, 0);
 
   DigitalOutput output{0};
   DigitalPWMSim sim(output);
-  CHECK_FALSE(sim.GetInitialized());
+  EXPECT_FALSE(sim.GetInitialized());
 
   BooleanCallback initializeCallback;
   auto initCb =
@@ -31,17 +30,17 @@ TEST_CASE("DigitalPWMSimTest Initialize", "[wpilibc][simulation]") {
   constexpr double kTestDutyCycle = 0.191;
   output.EnablePWM(kTestDutyCycle);
 
-  CHECK(sim.GetInitialized());
-  CHECK(initializeCallback.WasTriggered());
-  CHECK(initializeCallback.GetLastValue());
+  EXPECT_TRUE(sim.GetInitialized());
+  EXPECT_TRUE(initializeCallback.WasTriggered());
+  EXPECT_TRUE(initializeCallback.GetLastValue());
 
-  CHECK(kTestDutyCycle == sim.GetDutyCycle());
-  CHECK(dutyCycleCallback.WasTriggered());
-  CHECK(kTestDutyCycle == dutyCycleCallback.GetLastValue());
+  EXPECT_EQ(kTestDutyCycle, sim.GetDutyCycle());
+  EXPECT_TRUE(dutyCycleCallback.WasTriggered());
+  EXPECT_EQ(kTestDutyCycle, dutyCycleCallback.GetLastValue());
 }
 
-TEST_CASE("DigitalPWMSimTest SetPin", "[wpilibc][simulation]") {
-  HAL_Initialize();
+TEST(DigitalPWMSimTest, SetPin) {
+  HAL_Initialize(500, 0);
 
   DigitalOutput output{2};
   DigitalPWMSim sim(output);
@@ -50,9 +49,9 @@ TEST_CASE("DigitalPWMSimTest SetPin", "[wpilibc][simulation]") {
   auto cb = sim.RegisterPinCallback(callback.GetCallback(), false);
 
   sim.SetPin(191);
-  CHECK(191 == sim.GetPin());
-  CHECK(callback.WasTriggered());
-  CHECK(191 == callback.GetLastValue());
+  EXPECT_EQ(191, sim.GetPin());
+  EXPECT_TRUE(callback.WasTriggered());
+  EXPECT_EQ(191, callback.GetLastValue());
 }
 
-}  // namespace wpi::sim
+}  // namespace frc::sim

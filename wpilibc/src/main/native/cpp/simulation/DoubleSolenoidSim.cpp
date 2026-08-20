@@ -2,15 +2,15 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/simulation/DoubleSolenoidSim.hpp"
+#include "frc/simulation/DoubleSolenoidSim.h"
 
 #include <memory>
 #include <utility>
 
-#include "wpi/hardware/pneumatic/PneumaticsBase.hpp"
+#include "frc/PneumaticsBase.h"
 
-using namespace wpi;
-using namespace wpi::sim;
+using namespace frc;
+using namespace frc::sim;
 
 DoubleSolenoidSim::DoubleSolenoidSim(
     std::shared_ptr<PneumaticsBaseSim> moduleSim, int fwd, int rev)
@@ -33,17 +33,17 @@ DoubleSolenoid::Value DoubleSolenoidSim::Get() const {
   bool fwdState = m_module->GetSolenoidOutput(m_fwd);
   bool revState = m_module->GetSolenoidOutput(m_rev);
   if (fwdState && !revState) {
-    return DoubleSolenoid::Value::FORWARD;
+    return DoubleSolenoid::Value::kForward;
   } else if (!fwdState && revState) {
-    return DoubleSolenoid::Value::REVERSE;
+    return DoubleSolenoid::Value::kReverse;
   } else {
-    return DoubleSolenoid::Value::OFF;
+    return DoubleSolenoid::Value::kOff;
   }
 }
 
 void DoubleSolenoidSim::Set(DoubleSolenoid::Value output) {
-  m_module->SetSolenoidOutput(m_fwd, output == DoubleSolenoid::Value::FORWARD);
-  m_module->SetSolenoidOutput(m_rev, output == DoubleSolenoid::Value::REVERSE);
+  m_module->SetSolenoidOutput(m_fwd, output == DoubleSolenoid::Value::kForward);
+  m_module->SetSolenoidOutput(m_rev, output == DoubleSolenoid::Value::kReverse);
 }
 
 std::shared_ptr<PneumaticsBaseSim> DoubleSolenoidSim::GetModuleSim() const {

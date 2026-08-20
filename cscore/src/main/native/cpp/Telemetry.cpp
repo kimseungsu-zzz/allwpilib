@@ -2,28 +2,30 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "Telemetry.hpp"
+#include "Telemetry.h"
 
 #include <chrono>
 #include <utility>
 
-#include "Handle.hpp"
-#include "Instance.hpp"
-#include "Notifier.hpp"
-#include "SourceImpl.hpp"
-#include "wpi/util/DenseMap.hpp"
+#include <wpi/DenseMap.h>
+#include <wpi/timestamp.h>
 
-using namespace wpi::cs;
+#include "Handle.h"
+#include "Instance.h"
+#include "Notifier.h"
+#include "SourceImpl.h"
 
-class Telemetry::Thread : public wpi::util::SafeThread {
+using namespace cs;
+
+class Telemetry::Thread : public wpi::SafeThread {
  public:
   explicit Thread(Notifier& notifier) : m_notifier(notifier) {}
 
   void Main() override;
 
   Notifier& m_notifier;
-  wpi::util::DenseMap<std::pair<CS_Handle, int>, int64_t> m_user;
-  wpi::util::DenseMap<std::pair<CS_Handle, int>, int64_t> m_current;
+  wpi::DenseMap<std::pair<CS_Handle, int>, int64_t> m_user;
+  wpi::DenseMap<std::pair<CS_Handle, int>, int64_t> m_current;
   double m_period = 0.0;
   double m_elapsed = 0.0;
   bool m_updated = false;
@@ -134,7 +136,7 @@ void Telemetry::RecordSourceBytes(const SourceImpl& source, int quantity) {
     return;
   }
   auto handleData = Instance::GetInstance().FindSource(source);
-  thr->m_current[std::pair{Handle{handleData.first, Handle::SOURCE},
+  thr->m_current[std::pair{Handle{handleData.first, Handle::kSource},
                            static_cast<int>(CS_SOURCE_BYTES_RECEIVED)}] +=
       quantity;
 }
@@ -145,7 +147,7 @@ void Telemetry::RecordSourceFrames(const SourceImpl& source, int quantity) {
     return;
   }
   auto handleData = Instance::GetInstance().FindSource(source);
-  thr->m_current[std::pair{Handle{handleData.first, Handle::SOURCE},
+  thr->m_current[std::pair{Handle{handleData.first, Handle::kSource},
                            static_cast<int>(CS_SOURCE_FRAMES_RECEIVED)}] +=
       quantity;
 }

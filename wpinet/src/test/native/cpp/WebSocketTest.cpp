@@ -2,20 +2,18 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/net/WebSocket.hpp"
+#include "wpinet/WebSocket.h"  // NOLINT(build/include_order)
 
-#ifndef _WIN32
-#include <unistd.h>
-#endif
+#include "WebSocketTest.h"
 
 #include <utility>
 #include <vector>
 
-#include "WebSocketTest.hpp"
-#include "wpi/net/HttpParser.hpp"
-#include "wpi/util/StringExtras.hpp"
+#include <wpi/StringExtras.h>
 
-namespace wpi::net {
+#include "wpinet/HttpParser.h"
+
+namespace wpi {
 
 #ifdef _WIN32
 const char* WebSocketTest::pipeName = "\\\\.\\pipe\\websocket-unit-test";
@@ -24,7 +22,7 @@ const char* WebSocketTest::pipeName = "/tmp/websocket-unit-test";
 #endif
 const uint8_t WebSocketTest::testMask[4] = {0x11, 0x22, 0x33, 0x44};
 
-void WebSocketTest::UnlinkPipe() {
+void WebSocketTest::SetUpTestCase() {
 #ifndef _WIN32
   unlink(pipeName);
 #endif
@@ -104,33 +102,32 @@ void WebSocketTest::AdjustMasking(std::span<uint8_t> message) {
   }
 }
 
-TEST_CASE_METHOD(WebSocketTest, "WebSocketTest CreateClientBasic",
-                 "[websocket][client][handshake]") {
+TEST_F(WebSocketTest, CreateClientBasic) {
   int gotHost = 0;
   int gotUpgrade = 0;
   int gotConnection = 0;
   int gotKey = 0;
   int gotVersion = 0;
 
-  HttpParser req{HttpParser::Type::REQUEST};
-  req.url.connect([](std::string_view url) { REQUIRE(url == "/test"); });
+  HttpParser req{HttpParser::kRequest};
+  req.url.connect([](std::string_view url) { ASSERT_EQ(url, "/test"); });
   req.header.connect([&](std::string_view name, std::string_view value) {
-    if (wpi::util::equals_lower(name, "host")) {
-      REQUIRE(value == pipeName);
+    if (equals_lower(name, "host")) {
+      ASSERT_EQ(value, pipeName);
       ++gotHost;
-    } else if (wpi::util::equals_lower(name, "upgrade")) {
-      REQUIRE(value == "websocket");
+    } else if (equals_lower(name, "upgrade")) {
+      ASSERT_EQ(value, "websocket");
       ++gotUpgrade;
-    } else if (wpi::util::equals_lower(name, "connection")) {
-      REQUIRE(value == "Upgrade");
+    } else if (equals_lower(name, "connection")) {
+      ASSERT_EQ(value, "Upgrade");
       ++gotConnection;
-    } else if (wpi::util::equals_lower(name, "sec-websocket-key")) {
+    } else if (equals_lower(name, "sec-websocket-key")) {
       ++gotKey;
-    } else if (wpi::util::equals_lower(name, "sec-websocket-version")) {
-      REQUIRE(value == "13");
+    } else if (equals_lower(name, "sec-websocket-version")) {
+      ASSERT_EQ(value, "13");
       ++gotVersion;
     } else {
-      FAIL("unexpected header " << name);
+      FAIL() << "unexpected header " << name;
     }
   });
   req.headersComplete.connect([&](bool) { Finish(); });
@@ -143,8 +140,7 @@ TEST_CASE_METHOD(WebSocketTest, "WebSocketTest CreateClientBasic",
       if (req.HasError()) {
         Finish();
       }
-      UNSCOPED_INFO(llhttp_errno_name(req.GetError()));
-      REQUIRE(req.GetError() == HPE_PAUSED_UPGRADE);
+      ASSERT_EQ(req.GetError(), HPE_OK) << http_errno_name(req.GetError());
     });
   });
   clientPipe->Connect(pipeName, [&]() {
@@ -152,24 +148,27 @@ TEST_CASE_METHOD(WebSocketTest, "WebSocketTest CreateClientBasic",
   });
 
   loop->Run();
-  REQUIRE(gotHost == 1);
-  REQUIRE(gotUpgrade == 1);
-  REQUIRE(gotConnection == 1);
-  REQUIRE(gotKey == 1);
-  REQUIRE(gotVersion == 1);
+
+  if (HasFatalFailure()) {
+    return;
+  }
+  ASSERT_EQ(gotHost, 1);
+  ASSERT_EQ(gotUpgrade, 1);
+  ASSERT_EQ(gotConnection, 1);
+  ASSERT_EQ(gotKey, 1);
+  ASSERT_EQ(gotVersion, 1);
 }
 
-TEST_CASE_METHOD(WebSocketTest, "WebSocketTest CreateClientExtraHeaders",
-                 "[websocket][client][handshake]") {
+TEST_F(WebSocketTest, CreateClientExtraHeaders) {
   int gotExtra1 = 0;
   int gotExtra2 = 0;
-  HttpParser req{HttpParser::Type::REQUEST};
+  HttpParser req{HttpParser::kRequest};
   req.header.connect([&](std::string_view name, std::string_view value) {
-    if (wpi::util::equals(name, "Extra1")) {
-      REQUIRE(value == "Data1");
+    if (equals(name, "Extra1")) {
+      ASSERT_EQ(value, "Data1");
       ++gotExtra1;
-    } else if (wpi::util::equals(name, "Extra2")) {
-      REQUIRE(value == "Data2");
+    } else if (equals(name, "Extra2")) {
+      ASSERT_EQ(value, "Data2");
       ++gotExtra2;
     }
   });
@@ -183,14 +182,12 @@ TEST_CASE_METHOD(WebSocketTest, "WebSocketTest CreateClientExtraHeaders",
       if (req.HasError()) {
         Finish();
       }
-      UNSCOPED_INFO(llhttp_errno_name(req.GetError()));
-      REQUIRE(req.GetError() == HPE_PAUSED_UPGRADE);
+      ASSERT_EQ(req.GetError(), HPE_OK) << http_errno_name(req.GetError());
     });
   });
   clientPipe->Connect(pipeName, [&]() {
     WebSocket::ClientOptions options;
-    wpi::util::SmallVector<std::pair<std::string_view, std::string_view>, 4>
-        extraHeaders;
+    SmallVector<std::pair<std::string_view, std::string_view>, 4> extraHeaders;
     extraHeaders.emplace_back("Extra1", "Data1");
     extraHeaders.emplace_back("Extra2", "Data2");
     options.extraHeaders = extraHeaders;
@@ -199,12 +196,15 @@ TEST_CASE_METHOD(WebSocketTest, "WebSocketTest CreateClientExtraHeaders",
   });
 
   loop->Run();
-  REQUIRE(gotExtra1 == 1);
-  REQUIRE(gotExtra2 == 1);
+
+  if (HasFatalFailure()) {
+    return;
+  }
+  ASSERT_EQ(gotExtra1, 1);
+  ASSERT_EQ(gotExtra2, 1);
 }
 
-TEST_CASE_METHOD(WebSocketTest, "WebSocketTest CreateClientTimeout",
-                 "[websocket][client][handshake]") {
+TEST_F(WebSocketTest, CreateClientTimeout) {
   int gotClosed = 0;
   serverPipe->Listen([&]() { auto conn = serverPipe->Accept(); });
   clientPipe->Connect(pipeName, [&]() {
@@ -215,40 +215,42 @@ TEST_CASE_METHOD(WebSocketTest, "WebSocketTest CreateClientTimeout",
     ws->closed.connect([&](uint16_t code, std::string_view) {
       Finish();
       ++gotClosed;
-      REQUIRE(code == 1006);
+      ASSERT_EQ(code, 1006);
     });
   });
 
   loop->Run();
-  REQUIRE(gotClosed == 1);
+
+  if (HasFatalFailure()) {
+    return;
+  }
+  ASSERT_EQ(gotClosed, 1);
 }
 
-TEST_CASE_METHOD(WebSocketTest, "WebSocketTest CreateServerBasic",
-                 "[websocket][server][handshake]") {
+TEST_F(WebSocketTest, CreateServerBasic) {
   int gotStatus = 0;
   int gotUpgrade = 0;
   int gotConnection = 0;
   int gotAccept = 0;
   int gotOpen = 0;
 
-  HttpParser resp{HttpParser::Type::RESPONSE};
+  HttpParser resp{HttpParser::kResponse};
   resp.status.connect([&](std::string_view status) {
     ++gotStatus;
-    UNSCOPED_INFO("status: " << status);
-    REQUIRE(resp.GetStatusCode() == 101u);
+    ASSERT_EQ(resp.GetStatusCode(), 101u) << "status: " << status;
   });
   resp.header.connect([&](std::string_view name, std::string_view value) {
-    if (wpi::util::equals_lower(name, "upgrade")) {
-      REQUIRE(value == "websocket");
+    if (equals_lower(name, "upgrade")) {
+      ASSERT_EQ(value, "websocket");
       ++gotUpgrade;
-    } else if (wpi::util::equals_lower(name, "connection")) {
-      REQUIRE(value == "Upgrade");
+    } else if (equals_lower(name, "connection")) {
+      ASSERT_EQ(value, "Upgrade");
       ++gotConnection;
-    } else if (wpi::util::equals_lower(name, "sec-websocket-accept")) {
-      REQUIRE(value == "s3pPLMBiTxaQ9kYGzzhZRbK+xOo=");
+    } else if (equals_lower(name, "sec-websocket-accept")) {
+      ASSERT_EQ(value, "s3pPLMBiTxaQ9kYGzzhZRbK+xOo=");
       ++gotAccept;
     } else {
-      FAIL("unexpected header " << name);
+      FAIL() << "unexpected header " << name;
     }
   });
   resp.headersComplete.connect([&](bool) { Finish(); });
@@ -258,7 +260,7 @@ TEST_CASE_METHOD(WebSocketTest, "WebSocketTest CreateServerBasic",
     auto ws = WebSocket::CreateServer(*conn, "dGhlIHNhbXBsZSBub25jZQ==", "13");
     ws->open.connect([&](std::string_view protocol) {
       ++gotOpen;
-      REQUIRE(protocol.empty());
+      ASSERT_TRUE(protocol.empty());
     });
   });
   clientPipe->Connect(pipeName, [&] {
@@ -268,29 +270,31 @@ TEST_CASE_METHOD(WebSocketTest, "WebSocketTest CreateServerBasic",
       if (resp.HasError()) {
         Finish();
       }
-      UNSCOPED_INFO(llhttp_errno_name(resp.GetError()));
-      REQUIRE(resp.GetError() == HPE_PAUSED_UPGRADE);
+      ASSERT_EQ(resp.GetError(), HPE_OK) << http_errno_name(resp.GetError());
     });
   });
 
   loop->Run();
-  REQUIRE(gotStatus == 1);
-  REQUIRE(gotUpgrade == 1);
-  REQUIRE(gotConnection == 1);
-  REQUIRE(gotAccept == 1);
-  REQUIRE(gotOpen == 1);
+
+  if (HasFatalFailure()) {
+    return;
+  }
+  ASSERT_EQ(gotStatus, 1);
+  ASSERT_EQ(gotUpgrade, 1);
+  ASSERT_EQ(gotConnection, 1);
+  ASSERT_EQ(gotAccept, 1);
+  ASSERT_EQ(gotOpen, 1);
 }
 
-TEST_CASE_METHOD(WebSocketTest, "WebSocketTest CreateServerProtocol",
-                 "[websocket][server][handshake][protocol]") {
+TEST_F(WebSocketTest, CreateServerProtocol) {
   int gotProtocol = 0;
   int gotOpen = 0;
 
-  HttpParser resp{HttpParser::Type::RESPONSE};
+  HttpParser resp{HttpParser::kResponse};
   resp.header.connect([&](std::string_view name, std::string_view value) {
-    if (wpi::util::equals_lower(name, "sec-websocket-protocol")) {
+    if (equals_lower(name, "sec-websocket-protocol")) {
       ++gotProtocol;
-      REQUIRE(value == "myProtocol");
+      ASSERT_EQ(value, "myProtocol");
     }
   });
   resp.headersComplete.connect([&](bool) { Finish(); });
@@ -300,7 +304,7 @@ TEST_CASE_METHOD(WebSocketTest, "WebSocketTest CreateServerProtocol",
     auto ws = WebSocket::CreateServer(*conn, "foo", "13", "myProtocol");
     ws->open.connect([&](std::string_view protocol) {
       ++gotOpen;
-      REQUIRE(protocol == "myProtocol");
+      ASSERT_EQ(protocol, "myProtocol");
     });
   });
   clientPipe->Connect(pipeName, [&] {
@@ -310,37 +314,38 @@ TEST_CASE_METHOD(WebSocketTest, "WebSocketTest CreateServerProtocol",
       if (resp.HasError()) {
         Finish();
       }
-      UNSCOPED_INFO(llhttp_errno_name(resp.GetError()));
-      REQUIRE(resp.GetError() == HPE_PAUSED_UPGRADE);
+      ASSERT_EQ(resp.GetError(), HPE_OK) << http_errno_name(resp.GetError());
     });
   });
 
   loop->Run();
-  REQUIRE(gotProtocol == 1);
-  REQUIRE(gotOpen == 1);
+
+  if (HasFatalFailure()) {
+    return;
+  }
+  ASSERT_EQ(gotProtocol, 1);
+  ASSERT_EQ(gotOpen, 1);
 }
 
-TEST_CASE_METHOD(WebSocketTest, "WebSocketTest CreateServerBadVersion",
-                 "[websocket][server][handshake][protocol]") {
+TEST_F(WebSocketTest, CreateServerBadVersion) {
   int gotStatus = 0;
   int gotVersion = 0;
   int gotUpgrade = 0;
 
-  HttpParser resp{HttpParser::Type::RESPONSE};
+  HttpParser resp{HttpParser::kResponse};
   resp.status.connect([&](std::string_view status) {
     ++gotStatus;
-    UNSCOPED_INFO("status: " << status);
-    REQUIRE(resp.GetStatusCode() == 426u);
+    ASSERT_EQ(resp.GetStatusCode(), 426u) << "status: " << status;
   });
   resp.header.connect([&](std::string_view name, std::string_view value) {
-    if (wpi::util::equals_lower(name, "sec-websocket-version")) {
+    if (equals_lower(name, "sec-websocket-version")) {
       ++gotVersion;
-      REQUIRE(value == "13");
-    } else if (wpi::util::equals_lower(name, "upgrade")) {
+      ASSERT_EQ(value, "13");
+    } else if (equals_lower(name, "upgrade")) {
       ++gotUpgrade;
-      REQUIRE(value == "WebSocket");
+      ASSERT_EQ(value, "WebSocket");
     } else {
-      FAIL("unexpected header " << name);
+      FAIL() << "unexpected header " << name;
     }
   });
   resp.headersComplete.connect([&](bool) { Finish(); });
@@ -360,15 +365,18 @@ TEST_CASE_METHOD(WebSocketTest, "WebSocketTest CreateServerBadVersion",
       if (resp.HasError()) {
         Finish();
       }
-      UNSCOPED_INFO(llhttp_errno_name(resp.GetError()));
-      REQUIRE(resp.GetError() == HPE_OK);
+      ASSERT_EQ(resp.GetError(), HPE_OK) << http_errno_name(resp.GetError());
     });
   });
 
   loop->Run();
-  REQUIRE(gotStatus == 1);
-  REQUIRE(gotVersion == 1);
-  REQUIRE(gotUpgrade == 1);
+
+  if (HasFatalFailure()) {
+    return;
+  }
+  ASSERT_EQ(gotStatus, 1);
+  ASSERT_EQ(gotVersion, 1);
+  ASSERT_EQ(gotUpgrade, 1);
 }
 
-}  // namespace wpi::net
+}  // namespace wpi

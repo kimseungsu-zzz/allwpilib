@@ -4,13 +4,13 @@
 
 #include <thread>
 
-#include "wpi/hal/DriverStation.h"
-#include "wpi/hal/HAL.h"
+#include <hal/DriverStation.h>
+#include <hal/HALBase.h>
 
 extern "C" int HALSIM_InitExtension(void);
 
 int main() {
-  HAL_Initialize();
+  HAL_Initialize(500, 0);
   HALSIM_InitExtension();
 
   HAL_ObserveUserProgramStarting();

@@ -2,19 +2,19 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/glass/hardware/Encoder.hpp"
+#include "glass/hardware/Encoder.h"
 
-#include <format>
 #include <string>
 
+#include <fmt/format.h>
 #include <imgui.h>
+#include <wpi/StringExtras.h>
 
-#include "wpi/glass/Context.hpp"
-#include "wpi/glass/DataSource.hpp"
-#include "wpi/glass/Storage.hpp"
-#include "wpi/util/StringExtras.hpp"
+#include "glass/Context.h"
+#include "glass/DataSource.h"
+#include "glass/Storage.h"
 
-using namespace wpi::glass;
+using namespace glass;
 
 void EncoderModel::SetName(std::string_view name) {
   if (name.empty()) {
@@ -23,6 +23,9 @@ void EncoderModel::SetName(std::string_view name) {
     }
     if (auto count = GetCountData()) {
       count->SetName("");
+    }
+    if (auto period = GetPeriodData()) {
+      period->SetName("");
     }
     if (auto direction = GetDirectionData()) {
       direction->SetName("");
@@ -35,24 +38,27 @@ void EncoderModel::SetName(std::string_view name) {
     }
   } else {
     if (auto distancePerPulse = GetDistancePerPulseData()) {
-      distancePerPulse->SetName(std::format("{} Distance/Count", name));
+      distancePerPulse->SetName(fmt::format("{} Distance/Count", name));
     }
     if (auto count = GetCountData()) {
-      count->SetName(std::format("{} Count", name));
+      count->SetName(fmt::format("{} Count", name));
+    }
+    if (auto period = GetPeriodData()) {
+      period->SetName(fmt::format("{} Period", name));
     }
     if (auto direction = GetDirectionData()) {
-      direction->SetName(std::format("{} Direction", name));
+      direction->SetName(fmt::format("{} Direction", name));
     }
     if (auto distance = GetDistanceData()) {
-      distance->SetName(std::format("{} Distance", name));
+      distance->SetName(fmt::format("{} Distance", name));
     }
     if (auto rate = GetRateData()) {
-      rate->SetName(std::format("{} Rate", name));
+      rate->SetName(fmt::format("{} Rate", name));
     }
   }
 }
 
-void wpi::glass::DisplayEncoder(EncoderModel* model) {
+void glass::DisplayEncoder(EncoderModel* model) {
   if (auto simDevice = model->GetSimDevice()) {
     ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(96, 96, 96, 255));
     ImGui::TextUnformatted(simDevice);
@@ -67,11 +73,11 @@ void wpi::glass::DisplayEncoder(EncoderModel* model) {
   std::string& name = GetStorage().GetString("name");
   char label[128];
   if (!name.empty()) {
-    wpi::util::format_to_n_c_str(label, sizeof(label), "{} [{},{}]###header",
-                                 name, chA, chB);
+    wpi::format_to_n_c_str(label, sizeof(label), "{} [{},{}]###header", name,
+                           chA, chB);
   } else {
-    wpi::util::format_to_n_c_str(label, sizeof(label),
-                                 "Encoder[{},{}]###header", chA, chB);
+    wpi::format_to_n_c_str(label, sizeof(label), "Encoder[{},{}]###header", chA,
+                           chB);
   }
 
   // header
@@ -108,6 +114,20 @@ void wpi::glass::DisplayEncoder(EncoderModel* model) {
     countData->EmitDrag();
   }
 
+  // max period
+  {
+    double maxPeriod = model->GetMaxPeriod();
+    ImGui::LabelText("Max Period", "%.6f", maxPeriod);
+  }
+
+  // period
+  if (auto periodData = model->GetPeriodData()) {
+    double value = periodData->GetValue();
+    if (periodData->InputDouble("Period", &value, 0, 0, "%.6g")) {
+      model->SetPeriod(value);
+    }
+  }
+
   // reverse direction
   ImGui::LabelText("Reverse Direction", "%s",
                    model->GetReverseDirection() ? "true" : "false");
@@ -139,8 +159,7 @@ void wpi::glass::DisplayEncoder(EncoderModel* model) {
   ImGui::PopItemWidth();
 }
 
-void wpi::glass::DisplayEncoders(EncodersModel* model,
-                                 std::string_view noneMsg) {
+void glass::DisplayEncoders(EncodersModel* model, std::string_view noneMsg) {
   bool hasAny = false;
   model->ForEachEncoder([&](EncoderModel& encoder, int i) {
     hasAny = true;

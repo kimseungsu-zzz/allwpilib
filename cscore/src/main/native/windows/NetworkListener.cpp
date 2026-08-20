@@ -2,28 +2,33 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "NetworkListener.hpp"
+#include "NetworkListener.h"
 
-#include <winsock2.h>
-#include <windows.h>
-#include <ws2def.h>
-#include <ws2ipdef.h>
-#include <iphlpapi.h>
-#include <netioapi.h>
+#include <winsock2.h>  // NOLINT(build/include_order)
 
-#include "Instance.hpp"
-#include "Log.hpp"
-#include "Notifier.hpp"
+#include <windows.h>  // NOLINT(build/include_order)
+
+#include <ws2def.h>  // NOLINT(build/include_order)
+
+#include <ws2ipdef.h>  // NOLINT(build/include_order)
+
+#include <iphlpapi.h>  // NOLINT(build/include_order)
+
+#include <netioapi.h>  // NOLINT(build/include_order)
+
+#include "Instance.h"
+#include "Log.h"
+#include "Notifier.h"
 
 #pragma comment(lib, "Iphlpapi.lib")
 
-using namespace wpi::cs;
+using namespace cs;
 
 class NetworkListener::Impl {
  public:
-  Impl(wpi::util::Logger& logger, Notifier& notifier)
+  Impl(wpi::Logger& logger, Notifier& notifier)
       : m_logger(logger), m_notifier(notifier) {}
-  wpi::util::Logger& m_logger;
+  wpi::Logger& m_logger;
   Notifier& m_notifier;
   HANDLE eventHandle = 0;
 };
@@ -36,7 +41,7 @@ static void WINAPI OnInterfaceChange(PVOID callerContext,
   notifier->NotifyNetworkInterfacesChanged();
 }
 
-NetworkListener::NetworkListener(wpi::util::Logger& logger, Notifier& notifier)
+NetworkListener::NetworkListener(wpi::Logger& logger, Notifier& notifier)
     : m_impl(std::make_unique<Impl>(logger, notifier)) {}
 
 NetworkListener::~NetworkListener() {

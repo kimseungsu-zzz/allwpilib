@@ -23,49 +23,47 @@
  * IN THE SOFTWARE.
  */
 
-// clang-format off
-#include "wpi/net/uv/GetAddrInfo.hpp"
-// clang-format on
+#include "wpinet/uv/GetAddrInfo.h"  // NOLINT(build/include_order)
 
-#include <catch2/catch_test_macros.hpp>
+#include <gtest/gtest.h>
 
-#include "wpi/net/uv/Loop.hpp"
+#include "wpinet/uv/Loop.h"
 
 #define CONCURRENT_COUNT 10
 
-namespace wpi::net::uv {
+namespace wpi::uv {
 
-TEST_CASE("UvGetAddrInfoTest BothNull", "[uv][dns][addrinfo]") {
+TEST(UvGetAddrInfoTest, BothNull) {
   int fail_cb_called = 0;
 
   auto loop = Loop::Create();
   loop->error.connect([&](Error err) {
-    REQUIRE(err.code() == UV_EINVAL);
+    ASSERT_EQ(err.code(), UV_EINVAL);
     fail_cb_called++;
   });
 
   GetAddrInfo(loop, [](const addrinfo&) { FAIL(); }, "");
   loop->Run();
-  REQUIRE(fail_cb_called == 1);
+  ASSERT_EQ(fail_cb_called, 1);
 }
 
-TEST_CASE("UvGetAddrInfoTest FailedLookup", "[uv][dns][addrinfo][.]") {
+TEST(UvGetAddrInfoTest, DISABLED_FailedLookup) {
   int fail_cb_called = 0;
 
   auto loop = Loop::Create();
   loop->error.connect([&](Error err) {
-    REQUIRE(fail_cb_called == 0);
-    REQUIRE(err.code() < 0);
+    ASSERT_EQ(fail_cb_called, 0);
+    ASSERT_LT(err.code(), 0);
     fail_cb_called++;
   });
 
   // Use a FQDN by ending in a period
   GetAddrInfo(loop, [](const addrinfo&) { FAIL(); }, "xyzzy.xyzzy.xyzzy.");
   loop->Run();
-  REQUIRE(fail_cb_called == 1);
+  ASSERT_EQ(fail_cb_called, 1);
 }
 
-TEST_CASE("UvGetAddrInfoTest Basic", "[uv][dns][addrinfo]") {
+TEST(UvGetAddrInfoTest, Basic) {
   int getaddrinfo_cbs = 0;
 
   auto loop = Loop::Create();
@@ -75,11 +73,11 @@ TEST_CASE("UvGetAddrInfoTest Basic", "[uv][dns][addrinfo]") {
 
   loop->Run();
 
-  REQUIRE(getaddrinfo_cbs == 1);
+  ASSERT_EQ(getaddrinfo_cbs, 1);
 }
 
 #ifndef _WIN32
-TEST_CASE("UvGetAddrInfoTest Concurrent", "[uv][dns][addrinfo]") {
+TEST(UvGetAddrInfoTest, Concurrent) {
   int getaddrinfo_cbs = 0;
   int callback_counts[CONCURRENT_COUNT];
 
@@ -100,9 +98,9 @@ TEST_CASE("UvGetAddrInfoTest Concurrent", "[uv][dns][addrinfo]") {
   loop->Run();
 
   for (int i = 0; i < CONCURRENT_COUNT; i++) {
-    REQUIRE(callback_counts[i] == 1);
+    ASSERT_EQ(callback_counts[i], 1);
   }
 }
 #endif
 
-}  // namespace wpi::net::uv
+}  // namespace wpi::uv

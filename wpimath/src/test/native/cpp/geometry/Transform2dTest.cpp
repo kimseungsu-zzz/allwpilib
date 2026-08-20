@@ -2,36 +2,35 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/math/geometry/Transform2d.hpp"
+#include <cmath>
 
-#include <catch2/catch_test_macros.hpp>
+#include <gtest/gtest.h>
 
-#include "wpi/math/geometry/Pose2d.hpp"
-#include "wpi/math/geometry/Rotation2d.hpp"
-#include "wpi/math/geometry/Translation2d.hpp"
-#include "wpi/units/angle.hpp"
-#include "wpi/units/length.hpp"
+#include "frc/geometry/Pose2d.h"
+#include "frc/geometry/Rotation2d.h"
+#include "frc/geometry/Transform2d.h"
+#include "frc/geometry/Translation2d.h"
 
-using namespace wpi::math;
+using namespace frc;
 
-TEST_CASE("Transform2dTest ToMatrix", "[wpimath]") {
+TEST(Transform2dTest, ToMatrix) {
   Transform2d before{1_m, 2_m, 20_deg};
   Transform2d after{before.ToMatrix()};
 
-  CHECK(before == after);
+  EXPECT_EQ(before, after);
 }
 
-TEST_CASE("Transform2dTest Inverse", "[wpimath]") {
+TEST(Transform2dTest, Inverse) {
   const Pose2d initial{1_m, 2_m, 45_deg};
   const Transform2d transform{{5_m, 0_m}, 5_deg};
 
   auto transformed = initial + transform;
   auto untransformed = transformed + transform.Inverse();
 
-  CHECK(initial == untransformed);
+  EXPECT_EQ(initial, untransformed);
 }
 
-TEST_CASE("Transform2dTest Composition", "[wpimath]") {
+TEST(Transform2dTest, Composition) {
   const Pose2d initial{1_m, 2_m, 45_deg};
   const Transform2d transform1{{5_m, 0_m}, 5_deg};
   const Transform2d transform2{{0_m, 2_m}, 5_deg};
@@ -39,10 +38,10 @@ TEST_CASE("Transform2dTest Composition", "[wpimath]") {
   auto transformedSeparate = initial + transform1 + transform2;
   auto transformedCombined = initial + (transform1 + transform2);
 
-  CHECK(transformedSeparate == transformedCombined);
+  EXPECT_EQ(transformedSeparate, transformedCombined);
 }
 
-TEST_CASE("Transform2dTest Constexpr", "[wpimath]") {
+TEST(Transform2dTest, Constexpr) {
   constexpr Transform2d defaultCtor;
   constexpr Transform2d translationRotationCtor{Translation2d{},
                                                 Rotation2d{10_deg}};

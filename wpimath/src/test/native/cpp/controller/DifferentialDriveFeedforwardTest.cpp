@@ -2,35 +2,30 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/math/controller/DifferentialDriveFeedforward.hpp"
+#include <cmath>
 
 #include <Eigen/Core>
-#include <catch2/catch_test_macros.hpp>
+#include <gtest/gtest.h>
 
-#include "wpi/math/TestAssertions.hpp"
-#include "wpi/math/system/LinearSystem.hpp"
-#include "wpi/math/system/Models.hpp"
-#include "wpi/units/acceleration.hpp"
-#include "wpi/units/angular_acceleration.hpp"
-#include "wpi/units/angular_velocity.hpp"
-#include "wpi/units/length.hpp"
-#include "wpi/units/time.hpp"
-#include "wpi/units/velocity.hpp"
-#include "wpi/units/voltage.hpp"
+#include "frc/controller/DifferentialDriveFeedforward.h"
+#include "frc/controller/LinearPlantInversionFeedforward.h"
+#include "frc/system/plant/LinearSystemId.h"
+#include "units/acceleration.h"
+#include "units/length.h"
+#include "units/time.h"
 
-TEST_CASE("DifferentialDriveFeedforwardTest CalculateWithTrackwidth",
-          "[wpimath]") {
+TEST(DifferentialDriveFeedforwardTest, CalculateWithTrackwidth) {
   constexpr auto kVLinear = 1_V / 1_mps;
   constexpr auto kALinear = 1_V / 1_mps_sq;
   constexpr auto kVAngular = 1_V / 1_rad_per_s;
   constexpr auto kAAngular = 1_V / 1_rad_per_s_sq;
   constexpr auto trackwidth = 1_m;
-  constexpr wpi::units::second_t dt = 20_ms;
+  constexpr units::second_t dt = 20_ms;
 
-  wpi::math::DifferentialDriveFeedforward differentialDriveFeedforward{
+  frc::DifferentialDriveFeedforward differentialDriveFeedforward{
       kVLinear, kALinear, kVAngular, kAAngular, trackwidth};
-  wpi::math::LinearSystem<2, 2, 2> plant =
-      wpi::math::Models::DifferentialDriveFromSysId(
+  frc::LinearSystem<2, 2, 2> plant =
+      frc::LinearSystemId::IdentifyDrivetrainSystem(
           kVLinear, kALinear, kVAngular, kAAngular, trackwidth);
   for (auto currentLeftVelocity = -4_mps; currentLeftVelocity <= 4_mps;
        currentLeftVelocity += 2_mps) {
@@ -46,26 +41,25 @@ TEST_CASE("DifferentialDriveFeedforwardTest CalculateWithTrackwidth",
           Eigen::Vector2d nextX = plant.CalculateX(
               Eigen::Vector2d{currentLeftVelocity, currentRightVelocity},
               Eigen::Vector2d{left, right}, dt);
-          CHECK_NEAR(nextX(0), nextLeftVelocity.value(), 1e-6);
-          CHECK_NEAR(nextX(1), nextRightVelocity.value(), 1e-6);
+          EXPECT_NEAR(nextX(0), nextLeftVelocity.value(), 1e-6);
+          EXPECT_NEAR(nextX(1), nextRightVelocity.value(), 1e-6);
         }
       }
     }
   }
 }
 
-TEST_CASE("DifferentialDriveFeedforwardTest CalculateWithoutTrackwidth",
-          "[wpimath]") {
+TEST(DifferentialDriveFeedforwardTest, CalculateWithoutTrackwidth) {
   constexpr auto kVLinear = 1_V / 1_mps;
   constexpr auto kALinear = 1_V / 1_mps_sq;
   constexpr auto kVAngular = 1_V / 1_mps;
   constexpr auto kAAngular = 1_V / 1_mps_sq;
-  constexpr wpi::units::second_t dt = 20_ms;
+  constexpr units::second_t dt = 20_ms;
 
-  wpi::math::DifferentialDriveFeedforward differentialDriveFeedforward{
+  frc::DifferentialDriveFeedforward differentialDriveFeedforward{
       kVLinear, kALinear, kVAngular, kAAngular};
-  wpi::math::LinearSystem<2, 2, 2> plant =
-      wpi::math::Models::DifferentialDriveFromSysId(kVLinear, kALinear,
+  frc::LinearSystem<2, 2, 2> plant =
+      frc::LinearSystemId::IdentifyDrivetrainSystem(kVLinear, kALinear,
                                                     kVAngular, kAAngular);
   for (auto currentLeftVelocity = -4_mps; currentLeftVelocity <= 4_mps;
        currentLeftVelocity += 2_mps) {
@@ -81,8 +75,8 @@ TEST_CASE("DifferentialDriveFeedforwardTest CalculateWithoutTrackwidth",
           Eigen::Vector2d nextX = plant.CalculateX(
               Eigen::Vector2d{currentLeftVelocity, currentRightVelocity},
               Eigen::Vector2d{left, right}, dt);
-          CHECK_NEAR(nextX(0), nextLeftVelocity.value(), 1e-6);
-          CHECK_NEAR(nextX(1), nextRightVelocity.value(), 1e-6);
+          EXPECT_NEAR(nextX(0), nextLeftVelocity.value(), 1e-6);
+          EXPECT_NEAR(nextX(1), nextRightVelocity.value(), 1e-6);
         }
       }
     }

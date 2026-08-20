@@ -3,7 +3,6 @@
 
 #include <algorithm>
 #include <limits>
-#include <type_traits>
 #include <vector>
 
 #include "check.h"

@@ -9,15 +9,16 @@
 #include <utility>
 #include <vector>
 
-#include "../MulticastHandleManager.hpp"
-#include "org_wpilib_net_WPINetJNI.h"
-#include "wpi/net/MulticastServiceAnnouncer.hpp"
-#include "wpi/net/MulticastServiceResolver.hpp"
-#include "wpi/net/PortForwarder.hpp"
-#include "wpi/net/WebServer.hpp"
-#include "wpi/util/jni_util.hpp"
+#include <wpi/jni_util.h>
 
-using namespace wpi::util::java;
+#include "../MulticastHandleManager.h"
+#include "edu_wpi_first_net_WPINetJNI.h"
+#include "wpinet/MulticastServiceAnnouncer.h"
+#include "wpinet/MulticastServiceResolver.h"
+#include "wpinet/PortForwarder.h"
+#include "wpinet/WebServer.h"
+
+using namespace wpi::java;
 
 static JClass serviceDataCls;
 static JGlobal<jobjectArray> serviceDataEmptyArray;
@@ -30,7 +31,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved) {
     return JNI_ERR;
   }
 
-  serviceDataCls = JClass{env, "org/wpilib/net/ServiceData"};
+  serviceDataCls = JClass{env, "edu/wpi/first/net/ServiceData"};
   if (!serviceDataCls) {
     return JNI_ERR;
   }
@@ -55,73 +56,73 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM* vm, void* reserved) {
 }
 
 /*
- * Class:     org_wpilib_net_WPINetJNI
+ * Class:     edu_wpi_first_net_WPINetJNI
  * Method:    addPortForwarder
  * Signature: (ILjava/lang/String;I)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_net_WPINetJNI_addPortForwarder
+Java_edu_wpi_first_net_WPINetJNI_addPortForwarder
   (JNIEnv* env, jclass, jint port, jstring remoteHost, jint remotePort)
 {
-  wpi::net::PortForwarder::GetInstance().Add(
-      static_cast<unsigned int>(port), JStringRef{env, remoteHost}.str(),
-      static_cast<unsigned int>(remotePort));
+  wpi::PortForwarder::GetInstance().Add(static_cast<unsigned int>(port),
+                                        JStringRef{env, remoteHost}.str(),
+                                        static_cast<unsigned int>(remotePort));
 }
 
 /*
- * Class:     org_wpilib_net_WPINetJNI
+ * Class:     edu_wpi_first_net_WPINetJNI
  * Method:    removePortForwarder
  * Signature: (I)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_net_WPINetJNI_removePortForwarder
+Java_edu_wpi_first_net_WPINetJNI_removePortForwarder
   (JNIEnv* env, jclass, jint port)
 {
-  wpi::net::PortForwarder::GetInstance().Remove(port);
+  wpi::PortForwarder::GetInstance().Remove(port);
 }
 
 /*
- * Class:     org_wpilib_net_WPINetJNI
+ * Class:     edu_wpi_first_net_WPINetJNI
  * Method:    startWebServer
  * Signature: (ILjava/lang/String;)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_net_WPINetJNI_startWebServer
+Java_edu_wpi_first_net_WPINetJNI_startWebServer
   (JNIEnv* env, jclass, jint port, jstring path)
 {
-  wpi::net::WebServer::GetInstance().Start(static_cast<unsigned int>(port),
-                                           JStringRef{env, path}.str());
+  wpi::WebServer::GetInstance().Start(static_cast<unsigned int>(port),
+                                      JStringRef{env, path}.str());
 }
 
 /*
- * Class:     org_wpilib_net_WPINetJNI
+ * Class:     edu_wpi_first_net_WPINetJNI
  * Method:    stopWebServer
  * Signature: (I)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_net_WPINetJNI_stopWebServer
+Java_edu_wpi_first_net_WPINetJNI_stopWebServer
   (JNIEnv* env, jclass, jint port)
 {
-  wpi::net::WebServer::GetInstance().Stop(port);
+  wpi::WebServer::GetInstance().Stop(port);
 }
 
 /*
- * Class:     org_wpilib_net_WPINetJNI
+ * Class:     edu_wpi_first_net_WPINetJNI
  * Method:    createMulticastServiceAnnouncer
  * Signature: (Ljava/lang/String;Ljava/lang/String;I[Ljava/lang/Object;[Ljava/lang/Object;)I
  */
 JNIEXPORT jint JNICALL
-Java_org_wpilib_net_WPINetJNI_createMulticastServiceAnnouncer
+Java_edu_wpi_first_net_WPINetJNI_createMulticastServiceAnnouncer
   (JNIEnv* env, jclass, jstring serviceName, jstring serviceType, jint port,
    jobjectArray keys, jobjectArray values)
 {
-  auto& manager = wpi::net::GetMulticastManager();
+  auto& manager = wpi::GetMulticastManager();
   std::scoped_lock lock{manager.mutex};
 
   JStringRef serviceNameRef{env, serviceName};
   JStringRef serviceTypeRef{env, serviceType};
 
-  wpi::util::SmallVector<std::pair<std::string, std::string>, 8> txtVec;
+  wpi::SmallVector<std::pair<std::string, std::string>, 8> txtVec;
 
   if (keys != nullptr && values != nullptr) {
     size_t keysLen = env->GetArrayLength(keys);
@@ -138,7 +139,7 @@ Java_org_wpilib_net_WPINetJNI_createMulticastServiceAnnouncer
     }
   }
 
-  auto announcer = std::make_unique<wpi::net::MulticastServiceAnnouncer>(
+  auto announcer = std::make_unique<wpi::MulticastServiceAnnouncer>(
       serviceNameRef.str(), serviceTypeRef.str(), port, txtVec);
 
   size_t index = manager.handleIds.emplace_back(1);
@@ -149,80 +150,80 @@ Java_org_wpilib_net_WPINetJNI_createMulticastServiceAnnouncer
 }
 
 /*
- * Class:     org_wpilib_net_WPINetJNI
+ * Class:     edu_wpi_first_net_WPINetJNI
  * Method:    freeMulticastServiceAnnouncer
  * Signature: (I)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_net_WPINetJNI_freeMulticastServiceAnnouncer
+Java_edu_wpi_first_net_WPINetJNI_freeMulticastServiceAnnouncer
   (JNIEnv* env, jclass, jint handle)
 {
-  auto& manager = wpi::net::GetMulticastManager();
+  auto& manager = wpi::GetMulticastManager();
   std::scoped_lock lock{manager.mutex};
   manager.announcers[handle] = nullptr;
   manager.handleIds.erase(handle);
 }
 
 /*
- * Class:     org_wpilib_net_WPINetJNI
+ * Class:     edu_wpi_first_net_WPINetJNI
  * Method:    startMulticastServiceAnnouncer
  * Signature: (I)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_net_WPINetJNI_startMulticastServiceAnnouncer
+Java_edu_wpi_first_net_WPINetJNI_startMulticastServiceAnnouncer
   (JNIEnv* env, jclass, jint handle)
 {
-  auto& manager = wpi::net::GetMulticastManager();
+  auto& manager = wpi::GetMulticastManager();
   std::scoped_lock lock{manager.mutex};
   auto& announcer = manager.announcers[handle];
   announcer->Start();
 }
 
 /*
- * Class:     org_wpilib_net_WPINetJNI
+ * Class:     edu_wpi_first_net_WPINetJNI
  * Method:    stopMulticastServiceAnnouncer
  * Signature: (I)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_net_WPINetJNI_stopMulticastServiceAnnouncer
+Java_edu_wpi_first_net_WPINetJNI_stopMulticastServiceAnnouncer
   (JNIEnv* env, jclass, jint handle)
 {
-  auto& manager = wpi::net::GetMulticastManager();
+  auto& manager = wpi::GetMulticastManager();
   std::scoped_lock lock{manager.mutex};
   auto& announcer = manager.announcers[handle];
   announcer->Stop();
 }
 
 /*
- * Class:     org_wpilib_net_WPINetJNI
+ * Class:     edu_wpi_first_net_WPINetJNI
  * Method:    getMulticastServiceAnnouncerHasImplementation
  * Signature: (I)Z
  */
 JNIEXPORT jboolean JNICALL
-Java_org_wpilib_net_WPINetJNI_getMulticastServiceAnnouncerHasImplementation
+Java_edu_wpi_first_net_WPINetJNI_getMulticastServiceAnnouncerHasImplementation
   (JNIEnv* env, jclass, jint handle)
 {
-  auto& manager = wpi::net::GetMulticastManager();
+  auto& manager = wpi::GetMulticastManager();
   std::scoped_lock lock{manager.mutex};
   auto& announcer = manager.announcers[handle];
   return announcer->HasImplementation();
 }
 
 /*
- * Class:     org_wpilib_net_WPINetJNI
+ * Class:     edu_wpi_first_net_WPINetJNI
  * Method:    createMulticastServiceResolver
  * Signature: (Ljava/lang/String;)I
  */
 JNIEXPORT jint JNICALL
-Java_org_wpilib_net_WPINetJNI_createMulticastServiceResolver
+Java_edu_wpi_first_net_WPINetJNI_createMulticastServiceResolver
   (JNIEnv* env, jclass, jstring serviceType)
 {
-  auto& manager = wpi::net::GetMulticastManager();
+  auto& manager = wpi::GetMulticastManager();
   std::scoped_lock lock{manager.mutex};
   JStringRef serviceTypeRef{env, serviceType};
 
-  auto resolver = std::make_unique<wpi::net::MulticastServiceResolver>(
-      serviceTypeRef.str());
+  auto resolver =
+      std::make_unique<wpi::MulticastServiceResolver>(serviceTypeRef.str());
 
   size_t index = manager.handleIds.emplace_back(2);
 
@@ -232,95 +233,95 @@ Java_org_wpilib_net_WPINetJNI_createMulticastServiceResolver
 }
 
 /*
- * Class:     org_wpilib_net_WPINetJNI
+ * Class:     edu_wpi_first_net_WPINetJNI
  * Method:    freeMulticastServiceResolver
  * Signature: (I)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_net_WPINetJNI_freeMulticastServiceResolver
+Java_edu_wpi_first_net_WPINetJNI_freeMulticastServiceResolver
   (JNIEnv* env, jclass, jint handle)
 {
-  auto& manager = wpi::net::GetMulticastManager();
+  auto& manager = wpi::GetMulticastManager();
   std::scoped_lock lock{manager.mutex};
   manager.resolvers[handle] = nullptr;
   manager.handleIds.erase(handle);
 }
 
 /*
- * Class:     org_wpilib_net_WPINetJNI
+ * Class:     edu_wpi_first_net_WPINetJNI
  * Method:    startMulticastServiceResolver
  * Signature: (I)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_net_WPINetJNI_startMulticastServiceResolver
+Java_edu_wpi_first_net_WPINetJNI_startMulticastServiceResolver
   (JNIEnv* env, jclass, jint handle)
 {
-  auto& manager = wpi::net::GetMulticastManager();
+  auto& manager = wpi::GetMulticastManager();
   std::scoped_lock lock{manager.mutex};
   auto& resolver = manager.resolvers[handle];
   resolver->Start();
 }
 
 /*
- * Class:     org_wpilib_net_WPINetJNI
+ * Class:     edu_wpi_first_net_WPINetJNI
  * Method:    stopMulticastServiceResolver
  * Signature: (I)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_net_WPINetJNI_stopMulticastServiceResolver
+Java_edu_wpi_first_net_WPINetJNI_stopMulticastServiceResolver
   (JNIEnv* env, jclass, jint handle)
 {
-  auto& manager = wpi::net::GetMulticastManager();
+  auto& manager = wpi::GetMulticastManager();
   std::scoped_lock lock{manager.mutex};
   auto& resolver = manager.resolvers[handle];
   resolver->Stop();
 }
 
 /*
- * Class:     org_wpilib_net_WPINetJNI
+ * Class:     edu_wpi_first_net_WPINetJNI
  * Method:    getMulticastServiceResolverHasImplementation
  * Signature: (I)Z
  */
 JNIEXPORT jboolean JNICALL
-Java_org_wpilib_net_WPINetJNI_getMulticastServiceResolverHasImplementation
+Java_edu_wpi_first_net_WPINetJNI_getMulticastServiceResolverHasImplementation
   (JNIEnv* env, jclass, jint handle)
 {
-  auto& manager = wpi::net::GetMulticastManager();
+  auto& manager = wpi::GetMulticastManager();
   std::scoped_lock lock{manager.mutex};
   auto& resolver = manager.resolvers[handle];
   return resolver->HasImplementation();
 }
 
 /*
- * Class:     org_wpilib_net_WPINetJNI
+ * Class:     edu_wpi_first_net_WPINetJNI
  * Method:    getMulticastServiceResolverEventHandle
  * Signature: (I)I
  */
 JNIEXPORT jint JNICALL
-Java_org_wpilib_net_WPINetJNI_getMulticastServiceResolverEventHandle
+Java_edu_wpi_first_net_WPINetJNI_getMulticastServiceResolverEventHandle
   (JNIEnv* env, jclass, jint handle)
 {
-  auto& manager = wpi::net::GetMulticastManager();
+  auto& manager = wpi::GetMulticastManager();
   std::scoped_lock lock{manager.mutex};
   auto& resolver = manager.resolvers[handle];
   return resolver->GetEventHandle();
 }
 
 /*
- * Class:     org_wpilib_net_WPINetJNI
+ * Class:     edu_wpi_first_net_WPINetJNI
  * Method:    getMulticastServiceResolverData
  * Signature: (I)[Ljava/lang/Object;
  */
 JNIEXPORT jobjectArray JNICALL
-Java_org_wpilib_net_WPINetJNI_getMulticastServiceResolverData
+Java_edu_wpi_first_net_WPINetJNI_getMulticastServiceResolverData
   (JNIEnv* env, jclass, jint handle)
 {
   static jmethodID constructor =
       env->GetMethodID(serviceDataCls, "<init>",
                        "(JILjava/lang/String;Ljava/lang/String;[Ljava/lang/"
                        "String;[Ljava/lang/String;)V");
-  auto& manager = wpi::net::GetMulticastManager();
-  std::vector<wpi::net::MulticastServiceResolver::ServiceData> allData;
+  auto& manager = wpi::GetMulticastManager();
+  std::vector<wpi::MulticastServiceResolver::ServiceData> allData;
   {
     std::scoped_lock lock{manager.mutex};
     auto& resolver = manager.resolvers[handle];
@@ -330,17 +331,17 @@ Java_org_wpilib_net_WPINetJNI_getMulticastServiceResolverData
     return serviceDataEmptyArray;
   }
 
-  jobjectArray returnData =
-      env->NewObjectArray(allData.size(), serviceDataCls, nullptr);
+  JLocal<jobjectArray> returnData{
+      env, env->NewObjectArray(allData.size(), serviceDataCls, nullptr)};
 
-  size_t index = 0;
   for (auto&& data : allData) {
     JLocal<jstring> serviceName{env, MakeJString(env, data.serviceName)};
     JLocal<jstring> hostName{env, MakeJString(env, data.hostName)};
 
-    wpi::util::SmallVector<std::string_view, 8> keysRef;
-    wpi::util::SmallVector<std::string_view, 8> valuesRef;
+    wpi::SmallVector<std::string_view, 8> keysRef;
+    wpi::SmallVector<std::string_view, 8> valuesRef;
 
+    size_t index = 0;
     for (auto&& txt : data.txt) {
       keysRef.emplace_back(txt.first);
       valuesRef.emplace_back(txt.second);

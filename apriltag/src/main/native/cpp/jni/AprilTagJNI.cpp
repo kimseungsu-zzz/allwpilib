@@ -8,15 +8,16 @@
 #include <cstring>
 
 #define WPI_RAWFRAME_JNI
-#include "org_wpilib_vision_apriltag_jni_AprilTagJNI.h"
-#include "wpi/apriltag/AprilTagDetector.hpp"
-#include "wpi/apriltag/AprilTagImageGenerator.hpp"
-#include "wpi/apriltag/AprilTagPoseEstimator.hpp"
-#include "wpi/util/RawFrame.h"
-#include "wpi/util/jni_util.hpp"
+#include <wpi/RawFrame.h>
+#include <wpi/jni_util.h>
 
-using namespace wpi::apriltag;
-using namespace wpi::util::java;
+#include "edu_wpi_first_apriltag_jni_AprilTagJNI.h"
+#include "frc/apriltag/AprilTag.h"
+#include "frc/apriltag/AprilTagDetector.h"
+#include "frc/apriltag/AprilTagPoseEstimator.h"
+
+using namespace frc;
+using namespace wpi::java;
 
 static JavaVM* jvm = nullptr;
 
@@ -33,16 +34,16 @@ static JException illegalArgEx;
 static JException nullPointerEx;
 
 static const JClassInit classes[] = {
-    {"org/wpilib/vision/apriltag/AprilTagDetection", &detectionCls},
-    {"org/wpilib/vision/apriltag/AprilTagDetector$Config", &detectorConfigCls},
-    {"org/wpilib/vision/apriltag/AprilTagDetector$QuadThresholdParameters",
+    {"edu/wpi/first/apriltag/AprilTagDetection", &detectionCls},
+    {"edu/wpi/first/apriltag/AprilTagDetector$Config", &detectorConfigCls},
+    {"edu/wpi/first/apriltag/AprilTagDetector$QuadThresholdParameters",
      &detectorQTPCls},
-    {"org/wpilib/vision/apriltag/AprilTagPoseEstimate", &poseEstimateCls},
-    {"org/wpilib/math/geometry/Quaternion", &quaternionCls},
-    {"org/wpilib/math/geometry/Rotation3d", &rotation3dCls},
-    {"org/wpilib/math/geometry/Transform3d", &transform3dCls},
-    {"org/wpilib/math/geometry/Translation3d", &translation3dCls},
-    {"org/wpilib/util/RawFrame", &rawFrameCls}};
+    {"edu/wpi/first/apriltag/AprilTagPoseEstimate", &poseEstimateCls},
+    {"edu/wpi/first/math/geometry/Quaternion", &quaternionCls},
+    {"edu/wpi/first/math/geometry/Rotation3d", &rotation3dCls},
+    {"edu/wpi/first/math/geometry/Transform3d", &transform3dCls},
+    {"edu/wpi/first/math/geometry/Translation3d", &translation3dCls},
+    {"edu/wpi/first/util/RawFrame", &rawFrameCls}};
 
 static const JExceptionInit exceptions[] = {
     {"java/lang/IllegalArgumentException", &illegalArgEx},
@@ -161,7 +162,7 @@ static AprilTagDetector::QuadThresholdParameters FromJavaDetectorQTP(
   return {
       FIELD(int, Int, minClusterPixels),
       FIELD(int, Int, maxNumMaxima),
-      .criticalAngle = wpi::units::radian_t{static_cast<double>(
+      .criticalAngle = units::radian_t{static_cast<double>(
           env->GetDoubleField(jparams, criticalAngleField))},
       FIELD(float, Float, maxLineFitMSE),
       FIELD(int, Int, minWhiteBlackDiff),
@@ -255,7 +256,7 @@ static jobject MakeJObject(
                         static_cast<jboolean>(params.deglitch));
 }
 
-static jobject MakeJObject(JNIEnv* env, const wpi::math::Translation3d& xlate) {
+static jobject MakeJObject(JNIEnv* env, const Translation3d& xlate) {
   static jmethodID constructor =
       env->GetMethodID(translation3dCls, "<init>", "(DDD)V");
   if (!constructor) {
@@ -267,7 +268,7 @@ static jobject MakeJObject(JNIEnv* env, const wpi::math::Translation3d& xlate) {
       static_cast<jdouble>(xlate.Y()), static_cast<jdouble>(xlate.Z()));
 }
 
-static jobject MakeJObject(JNIEnv* env, const wpi::math::Quaternion& q) {
+static jobject MakeJObject(JNIEnv* env, const Quaternion& q) {
   static jmethodID constructor =
       env->GetMethodID(quaternionCls, "<init>", "(DDDD)V");
   if (!constructor) {
@@ -280,9 +281,9 @@ static jobject MakeJObject(JNIEnv* env, const wpi::math::Quaternion& q) {
                         static_cast<jdouble>(q.Z()));
 }
 
-static jobject MakeJObject(JNIEnv* env, const wpi::math::Rotation3d& rot) {
+static jobject MakeJObject(JNIEnv* env, const Rotation3d& rot) {
   static jmethodID constructor = env->GetMethodID(
-      rotation3dCls, "<init>", "(Lorg/wpilib/math/geometry/Quaternion;)V");
+      rotation3dCls, "<init>", "(Ledu/wpi/first/math/geometry/Quaternion;)V");
   if (!constructor) {
     return nullptr;
   }
@@ -291,11 +292,11 @@ static jobject MakeJObject(JNIEnv* env, const wpi::math::Rotation3d& rot) {
   return env->NewObject(rotation3dCls, constructor, q.obj());
 }
 
-static jobject MakeJObject(JNIEnv* env, const wpi::math::Transform3d& xform) {
+static jobject MakeJObject(JNIEnv* env, const Transform3d& xform) {
   static jmethodID constructor =
       env->GetMethodID(transform3dCls, "<init>",
-                       "(Lorg/wpilib/math/geometry/Translation3d;"
-                       "Lorg/wpilib/math/geometry/Rotation3d;)V");
+                       "(Ledu/wpi/first/math/geometry/Translation3d;"
+                       "Ledu/wpi/first/math/geometry/Rotation3d;)V");
   if (!constructor) {
     return nullptr;
   }
@@ -308,8 +309,8 @@ static jobject MakeJObject(JNIEnv* env, const wpi::math::Transform3d& xform) {
 static jobject MakeJObject(JNIEnv* env, const AprilTagPoseEstimate& est) {
   static jmethodID constructor =
       env->GetMethodID(poseEstimateCls, "<init>",
-                       "(Lorg/wpilib/math/geometry/Transform3d;"
-                       "Lorg/wpilib/math/geometry/Transform3d;DD)V");
+                       "(Ledu/wpi/first/math/geometry/Transform3d;"
+                       "Ledu/wpi/first/math/geometry/Transform3d;DD)V");
   if (!constructor) {
     return nullptr;
   }
@@ -324,36 +325,36 @@ static jobject MakeJObject(JNIEnv* env, const AprilTagPoseEstimate& est) {
 extern "C" {
 
 /*
- * Class:     org_wpilib_vision_apriltag_jni_AprilTagJNI
+ * Class:     edu_wpi_first_apriltag_jni_AprilTagJNI
  * Method:    createDetector
  * Signature: ()J
  */
 JNIEXPORT jlong JNICALL
-Java_org_wpilib_vision_apriltag_jni_AprilTagJNI_createDetector
+Java_edu_wpi_first_apriltag_jni_AprilTagJNI_createDetector
   (JNIEnv* env, jclass)
 {
   return reinterpret_cast<jlong>(new AprilTagDetector);
 }
 
 /*
- * Class:     org_wpilib_vision_apriltag_jni_AprilTagJNI
+ * Class:     edu_wpi_first_apriltag_jni_AprilTagJNI
  * Method:    destroyDetector
  * Signature: (J)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_vision_apriltag_jni_AprilTagJNI_destroyDetector
+Java_edu_wpi_first_apriltag_jni_AprilTagJNI_destroyDetector
   (JNIEnv* env, jclass, jlong det)
 {
   delete reinterpret_cast<AprilTagDetector*>(det);
 }
 
 /*
- * Class:     org_wpilib_vision_apriltag_jni_AprilTagJNI
+ * Class:     edu_wpi_first_apriltag_jni_AprilTagJNI
  * Method:    setDetectorConfig
  * Signature: (JLjava/lang/Object;)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_vision_apriltag_jni_AprilTagJNI_setDetectorConfig
+Java_edu_wpi_first_apriltag_jni_AprilTagJNI_setDetectorConfig
   (JNIEnv* env, jclass, jlong det, jobject config)
 {
   if (det == 0) {
@@ -365,12 +366,12 @@ Java_org_wpilib_vision_apriltag_jni_AprilTagJNI_setDetectorConfig
 }
 
 /*
- * Class:     org_wpilib_vision_apriltag_jni_AprilTagJNI
+ * Class:     edu_wpi_first_apriltag_jni_AprilTagJNI
  * Method:    getDetectorConfig
  * Signature: (J)Ljava/lang/Object;
  */
 JNIEXPORT jobject JNICALL
-Java_org_wpilib_vision_apriltag_jni_AprilTagJNI_getDetectorConfig
+Java_edu_wpi_first_apriltag_jni_AprilTagJNI_getDetectorConfig
   (JNIEnv* env, jclass, jlong det)
 {
   if (det == 0) {
@@ -382,12 +383,12 @@ Java_org_wpilib_vision_apriltag_jni_AprilTagJNI_getDetectorConfig
 }
 
 /*
- * Class:     org_wpilib_vision_apriltag_jni_AprilTagJNI
+ * Class:     edu_wpi_first_apriltag_jni_AprilTagJNI
  * Method:    setDetectorQTP
  * Signature: (JLjava/lang/Object;)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_vision_apriltag_jni_AprilTagJNI_setDetectorQTP
+Java_edu_wpi_first_apriltag_jni_AprilTagJNI_setDetectorQTP
   (JNIEnv* env, jclass, jlong det, jobject params)
 {
   if (det == 0) {
@@ -399,12 +400,12 @@ Java_org_wpilib_vision_apriltag_jni_AprilTagJNI_setDetectorQTP
 }
 
 /*
- * Class:     org_wpilib_vision_apriltag_jni_AprilTagJNI
+ * Class:     edu_wpi_first_apriltag_jni_AprilTagJNI
  * Method:    getDetectorQTP
  * Signature: (J)Ljava/lang/Object;
  */
 JNIEXPORT jobject JNICALL
-Java_org_wpilib_vision_apriltag_jni_AprilTagJNI_getDetectorQTP
+Java_edu_wpi_first_apriltag_jni_AprilTagJNI_getDetectorQTP
   (JNIEnv* env, jclass, jlong det)
 {
   if (det == 0) {
@@ -417,12 +418,12 @@ Java_org_wpilib_vision_apriltag_jni_AprilTagJNI_getDetectorQTP
 }
 
 /*
- * Class:     org_wpilib_vision_apriltag_jni_AprilTagJNI
+ * Class:     edu_wpi_first_apriltag_jni_AprilTagJNI
  * Method:    addFamily
  * Signature: (JLjava/lang/String;I)Z
  */
 JNIEXPORT jboolean JNICALL
-Java_org_wpilib_vision_apriltag_jni_AprilTagJNI_addFamily
+Java_edu_wpi_first_apriltag_jni_AprilTagJNI_addFamily
   (JNIEnv* env, jclass, jlong det, jstring fam, jint bitsCorrected)
 {
   if (det == 0) {
@@ -438,12 +439,12 @@ Java_org_wpilib_vision_apriltag_jni_AprilTagJNI_addFamily
 }
 
 /*
- * Class:     org_wpilib_vision_apriltag_jni_AprilTagJNI
+ * Class:     edu_wpi_first_apriltag_jni_AprilTagJNI
  * Method:    removeFamily
  * Signature: (JLjava/lang/String;)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_vision_apriltag_jni_AprilTagJNI_removeFamily
+Java_edu_wpi_first_apriltag_jni_AprilTagJNI_removeFamily
   (JNIEnv* env, jclass, jlong det, jstring fam)
 {
   if (det == 0) {
@@ -458,12 +459,12 @@ Java_org_wpilib_vision_apriltag_jni_AprilTagJNI_removeFamily
 }
 
 /*
- * Class:     org_wpilib_vision_apriltag_jni_AprilTagJNI
+ * Class:     edu_wpi_first_apriltag_jni_AprilTagJNI
  * Method:    clearFamilies
  * Signature: (J)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_vision_apriltag_jni_AprilTagJNI_clearFamilies
+Java_edu_wpi_first_apriltag_jni_AprilTagJNI_clearFamilies
   (JNIEnv* env, jclass, jlong det)
 {
   if (det == 0) {
@@ -474,12 +475,12 @@ Java_org_wpilib_vision_apriltag_jni_AprilTagJNI_clearFamilies
 }
 
 /*
- * Class:     org_wpilib_vision_apriltag_jni_AprilTagJNI
+ * Class:     edu_wpi_first_apriltag_jni_AprilTagJNI
  * Method:    detect
  * Signature: (JIIIJ)[Ljava/lang/Object;
  */
 JNIEXPORT jobjectArray JNICALL
-Java_org_wpilib_vision_apriltag_jni_AprilTagJNI_detect
+Java_edu_wpi_first_apriltag_jni_AprilTagJNI_detect
   (JNIEnv* env, jclass, jlong det, jint width, jint height, jint stride,
    jlong bufAddr)
 {
@@ -497,12 +498,12 @@ Java_org_wpilib_vision_apriltag_jni_AprilTagJNI_detect
 }
 
 /*
- * Class:     org_wpilib_vision_apriltag_jni_AprilTagJNI
+ * Class:     edu_wpi_first_apriltag_jni_AprilTagJNI
  * Method:    estimatePoseHomography
  * Signature: ([DDDDDD)Ljava/lang/Object;
  */
 JNIEXPORT jobject JNICALL
-Java_org_wpilib_vision_apriltag_jni_AprilTagJNI_estimatePoseHomography
+Java_edu_wpi_first_apriltag_jni_AprilTagJNI_estimatePoseHomography
   (JNIEnv* env, jclass, jdoubleArray homography, jdouble tagSize, jdouble fx,
    jdouble fy, jdouble cx, jdouble cy)
 {
@@ -516,18 +517,17 @@ Java_org_wpilib_vision_apriltag_jni_AprilTagJNI_estimatePoseHomography
     return nullptr;
   }
 
-  AprilTagPoseEstimator estimator(
-      {wpi::units::meter_t{tagSize}, fx, fy, cx, cy});
+  AprilTagPoseEstimator estimator({units::meter_t{tagSize}, fx, fy, cx, cy});
   return MakeJObject(env, estimator.EstimateHomography(harr));
 }
 
 /*
- * Class:     org_wpilib_vision_apriltag_jni_AprilTagJNI
+ * Class:     edu_wpi_first_apriltag_jni_AprilTagJNI
  * Method:    estimatePoseOrthogonalIteration
  * Signature: ([D[DDDDDDI)Ljava/lang/Object;
  */
 JNIEXPORT jobject JNICALL
-Java_org_wpilib_vision_apriltag_jni_AprilTagJNI_estimatePoseOrthogonalIteration
+Java_edu_wpi_first_apriltag_jni_AprilTagJNI_estimatePoseOrthogonalIteration
   (JNIEnv* env, jclass, jdoubleArray homography, jdoubleArray corners,
    jdouble tagSize, jdouble fx, jdouble fy, jdouble cx, jdouble cy, jint nIters)
 {
@@ -553,19 +553,18 @@ Java_org_wpilib_vision_apriltag_jni_AprilTagJNI_estimatePoseOrthogonalIteration
     return nullptr;
   }
 
-  AprilTagPoseEstimator estimator(
-      {wpi::units::meter_t{tagSize}, fx, fy, cx, cy});
+  AprilTagPoseEstimator estimator({units::meter_t{tagSize}, fx, fy, cx, cy});
   return MakeJObject(env,
                      estimator.EstimateOrthogonalIteration(harr, carr, nIters));
 }
 
 /*
- * Class:     org_wpilib_vision_apriltag_jni_AprilTagJNI
+ * Class:     edu_wpi_first_apriltag_jni_AprilTagJNI
  * Method:    estimatePose
  * Signature: ([D[DDDDDD)Ljava/lang/Object;
  */
 JNIEXPORT jobject JNICALL
-Java_org_wpilib_vision_apriltag_jni_AprilTagJNI_estimatePose
+Java_edu_wpi_first_apriltag_jni_AprilTagJNI_estimatePose
   (JNIEnv* env, jclass, jdoubleArray homography, jdoubleArray corners,
    jdouble tagSize, jdouble fx, jdouble fy, jdouble cx, jdouble cy)
 {
@@ -591,46 +590,45 @@ Java_org_wpilib_vision_apriltag_jni_AprilTagJNI_estimatePose
     return nullptr;
   }
 
-  AprilTagPoseEstimator estimator(
-      {wpi::units::meter_t{tagSize}, fx, fy, cx, cy});
+  AprilTagPoseEstimator estimator({units::meter_t{tagSize}, fx, fy, cx, cy});
   return MakeJObject(env, estimator.Estimate(harr, carr));
 }
 
 /*
- * Class:     org_wpilib_vision_apriltag_jni_AprilTagJNI
+ * Class:     edu_wpi_first_apriltag_jni_AprilTagJNI
  * Method:    generate16h5AprilTagImage
  * Signature: (Ljava/lang/Object;JI)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_vision_apriltag_jni_AprilTagJNI_generate16h5AprilTagImage
+Java_edu_wpi_first_apriltag_jni_AprilTagJNI_generate16h5AprilTagImage
   (JNIEnv* env, jclass, jobject frameObj, jlong framePtr, jint id)
 {
-  auto* frame = reinterpret_cast<wpi::util::RawFrame*>(framePtr);
+  auto* frame = reinterpret_cast<wpi::RawFrame*>(framePtr);
   if (!frame) {
     nullPointerEx.Throw(env, "frame is null");
     return;
   }
-  bool newData = Generate16h5AprilTagImage(frame, id);
-  wpi::util::SetFrameData(env, rawFrameCls, frameObj, *frame, newData);
+  bool newData = AprilTag::Generate16h5AprilTagImage(frame, id);
+  wpi::SetFrameData(env, rawFrameCls, frameObj, *frame, newData);
 }
 
 /*
- * Class:     org_wpilib_vision_apriltag_jni_AprilTagJNI
+ * Class:     edu_wpi_first_apriltag_jni_AprilTagJNI
  * Method:    generate36h11AprilTagImage
  * Signature: (Ljava/lang/Object;JI)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_vision_apriltag_jni_AprilTagJNI_generate36h11AprilTagImage
+Java_edu_wpi_first_apriltag_jni_AprilTagJNI_generate36h11AprilTagImage
   (JNIEnv* env, jclass, jobject frameObj, jlong framePtr, jint id)
 {
-  auto* frame = reinterpret_cast<wpi::util::RawFrame*>(framePtr);
+  auto* frame = reinterpret_cast<wpi::RawFrame*>(framePtr);
   if (!frame) {
     nullPointerEx.Throw(env, "frame is null");
     return;
   }
   // function might reallocate
-  bool newData = Generate36h11AprilTagImage(frame, id);
-  wpi::util::SetFrameData(env, rawFrameCls, frameObj, *frame, newData);
+  bool newData = AprilTag::Generate36h11AprilTagImage(frame, id);
+  wpi::SetFrameData(env, rawFrameCls, frameObj, *frame, newData);
 }
 
 }  // extern "C"

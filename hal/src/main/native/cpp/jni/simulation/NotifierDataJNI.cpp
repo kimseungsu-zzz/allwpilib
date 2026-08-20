@@ -2,30 +2,30 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "org_wpilib_hardware_hal_simulation_NotifierDataJNI.h"
-#include "wpi/hal/simulation/NotifierData.h"
+#include "edu_wpi_first_hal_simulation_NotifierDataJNI.h"
+#include "hal/simulation/NotifierData.h"
 
 extern "C" {
 
 /*
- * Class:     org_wpilib_hardware_hal_simulation_NotifierDataJNI
+ * Class:     edu_wpi_first_hal_simulation_NotifierDataJNI
  * Method:    getNextTimeout
  * Signature: ()J
  */
 JNIEXPORT jlong JNICALL
-Java_org_wpilib_hardware_hal_simulation_NotifierDataJNI_getNextTimeout
+Java_edu_wpi_first_hal_simulation_NotifierDataJNI_getNextTimeout
   (JNIEnv*, jclass)
 {
   return HALSIM_GetNextNotifierTimeout();
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_simulation_NotifierDataJNI
+ * Class:     edu_wpi_first_hal_simulation_NotifierDataJNI
  * Method:    getNumNotifiers
  * Signature: ()I
  */
 JNIEXPORT jint JNICALL
-Java_org_wpilib_hardware_hal_simulation_NotifierDataJNI_getNumNotifiers
+Java_edu_wpi_first_hal_simulation_NotifierDataJNI_getNumNotifiers
   (JNIEnv*, jclass)
 {
   return HALSIM_GetNumNotifiers();

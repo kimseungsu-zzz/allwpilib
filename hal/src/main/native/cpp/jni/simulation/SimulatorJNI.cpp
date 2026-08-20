@@ -2,56 +2,33 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "SimulatorJNI.hpp"
+#include "SimulatorJNI.h"
 
-#include "BufferCallbackStore.hpp"
-#include "CallbackStore.hpp"
-#include "ConstBufferCallbackStore.hpp"
-#include "OpModeOptionsCallbackStore.hpp"
-#include "SimDeviceDataJNI.hpp"
-#include "org_wpilib_hardware_hal_simulation_SimulatorJNI.h"
-#include "wpi/hal/HAL.h"
-#include "wpi/hal/handles/HandlesInternal.hpp"
-#include "wpi/hal/simulation/MockHooks.h"
-#include "wpi/util/jni_util.hpp"
+#include <wpi/jni_util.h>
 
-using namespace wpi::util::java;
+#include "BufferCallbackStore.h"
+#include "CallbackStore.h"
+#include "ConstBufferCallbackStore.h"
+#include "SimDeviceDataJNI.h"
+#include "SpiReadAutoReceiveBufferCallbackStore.h"
+#include "edu_wpi_first_hal_simulation_SimulatorJNI.h"
+#include "hal/HAL.h"
+#include "hal/handles/HandlesInternal.h"
+#include "hal/simulation/MockHooks.h"
+
+using namespace wpi::java;
 
 static JavaVM* jvm = nullptr;
 static JClass notifyCallbackCls;
 static JClass bufferCallbackCls;
 static JClass constBufferCallbackCls;
-static JClass biConsumerCls;
+static JClass spiReadAutoReceiveBufferCallbackCls;
 static jmethodID notifyCallbackCallback;
 static jmethodID bufferCallbackCallback;
 static jmethodID constBufferCallbackCallback;
-static jmethodID biConsumerCallback;
+static jmethodID spiReadAutoReceiveBufferCallbackCallback;
 
-static const JClassInit classes[] = {
-    {"org/wpilib/hardware/hal/simulation/NotifyCallback", &notifyCallbackCls},
-    {"org/wpilib/hardware/hal/simulation/BufferCallback", &bufferCallbackCls},
-    {"org/wpilib/hardware/hal/simulation/ConstBufferCallback",
-     &constBufferCallbackCls},
-    {"java/util/function/BiConsumer", &biConsumerCls},
-};
-
-static const struct JMethodInit {
-  JClass* cls;
-  const char* name;
-  const char* sig;
-  jmethodID* method;
-} methods[] = {
-    {&notifyCallbackCls, "callbackNative", "(Ljava/lang/String;IJD)V",
-     &notifyCallbackCallback},
-    {&bufferCallbackCls, "callback", "(Ljava/lang/String;[BI)V",
-     &bufferCallbackCallback},
-    {&constBufferCallbackCls, "callback", "(Ljava/lang/String;[BI)V",
-     &constBufferCallbackCallback},
-    {&biConsumerCls, "accept", "(Ljava/lang/Object;Ljava/lang/Object;)V",
-     &biConsumerCallback},
-};
-
-namespace wpi::hal::sim {
+namespace hal::sim {
 jint SimOnLoad(JavaVM* vm, void* reserved) {
   jvm = vm;
 
@@ -60,24 +37,59 @@ jint SimOnLoad(JavaVM* vm, void* reserved) {
     return JNI_ERR;
   }
 
-  for (auto& c : classes) {
-    *c.cls = JClass(env, c.name);
-    if (!*c.cls) {
-      return JNI_ERR;
-    }
+  notifyCallbackCls =
+      JClass(env, "edu/wpi/first/hal/simulation/NotifyCallback");
+  if (!notifyCallbackCls) {
+    return JNI_ERR;
   }
 
-  for (auto& m : methods) {
-    *m.method = env->GetMethodID(*m.cls, m.name, m.sig);
-    if (!*m.method) {
-      return JNI_ERR;
-    }
+  notifyCallbackCallback = env->GetMethodID(notifyCallbackCls, "callbackNative",
+                                            "(Ljava/lang/String;IJD)V");
+  if (!notifyCallbackCallback) {
+    return JNI_ERR;
+  }
+
+  bufferCallbackCls =
+      JClass(env, "edu/wpi/first/hal/simulation/BufferCallback");
+  if (!bufferCallbackCls) {
+    return JNI_ERR;
+  }
+
+  bufferCallbackCallback = env->GetMethodID(bufferCallbackCls, "callback",
+                                            "(Ljava/lang/String;[BI)V");
+  if (!bufferCallbackCallback) {
+    return JNI_ERR;
+  }
+
+  constBufferCallbackCls =
+      JClass(env, "edu/wpi/first/hal/simulation/ConstBufferCallback");
+  if (!constBufferCallbackCls) {
+    return JNI_ERR;
+  }
+
+  constBufferCallbackCallback = env->GetMethodID(
+      constBufferCallbackCls, "callback", "(Ljava/lang/String;[BI)V");
+  if (!constBufferCallbackCallback) {
+    return JNI_ERR;
+  }
+
+  spiReadAutoReceiveBufferCallbackCls = JClass(
+      env, "edu/wpi/first/hal/simulation/SpiReadAutoReceiveBufferCallback");
+  if (!spiReadAutoReceiveBufferCallbackCls) {
+    return JNI_ERR;
+  }
+
+  spiReadAutoReceiveBufferCallbackCallback =
+      env->GetMethodID(spiReadAutoReceiveBufferCallbackCls, "callback",
+                       "(Ljava/lang/String;[II)I");
+  if (!spiReadAutoReceiveBufferCallbackCallback) {
+    return JNI_ERR;
   }
 
   InitializeStore();
   InitializeBufferStore();
   InitializeConstBufferStore();
-  InitializeOpModeOptionsStore();
+  InitializeSpiBufferStore();
   if (!InitializeSimDeviceDataJNI(env)) {
     return JNI_ERR;
   }
@@ -94,7 +106,7 @@ void SimOnUnload(JavaVM* vm, void* reserved) {
   notifyCallbackCls.free(env);
   bufferCallbackCls.free(env);
   constBufferCallbackCls.free(env);
-  biConsumerCls.free(env);
+  spiReadAutoReceiveBufferCallbackCls.free(env);
   FreeSimDeviceDataJNI(env);
   jvm = nullptr;
 }
@@ -115,167 +127,141 @@ jmethodID GetConstBufferCallback() {
   return constBufferCallbackCallback;
 }
 
-jmethodID GetBiConsumerCallback() {
-  return biConsumerCallback;
+jmethodID GetSpiReadAutoReceiveBufferCallback() {
+  return spiReadAutoReceiveBufferCallbackCallback;
 }
-}  // namespace wpi::hal::sim
+}  // namespace hal::sim
 
 extern "C" {
 /*
- * Class:     org_wpilib_hardware_hal_simulation_SimulatorJNI
+ * Class:     edu_wpi_first_hal_simulation_SimulatorJNI
  * Method:    setRuntimeType
  * Signature: (I)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_hardware_hal_simulation_SimulatorJNI_setRuntimeType
+Java_edu_wpi_first_hal_simulation_SimulatorJNI_setRuntimeType
   (JNIEnv*, jclass, jint type)
 {
   HALSIM_SetRuntimeType(static_cast<HAL_RuntimeType>(type));
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_simulation_SimulatorJNI
+ * Class:     edu_wpi_first_hal_simulation_SimulatorJNI
  * Method:    waitForProgramStart
- * Signature: (Z)V
+ * Signature: ()V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_hardware_hal_simulation_SimulatorJNI_waitForProgramStart
-  (JNIEnv*, jclass, jboolean waitForFirstNotifier)
+Java_edu_wpi_first_hal_simulation_SimulatorJNI_waitForProgramStart
+  (JNIEnv*, jclass)
 {
-  HALSIM_WaitForProgramStart(waitForFirstNotifier);
+  HALSIM_WaitForProgramStart();
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_simulation_SimulatorJNI
+ * Class:     edu_wpi_first_hal_simulation_SimulatorJNI
  * Method:    setProgramStarted
- * Signature: (Z)V
+ * Signature: ()V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_hardware_hal_simulation_SimulatorJNI_setProgramStarted
-  (JNIEnv*, jclass, jboolean started)
+Java_edu_wpi_first_hal_simulation_SimulatorJNI_setProgramStarted
+  (JNIEnv*, jclass)
 {
-  HALSIM_SetProgramStarted(started);
+  HALSIM_SetProgramStarted();
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_simulation_SimulatorJNI
+ * Class:     edu_wpi_first_hal_simulation_SimulatorJNI
  * Method:    getProgramStarted
  * Signature: ()Z
  */
 JNIEXPORT jboolean JNICALL
-Java_org_wpilib_hardware_hal_simulation_SimulatorJNI_getProgramStarted
+Java_edu_wpi_first_hal_simulation_SimulatorJNI_getProgramStarted
   (JNIEnv*, jclass)
 {
   return HALSIM_GetProgramStarted();
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_simulation_SimulatorJNI
- * Method:    setProgramState
- * Signature: (J)V
- */
-JNIEXPORT void JNICALL
-Java_org_wpilib_hardware_hal_simulation_SimulatorJNI_setProgramState
-  (JNIEnv*, jclass, jlong word)
-{
-  HALSIM_SetProgramState({word});
-}
-
-/*
- * Class:     org_wpilib_hardware_hal_simulation_SimulatorJNI
- * Method:    nativeGetProgramState
- * Signature: ()J
- */
-JNIEXPORT jlong JNICALL
-Java_org_wpilib_hardware_hal_simulation_SimulatorJNI_nativeGetProgramState
-  (JNIEnv*, jclass)
-{
-  HAL_ControlWord word;
-  HALSIM_GetProgramState(&word);
-  return word.value;
-}
-
-/*
- * Class:     org_wpilib_hardware_hal_simulation_SimulatorJNI
+ * Class:     edu_wpi_first_hal_simulation_SimulatorJNI
  * Method:    restartTiming
  * Signature: ()V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_hardware_hal_simulation_SimulatorJNI_restartTiming
+Java_edu_wpi_first_hal_simulation_SimulatorJNI_restartTiming
   (JNIEnv*, jclass)
 {
   HALSIM_RestartTiming();
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_simulation_SimulatorJNI
+ * Class:     edu_wpi_first_hal_simulation_SimulatorJNI
  * Method:    pauseTiming
  * Signature: ()V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_hardware_hal_simulation_SimulatorJNI_pauseTiming
+Java_edu_wpi_first_hal_simulation_SimulatorJNI_pauseTiming
   (JNIEnv*, jclass)
 {
   HALSIM_PauseTiming();
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_simulation_SimulatorJNI
+ * Class:     edu_wpi_first_hal_simulation_SimulatorJNI
  * Method:    resumeTiming
  * Signature: ()V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_hardware_hal_simulation_SimulatorJNI_resumeTiming
+Java_edu_wpi_first_hal_simulation_SimulatorJNI_resumeTiming
   (JNIEnv*, jclass)
 {
   HALSIM_ResumeTiming();
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_simulation_SimulatorJNI
+ * Class:     edu_wpi_first_hal_simulation_SimulatorJNI
  * Method:    isTimingPaused
  * Signature: ()Z
  */
 JNIEXPORT jboolean JNICALL
-Java_org_wpilib_hardware_hal_simulation_SimulatorJNI_isTimingPaused
+Java_edu_wpi_first_hal_simulation_SimulatorJNI_isTimingPaused
   (JNIEnv*, jclass)
 {
   return HALSIM_IsTimingPaused();
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_simulation_SimulatorJNI
+ * Class:     edu_wpi_first_hal_simulation_SimulatorJNI
  * Method:    stepTiming
  * Signature: (J)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_hardware_hal_simulation_SimulatorJNI_stepTiming
+Java_edu_wpi_first_hal_simulation_SimulatorJNI_stepTiming
   (JNIEnv*, jclass, jlong delta)
 {
   HALSIM_StepTiming(delta);
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_simulation_SimulatorJNI
+ * Class:     edu_wpi_first_hal_simulation_SimulatorJNI
  * Method:    stepTimingAsync
  * Signature: (J)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_hardware_hal_simulation_SimulatorJNI_stepTimingAsync
+Java_edu_wpi_first_hal_simulation_SimulatorJNI_stepTimingAsync
   (JNIEnv*, jclass, jlong delta)
 {
   HALSIM_StepTimingAsync(delta);
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_simulation_SimulatorJNI
+ * Class:     edu_wpi_first_hal_simulation_SimulatorJNI
  * Method:    resetHandles
  * Signature: ()V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_hardware_hal_simulation_SimulatorJNI_resetHandles
+Java_edu_wpi_first_hal_simulation_SimulatorJNI_resetHandles
   (JNIEnv*, jclass)
 {
-  wpi::hal::HandleBase::ResetGlobalHandles();
+  hal::HandleBase::ResetGlobalHandles();
 }
 }  // extern "C"

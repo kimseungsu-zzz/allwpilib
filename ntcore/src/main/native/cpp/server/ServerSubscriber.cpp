@@ -2,17 +2,18 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "ServerSubscriber.hpp"
+#include "ServerSubscriber.h"
 
 #include <utility>
 
-#include "PubSubOptions.hpp"
-#include "server/MessagePackWriter.hpp"
-#include "wpi/util/MessagePack.hpp"
-#include "wpi/util/StringExtras.hpp"
+#include <wpi/MessagePack.h>
+#include <wpi/StringExtras.h>
 
-using namespace wpi::nt;
-using namespace wpi::nt::server;
+#include "PubSubOptions.h"
+#include "server/MessagePackWriter.h"
+
+using namespace nt;
+using namespace nt::server;
 using namespace mpack;
 
 static void WriteOptions(mpack_writer_t& w, const PubSubOptionsImpl& options) {
@@ -44,7 +45,7 @@ bool ServerSubscriber::Matches(std::string_view name, bool special) {
   for (auto&& topicName : m_topicNames) {
     if ((!m_options.prefixMatch && name == topicName) ||
         (m_options.prefixMatch && (!special || !topicName.empty()) &&
-         wpi::util::starts_with(name, topicName))) {
+         wpi::starts_with(name, topicName))) {
       return true;
     }
   }

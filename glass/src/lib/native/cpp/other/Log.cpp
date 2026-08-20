@@ -2,13 +2,13 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/glass/other/Log.hpp"
+#include "glass/other/Log.h"
 
 #include <string>
 
 #include <imgui.h>
 
-using namespace wpi::glass;
+using namespace glass;
 
 LogData::LogData(size_t maxLines) : m_maxLines{maxLines} {}
 
@@ -36,7 +36,7 @@ const std::string& LogData::GetBuffer() {
   return m_buf;
 }
 
-void wpi::glass::DisplayLog(LogData* data, bool autoScroll) {
+void glass::DisplayLog(LogData* data, bool autoScroll) {
   if (data->m_buf.empty()) {
     return;
   }

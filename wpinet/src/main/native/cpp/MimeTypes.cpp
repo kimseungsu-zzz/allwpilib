@@ -2,18 +2,18 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/net/MimeTypes.hpp"
+#include "wpinet/MimeTypes.h"
 
-#include "wpi/util/StringExtras.hpp"
-#include "wpi/util/StringMap.hpp"
+#include <wpi/StringExtras.h>
+#include <wpi/StringMap.h>
 
-namespace wpi::net {
+namespace wpi {
 
 // derived partially from
 // https://github.com/DEGoodmanWilson/libmime/blob/stable/0.1.2/mime/mime.cpp
 std::string_view MimeTypeFromPath(std::string_view path) {
   // https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/MIME_types
-  static wpi::util::StringMap<const char*> mimeTypes{
+  static StringMap<const char*> mimeTypes{
       // text
       {"css", "text/css"},
       {"csv", "text/csv"},
@@ -54,11 +54,11 @@ std::string_view MimeTypeFromPath(std::string_view path) {
 
   auto pos = path.find_last_of("/");
   if (pos != std::string_view::npos) {
-    path = wpi::util::substr(path, pos + 1);
+    path = wpi::substr(path, pos + 1);
   }
   auto dot_pos = path.find_last_of(".");
   if (dot_pos > 0 && dot_pos != std::string_view::npos) {
-    auto type = mimeTypes.find(wpi::util::substr(path, dot_pos + 1));
+    auto type = mimeTypes.find(wpi::substr(path, dot_pos + 1));
     if (type != mimeTypes.end()) {
       return type->second;
     }
@@ -66,4 +66,4 @@ std::string_view MimeTypeFromPath(std::string_view path) {
   return defaultType;
 }
 
-}  // namespace wpi::net
+}  // namespace wpi

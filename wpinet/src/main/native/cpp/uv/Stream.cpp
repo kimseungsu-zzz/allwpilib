@@ -2,20 +2,19 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/net/uv/Stream.hpp"
+#include "wpinet/uv/Stream.h"
 
-#include <format>
 #include <functional>
 #include <memory>
 #include <string>
 #include <utility>
 
-#include "wpi/util/Logger.hpp"
-#include "wpi/util/SmallVector.hpp"
-#include "wpi/util/raw_ostream.hpp"
+#include <wpi/Logger.h>
+#include <wpi/SmallVector.h>
+#include <wpi/raw_ostream.h>
 
-using namespace wpi::net;
-using namespace wpi::net::uv;
+using namespace wpi;
+using namespace wpi::uv;
 
 namespace {
 class CallbackWriteReq : public WriteReq {
@@ -28,11 +27,11 @@ class CallbackWriteReq : public WriteReq {
   }
 
  private:
-  wpi::util::SmallVector<Buffer, 4> m_bufs;
+  SmallVector<Buffer, 4> m_bufs;
 };
 }  // namespace
 
-namespace wpi::net::uv {
+namespace wpi::uv {
 
 ShutdownReq::ShutdownReq() {
   error = [this](Error err) { GetStream().error(err); };
@@ -96,11 +95,11 @@ void Stream::StartRead() {
 
 static std::string BufsToString(std::span<const Buffer> bufs) {
   std::string str;
-  wpi::util::raw_string_ostream stros{str};
+  wpi::raw_string_ostream stros{str};
   size_t count = 0;
   for (auto buf : bufs) {
     for (auto ch : buf.bytes()) {
-      stros << std::format("{:02x},", static_cast<unsigned int>(ch) & 0xff);
+      stros << fmt::format("{:02x},", static_cast<unsigned int>(ch) & 0xff);
       if (count++ > 30) {
         goto extra;
       }
@@ -112,7 +111,7 @@ extra: {
   for (auto buf : bufs) {
     total += buf.len;
   }
-  stros << std::format("... (total {})", total);
+  stros << fmt::format("... (total {})", total);
 }
 done:
   return str;
@@ -178,4 +177,4 @@ int Stream::TryWrite2(std::span<const Buffer> bufs, Stream& send) {
   return val;
 }
 
-}  // namespace wpi::net::uv
+}  // namespace wpi::uv

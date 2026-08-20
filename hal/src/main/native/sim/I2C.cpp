@@ -2,20 +2,20 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/hal/I2C.h"
+#include "hal/I2C.h"
 
-#include "HALInitializer.hpp"
-#include "mockdata/I2CDataInternal.hpp"
+#include "HALInitializer.h"
+#include "mockdata/I2CDataInternal.h"
 
-using namespace wpi::hal;
+using namespace hal;
 
-namespace wpi::hal::init {
+namespace hal::init {
 void InitializeI2C() {}
-}  // namespace wpi::hal::init
+}  // namespace hal::init
 
 extern "C" {
 void HAL_InitializeI2C(HAL_I2CPort port, int32_t* status) {
-  wpi::hal::init::CheckInit();
+  hal::init::CheckInit();
   SimI2CData[port].initialized = true;
 }
 int32_t HAL_TransactionI2C(HAL_I2CPort port, int32_t deviceAddress,

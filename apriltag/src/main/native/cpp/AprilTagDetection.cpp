@@ -2,7 +2,7 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/apriltag/AprilTagDetection.hpp"
+#include "frc/apriltag/AprilTagDetection.h"
 
 #include <type_traits>
 
@@ -16,7 +16,7 @@
 
 #include "apriltag.h"
 
-using namespace wpi::apriltag;
+using namespace frc;
 
 static_assert(sizeof(AprilTagDetection) == sizeof(apriltag_detection_t),
               "structure sizes don't match");

@@ -4,51 +4,51 @@
 
 #include <jni.h>
 
-#include "HALUtil.hpp"
-#include "org_wpilib_hardware_hal_DutyCycleJNI.h"
-#include "wpi/hal/DutyCycle.h"
-#include "wpi/util/jni_util.hpp"
+#include "HALUtil.h"
+#include "edu_wpi_first_hal_DutyCycleJNI.h"
+#include "hal/DutyCycle.h"
 
-using namespace wpi::hal;
+using namespace hal;
 
 extern "C" {
 /*
- * Class:     org_wpilib_hardware_hal_DutyCycleJNI
+ * Class:     edu_wpi_first_hal_DutyCycleJNI
  * Method:    initialize
- * Signature: (I)I
+ * Signature: (II)I
  */
 JNIEXPORT jint JNICALL
-Java_org_wpilib_hardware_hal_DutyCycleJNI_initialize
-  (JNIEnv* env, jclass, jint channel)
+Java_edu_wpi_first_hal_DutyCycleJNI_initialize
+  (JNIEnv* env, jclass, jint digitalSourceHandle, jint analogTriggerType)
 {
   int32_t status = 0;
-  auto stack = wpi::util::java::GetJavaStackTrace(env, "org.wpilib");
-  auto handle = HAL_InitializeDutyCycle(channel, stack.c_str(), &status);
+  auto handle = HAL_InitializeDutyCycle(
+      static_cast<HAL_Handle>(digitalSourceHandle),
+      static_cast<HAL_AnalogTriggerType>(analogTriggerType), &status);
   CheckStatus(env, status);
   return handle;
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_DutyCycleJNI
+ * Class:     edu_wpi_first_hal_DutyCycleJNI
  * Method:    free
  * Signature: (I)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_hardware_hal_DutyCycleJNI_free
+Java_edu_wpi_first_hal_DutyCycleJNI_free
   (JNIEnv*, jclass, jint handle)
 {
-  if (handle != HAL_INVALID_HANDLE) {
+  if (handle != HAL_kInvalidHandle) {
     HAL_FreeDutyCycle(static_cast<HAL_DutyCycleHandle>(handle));
   }
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_DutyCycleJNI
+ * Class:     edu_wpi_first_hal_DutyCycleJNI
  * Method:    getFrequency
- * Signature: (I)D
+ * Signature: (I)I
  */
-JNIEXPORT jdouble JNICALL
-Java_org_wpilib_hardware_hal_DutyCycleJNI_getFrequency
+JNIEXPORT jint JNICALL
+Java_edu_wpi_first_hal_DutyCycleJNI_getFrequency
   (JNIEnv* env, jclass, jint handle)
 {
   int32_t status = 0;
@@ -59,12 +59,12 @@ Java_org_wpilib_hardware_hal_DutyCycleJNI_getFrequency
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_DutyCycleJNI
+ * Class:     edu_wpi_first_hal_DutyCycleJNI
  * Method:    getOutput
  * Signature: (I)D
  */
 JNIEXPORT jdouble JNICALL
-Java_org_wpilib_hardware_hal_DutyCycleJNI_getOutput
+Java_edu_wpi_first_hal_DutyCycleJNI_getOutput
   (JNIEnv* env, jclass, jint handle)
 {
   int32_t status = 0;
@@ -75,16 +75,48 @@ Java_org_wpilib_hardware_hal_DutyCycleJNI_getOutput
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_DutyCycleJNI
+ * Class:     edu_wpi_first_hal_DutyCycleJNI
  * Method:    getHighTime
  * Signature: (I)I
  */
 JNIEXPORT jint JNICALL
-Java_org_wpilib_hardware_hal_DutyCycleJNI_getHighTime
+Java_edu_wpi_first_hal_DutyCycleJNI_getHighTime
   (JNIEnv* env, jclass, jint handle)
 {
   int32_t status = 0;
   auto retVal = HAL_GetDutyCycleHighTime(
+      static_cast<HAL_DutyCycleHandle>(handle), &status);
+  CheckStatus(env, status);
+  return retVal;
+}
+
+/*
+ * Class:     edu_wpi_first_hal_DutyCycleJNI
+ * Method:    getOutputScaleFactor
+ * Signature: (I)I
+ */
+JNIEXPORT jint JNICALL
+Java_edu_wpi_first_hal_DutyCycleJNI_getOutputScaleFactor
+  (JNIEnv* env, jclass, jint handle)
+{
+  int32_t status = 0;
+  auto retVal = HAL_GetDutyCycleOutputScaleFactor(
+      static_cast<HAL_DutyCycleHandle>(handle), &status);
+  CheckStatus(env, status);
+  return retVal;
+}
+
+/*
+ * Class:     edu_wpi_first_hal_DutyCycleJNI
+ * Method:    getFPGAIndex
+ * Signature: (I)I
+ */
+JNIEXPORT jint JNICALL
+Java_edu_wpi_first_hal_DutyCycleJNI_getFPGAIndex
+  (JNIEnv* env, jclass, jint handle)
+{
+  int32_t status = 0;
+  auto retVal = HAL_GetDutyCycleFPGAIndex(
       static_cast<HAL_DutyCycleHandle>(handle), &status);
   CheckStatus(env, status);
   return retVal;

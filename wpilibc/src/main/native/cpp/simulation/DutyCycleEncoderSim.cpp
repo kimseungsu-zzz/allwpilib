@@ -2,18 +2,18 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/simulation/DutyCycleEncoderSim.hpp"
+#include "frc/simulation/DutyCycleEncoderSim.h"
 
-#include "wpi/hardware/rotation/DutyCycleEncoder.hpp"
-#include "wpi/simulation/SimDeviceSim.hpp"
+#include "frc/DutyCycleEncoder.h"
+#include "frc/simulation/SimDeviceSim.h"
 
-using namespace wpi::sim;
+using namespace frc::sim;
 
-DutyCycleEncoderSim::DutyCycleEncoderSim(const wpi::DutyCycleEncoder& encoder)
+DutyCycleEncoderSim::DutyCycleEncoderSim(const frc::DutyCycleEncoder& encoder)
     : DutyCycleEncoderSim{encoder.GetSourceChannel()} {}
 
 DutyCycleEncoderSim::DutyCycleEncoderSim(int channel) {
-  wpi::sim::SimDeviceSim deviceSim{"DutyCycle:DutyCycleEncoder", channel};
+  frc::sim::SimDeviceSim deviceSim{"DutyCycle:DutyCycleEncoder", channel};
   m_simPosition = deviceSim.GetDouble("Position");
   m_simIsConnected = deviceSim.GetBoolean("Connected");
 }

@@ -2,19 +2,15 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-// clang-format off
-#include "wpi/math/filter/LinearFilter.hpp"
-// clang-format on
-
-#include <stdint.h>
+#include "frc/filter/LinearFilter.h"  // NOLINT(build/include_order)
 
 #include <cmath>
 #include <numbers>
 #include <random>
 
-#include <catch2/catch_test_macros.hpp>
+#include <gtest/gtest.h>
 
-#include "wpi/units/time.hpp"
+#include "units/time.h"
 
 // Filter constants
 static constexpr auto kFilterStep = 5_ms;
@@ -28,21 +24,26 @@ static double GetData(double t) {
   return 100.0 * std::sin(2.0 * std::numbers::pi * t);
 }
 
-static wpi::math::LinearFilter<double> MakeFilter(
-    LinearFilterNoiseTestType testType) {
-  switch (testType) {
-    case kTestSinglePoleIIR:
-      return wpi::math::LinearFilter<double>::SinglePoleIIR(
-          kSinglePoleIIRTimeConstant, kFilterStep);
-    case kTestMovAvg:
-      return wpi::math::LinearFilter<double>::MovingAverage(kMovAvgTaps);
-  }
+class LinearFilterNoiseTest
+    : public testing::TestWithParam<LinearFilterNoiseTestType> {
+ protected:
+  frc::LinearFilter<double> m_filter = [=] {
+    switch (GetParam()) {
+      case kTestSinglePoleIIR:
+        return frc::LinearFilter<double>::SinglePoleIIR(
+            kSinglePoleIIRTimeConstant, kFilterStep);
+        break;
+      default:
+        return frc::LinearFilter<double>::MovingAverage(kMovAvgTaps);
+        break;
+    }
+  }();
+};
 
-  return wpi::math::LinearFilter<double>::MovingAverage(kMovAvgTaps);
-}
-
-static void CheckNoiseReduce(LinearFilterNoiseTestType testType) {
-  auto filter = MakeFilter(testType);
+/**
+ * Test if the filter reduces the noise produced by a signal generator
+ */
+TEST_P(LinearFilterNoiseTest, NoiseReduce) {
   double noiseGenError = 0.0;
   double filterError = 0.0;
 
@@ -53,23 +54,16 @@ static void CheckNoiseReduce(LinearFilterNoiseTestType testType) {
   for (auto t = 0_s; t < kFilterTime; t += kFilterStep) {
     double theory = GetData(t.value());
     double noise = distr(gen);
-    filterError += std::abs(filter.Calculate(theory + noise) - theory);
+    filterError += std::abs(m_filter.Calculate(theory + noise) - theory);
     noiseGenError += std::abs(noise - theory);
   }
 
+  RecordProperty("FilterError", filterError);
+
   // The filter should have produced values closer to the theory
-  CHECK(noiseGenError > filterError);
+  EXPECT_GT(noiseGenError, filterError)
+      << "Filter should have reduced noise accumulation but failed";
 }
 
-/**
- * Test if the filter reduces the noise produced by a signal generator
- */
-TEST_CASE("LinearFilterNoiseTest NoiseReduce", "[wpimath]") {
-  SECTION("SinglePoleIIR") {
-    CheckNoiseReduce(kTestSinglePoleIIR);
-  }
-
-  SECTION("MovingAverage") {
-    CheckNoiseReduce(kTestMovAvg);
-  }
-}
+INSTANTIATE_TEST_SUITE_P(Tests, LinearFilterNoiseTest,
+                         testing::Values(kTestSinglePoleIIR, kTestMovAvg));

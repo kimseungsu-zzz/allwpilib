@@ -2,16 +2,17 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/net/hostname.hpp"
+#include "wpinet/hostname.h"
 
 #include <cstdlib>
 #include <string>
 #include <string_view>
 
-#include "uv.h"
-#include "wpi/util/SmallVector.hpp"
+#include <wpi/SmallVector.h>
 
-namespace wpi::net {
+#include "uv.h"
+
+namespace wpi {
 
 std::string GetHostname() {
   std::string rv;
@@ -33,8 +34,8 @@ std::string GetHostname() {
   return rv;
 }
 
-std::string_view GetHostname(wpi::util::SmallVectorImpl<char>& name) {
-  // Use a tmp array to not require the wpi::util::SmallVector to be too large.
+std::string_view GetHostname(SmallVectorImpl<char>& name) {
+  // Use a tmp array to not require the SmallVector to be too large.
   char tmpName[256];
   size_t size = sizeof(tmpName);
 
@@ -54,4 +55,4 @@ std::string_view GetHostname(wpi::util::SmallVectorImpl<char>& name) {
   return {name.data(), size};
 }
 
-}  // namespace wpi::net
+}  // namespace wpi

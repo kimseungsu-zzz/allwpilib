@@ -2,22 +2,22 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/smartdashboard/MechanismLigament2d.hpp"
+#include "frc/smartdashboard/MechanismLigament2d.h"
 
 #include <cstdio>
 #include <memory>
 
-#include "wpi/util/StringExtras.hpp"
-#include "wpi/util/json.hpp"
+#include <wpi/StringExtras.h>
+#include <wpi/json.h>
 
-using namespace wpi;
+using namespace frc;
 
 static constexpr std::string_view kSmartDashboardType = "line";
 
 MechanismLigament2d::MechanismLigament2d(std::string_view name, double length,
-                                         wpi::units::degree_t angle,
+                                         units::degree_t angle,
                                          double lineWeight,
-                                         const wpi::util::Color8Bit& color)
+                                         const frc::Color8Bit& color)
     : MechanismObject2d{name},
       m_length{length},
       m_angle{angle.value()},
@@ -26,10 +26,9 @@ MechanismLigament2d::MechanismLigament2d(std::string_view name, double length,
 }
 
 void MechanismLigament2d::UpdateEntries(
-    std::shared_ptr<wpi::nt::NetworkTable> table) {
+    std::shared_ptr<nt::NetworkTable> table) {
   m_typePub = table->GetStringTopic(".type").PublishEx(
-      wpi::nt::StringTopic::TYPE_STRING,
-      wpi::util::json::object("SmartDashboard", kSmartDashboardType));
+      nt::StringTopic::kTypeString, {{"SmartDashboard", kSmartDashboardType}});
   m_typePub.Set(kSmartDashboardType);
 
   m_colorEntry = table->GetStringTopic("color").GetEntry("");
@@ -42,18 +41,18 @@ void MechanismLigament2d::UpdateEntries(
   m_lengthEntry.Set(m_length);
 }
 
-void MechanismLigament2d::SetColor(const wpi::util::Color8Bit& color) {
+void MechanismLigament2d::SetColor(const Color8Bit& color) {
   std::scoped_lock lock(m_mutex);
 
-  wpi::util::format_to_n_c_str(m_color, sizeof(m_color), "#{:02X}{:02X}{:02X}",
-                               color.red, color.green, color.blue);
+  wpi::format_to_n_c_str(m_color, sizeof(m_color), "#{:02X}{:02X}{:02X}",
+                         color.red, color.green, color.blue);
 
   if (m_colorEntry) {
     m_colorEntry.Set(m_color);
   }
 }
 
-void MechanismLigament2d::SetAngle(wpi::units::degree_t angle) {
+void MechanismLigament2d::SetAngle(units::degree_t angle) {
   std::scoped_lock lock(m_mutex);
   m_angle = angle.value();
   if (m_angleEntry) {
@@ -69,7 +68,7 @@ void MechanismLigament2d::SetLineWeight(double lineWidth) {
   }
 }
 
-wpi::util::Color8Bit MechanismLigament2d::GetColor() {
+Color8Bit MechanismLigament2d::GetColor() {
   std::scoped_lock lock(m_mutex);
   if (m_colorEntry) {
     auto color = m_colorEntry.Get();

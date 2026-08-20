@@ -2,55 +2,56 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "Drivetrain.hpp"
-#include "wpi/driverstation/Gamepad.hpp"
-#include "wpi/framework/TimedRobot.hpp"
-#include "wpi/math/filter/SlewRateLimiter.hpp"
+#include <frc/TimedRobot.h>
+#include <frc/XboxController.h>
+#include <frc/filter/SlewRateLimiter.h>
 
-class Robot : public wpi::TimedRobot {
+#include "Drivetrain.h"
+
+class Robot : public frc::TimedRobot {
  public:
   void AutonomousPeriodic() override {
     DriveWithJoystick(false);
-    swerve.UpdateOdometry();
+    m_swerve.UpdateOdometry();
   }
 
   void TeleopPeriodic() override { DriveWithJoystick(true); }
 
  private:
-  wpi::Gamepad controller{0};
-  Drivetrain swerve;
+  frc::XboxController m_controller{0};
+  Drivetrain m_swerve;
 
   // Slew rate limiters to make joystick inputs more gentle; 1/3 sec from 0
   // to 1.
-  wpi::math::SlewRateLimiter<wpi::units::scalar> xVelocityLimiter{3 / 1_s};
-  wpi::math::SlewRateLimiter<wpi::units::scalar> yVelocityLimiter{3 / 1_s};
-  wpi::math::SlewRateLimiter<wpi::units::scalar> rotLimiter{3 / 1_s};
+  frc::SlewRateLimiter<units::scalar> m_xspeedLimiter{3 / 1_s};
+  frc::SlewRateLimiter<units::scalar> m_yspeedLimiter{3 / 1_s};
+  frc::SlewRateLimiter<units::scalar> m_rotLimiter{3 / 1_s};
 
   void DriveWithJoystick(bool fieldRelative) {
-    // Get the x velocity. We are inverting this because gamepads return
+    // Get the x speed. We are inverting this because Xbox controllers return
     // negative values when we push forward.
-    const auto xVelocity = -xVelocityLimiter.Calculate(controller.GetLeftY()) *
-                           Drivetrain::kMaxVelocity;
+    const auto xSpeed = -m_xspeedLimiter.Calculate(m_controller.GetLeftY()) *
+                        Drivetrain::kMaxSpeed;
 
-    // Get the y velocity or sideways/strafe velocity. We are inverting this
-    // because we want a positive value when we pull to the left. Gamepads
+    // Get the y speed or sideways/strafe speed. We are inverting this because
+    // we want a positive value when we pull to the left. Xbox controllers
     // return positive values when you pull to the right by default.
-    const auto yVelocity = -yVelocityLimiter.Calculate(controller.GetLeftX()) *
-                           Drivetrain::kMaxVelocity;
+    const auto ySpeed = -m_yspeedLimiter.Calculate(m_controller.GetLeftX()) *
+                        Drivetrain::kMaxSpeed;
 
     // Get the rate of angular rotation. We are inverting this because we want a
     // positive value when we pull to the left (remember, CCW is positive in
-    // mathematics). Gamepads return positive values when you pull to
+    // mathematics). Xbox controllers return positive values when you pull to
     // the right by default.
-    const auto rot = -rotLimiter.Calculate(controller.GetRightX()) *
-                     Drivetrain::kMaxAngularVelocity;
+    const auto rot = -m_rotLimiter.Calculate(m_controller.GetRightX()) *
+                     Drivetrain::kMaxAngularSpeed;
 
-    swerve.Drive(xVelocity, yVelocity, rot, fieldRelative, GetPeriod());
+    m_swerve.Drive(xSpeed, ySpeed, rot, fieldRelative, GetPeriod());
   }
 };
 
-#ifndef RUNNING_WPILIB_TESTS
+#ifndef RUNNING_FRC_TESTS
 int main() {
-  return wpi::StartRobot<Robot>();
+  return frc::StartRobot<Robot>();
 }
 #endif

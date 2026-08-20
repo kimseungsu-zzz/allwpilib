@@ -14,15 +14,14 @@
 #define _CRT_NONSTDC_NO_WARNINGS
 #endif
 
-#include "wpi/util/raw_ostream.hpp"
-#include "wpi/util/SmallString.hpp"
-#include "wpi/util/SmallVector.hpp"
-#include "wpi/util/StringExtras.hpp"
-#include "wpi/util/Compiler.hpp"
-#include "wpi/util/ErrorHandling.hpp"
-#include "wpi/util/fs.hpp"
-#include "wpi/util/IOSandbox.hpp"
-#include "wpi/util/MathExtras.hpp"
+#include "wpi/raw_ostream.h"
+#include "wpi/SmallString.h"
+#include "wpi/SmallVector.h"
+#include "wpi/StringExtras.h"
+#include "wpi/Compiler.h"
+#include "wpi/ErrorHandling.h"
+#include "wpi/fs.h"
+#include "wpi/MathExtras.h"
 #include <algorithm>
 #include <cerrno>
 #include <cstdio>
@@ -54,21 +53,30 @@
 #endif
 
 #ifdef _WIN32
-#include "wpi/util/ConvertUTF.hpp"
-// mingw-w64 tends to define it as 0x0502 in its headers.
-#undef _WIN32_WINNT
-
-// Require at least Windows 7 API.
-#define _WIN32_WINNT 0x0601
-#define WIN32_LEAN_AND_MEAN
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#define WIN32_NO_STATUS
-#include <windows.h>
+#include "wpi/ConvertUTF.h"
+#include "Windows/WindowsSupport.h"
 #endif
 
-using namespace wpi::util;
+using namespace wpi;
+
+constexpr raw_ostream::Colors raw_ostream::BLACK;
+constexpr raw_ostream::Colors raw_ostream::RED;
+constexpr raw_ostream::Colors raw_ostream::GREEN;
+constexpr raw_ostream::Colors raw_ostream::YELLOW;
+constexpr raw_ostream::Colors raw_ostream::BLUE;
+constexpr raw_ostream::Colors raw_ostream::MAGENTA;
+constexpr raw_ostream::Colors raw_ostream::CYAN;
+constexpr raw_ostream::Colors raw_ostream::WHITE;
+constexpr raw_ostream::Colors raw_ostream::SAVEDCOLOR;
+constexpr raw_ostream::Colors raw_ostream::RESET;
+
+namespace {
+// Find the length of an array.
+template <class T, std::size_t N>
+constexpr inline size_t array_lengthof(T (&)[N]) {
+  return N;
+}
+}  // namespace
 
 raw_ostream::~raw_ostream() {
   // raw_ostream's subclasses should take care to flush the buffer
@@ -288,9 +296,6 @@ void raw_ostream::anchor() {}
 static int getFD(std::string_view Filename, std::error_code &EC,
                  fs::CreationDisposition Disp, fs::FileAccess Access,
                  fs::OpenFlags Flags) {
-  // FIXME(sandboxing): Remove this by adopting `wpi::util::vfs::OutputBackend`.
-  auto BypassSandbox = sys::sandbox::scopedDisable();
-
   assert((Access & fs::FA_Write) &&
          "Cannot make a raw_ostream from a read-only descriptor!");
 
@@ -350,9 +355,6 @@ raw_fd_ostream::raw_fd_ostream(std::string_view Filename, std::error_code &EC,
 raw_fd_ostream::raw_fd_ostream(int fd, bool shouldClose, bool unbuffered,
                                OStreamKind K)
     : raw_pwrite_stream(unbuffered, K), FD(fd), ShouldClose(shouldClose) {
-  // FIXME(sandboxing): Remove this by adopting `wpi::util::vfs::OutputBackend`.
-  auto BypassSandbox = sys::sandbox::scopedDisable();
-
   if (FD < 0 ) {
     ShouldClose = false;
     return;
@@ -408,7 +410,8 @@ raw_fd_ostream::~raw_fd_ostream() {
   // has_error() and clear the error flag with clear_error() before
   // destructing raw_ostream objects which may have errors.
   if (has_error())
-    reportFatalUsageError("IO failure on output stream: " + error().message());
+    report_fatal_error("IO failure on output stream: " + error().message(),
+                       /*gen_crash_diag=*/false);
 }
 
 #if defined(_WIN32)
@@ -433,7 +436,11 @@ static bool write_console_impl(int FD, std::string_view Data) {
   if (auto EC = sys::windows::UTF8ToUTF16(Data, WideText))
     return false;
 
+  // On Windows 7 and earlier, WriteConsoleW has a low maximum amount of data
+  // that can be written to the console at a time.
   size_t MaxWriteSize = WideText.size();
+  if (!RunningWindows8OrGreater())
+    MaxWriteSize = 32767;
 
   size_t WCharsWritten = 0;
   do {
@@ -568,10 +575,6 @@ size_t raw_fd_ostream::preferred_buffer_size() const {
   if (IsWindowsConsole)
     return 0;
   return raw_ostream::preferred_buffer_size();
-#elif defined(__MVS__)
-  // The buffer size on z/OS is defined with macro BUFSIZ, which can be
-  // retrieved by invoking function raw_ostream::preferred_buffer_size().
-  return raw_ostream::preferred_buffer_size();
 #else
   assert(FD >= 0 && "File not yet open!");
   struct stat statbuf;
@@ -594,23 +597,22 @@ void raw_fd_ostream::anchor() {}
 //  outs(), errs(), nulls()
 //===----------------------------------------------------------------------===//
 
-raw_fd_ostream &wpi::util::outs() {
+raw_fd_ostream &wpi::outs() {
   // Set buffer settings to model stdout behavior.
   std::error_code EC;
-
   static raw_fd_ostream* S = new raw_fd_ostream("-", EC, fs::OF_None);
   assert(!EC);
   return *S;
 }
 
-raw_fd_ostream &wpi::util::errs() {
+raw_fd_ostream &wpi::errs() {
   // Set standard error to be unbuffered and tied to outs() by default.
   static raw_fd_ostream* S = new raw_fd_ostream(STDERR_FILENO, false, true);
   return *S;
 }
 
 /// nulls() - This returns a reference to a raw_ostream which discards output.
-raw_ostream &wpi::util::nulls() {
+raw_ostream &wpi::nulls() {
   static raw_null_ostream S;
   return S;
 }

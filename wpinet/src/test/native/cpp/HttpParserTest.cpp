@@ -2,205 +2,205 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/net/HttpParser.hpp"
+#include "wpinet/HttpParser.h"  // NOLINT(build/include_order)
 
-#include <catch2/catch_test_macros.hpp>
+#include <gtest/gtest.h>
 
-namespace wpi::net {
+namespace wpi {
 
-TEST_CASE("HttpParserTest UrlMethodHeadersComplete", "[http][parser]") {
-  HttpParser p{HttpParser::Type::REQUEST};
+TEST(HttpParserTest, UrlMethodHeadersComplete) {
+  HttpParser p{HttpParser::kRequest};
   int callbacks = 0;
   p.url.connect([&](std::string_view path) {
-    REQUIRE(path == "/foo/bar");
-    REQUIRE(p.GetUrl() == "/foo/bar");
+    ASSERT_EQ(path, "/foo/bar");
+    ASSERT_EQ(p.GetUrl(), "/foo/bar");
     ++callbacks;
   });
   p.Execute("GET /foo");
   p.Execute("/bar");
-  REQUIRE(callbacks == 0);
+  ASSERT_EQ(callbacks, 0);
   p.Execute(" HTTP/1.1\r\n\r\n");
-  REQUIRE(callbacks == 1);
-  REQUIRE(p.GetUrl() == "/foo/bar");
-  REQUIRE(p.GetMethod() == HTTP_GET);
-  REQUIRE_FALSE(p.HasError());
+  ASSERT_EQ(callbacks, 1);
+  ASSERT_EQ(p.GetUrl(), "/foo/bar");
+  ASSERT_EQ(p.GetMethod(), HTTP_GET);
+  ASSERT_FALSE(p.HasError());
 }
 
-TEST_CASE("HttpParserTest UrlMethodHeader", "[http][parser]") {
-  HttpParser p{HttpParser::Type::REQUEST};
+TEST(HttpParserTest, UrlMethodHeader) {
+  HttpParser p{HttpParser::kRequest};
   int callbacks = 0;
   p.url.connect([&](std::string_view path) {
-    REQUIRE(path == "/foo/bar");
-    REQUIRE(p.GetUrl() == "/foo/bar");
+    ASSERT_EQ(path, "/foo/bar");
+    ASSERT_EQ(p.GetUrl(), "/foo/bar");
     ++callbacks;
   });
   p.Execute("GET /foo");
   p.Execute("/bar");
-  REQUIRE(callbacks == 0);
+  ASSERT_EQ(callbacks, 0);
   p.Execute(" HTTP/1.1\r\n");
-  REQUIRE(callbacks == 0);
+  ASSERT_EQ(callbacks, 0);
   p.Execute("F");
-  REQUIRE(callbacks == 1);
-  REQUIRE(p.GetUrl() == "/foo/bar");
-  REQUIRE(p.GetMethod() == HTTP_GET);
-  REQUIRE_FALSE(p.HasError());
+  ASSERT_EQ(callbacks, 1);
+  ASSERT_EQ(p.GetUrl(), "/foo/bar");
+  ASSERT_EQ(p.GetMethod(), HTTP_GET);
+  ASSERT_FALSE(p.HasError());
 }
 
-TEST_CASE("HttpParserTest StatusHeadersComplete", "[http][parser]") {
-  HttpParser p{HttpParser::Type::RESPONSE};
+TEST(HttpParserTest, StatusHeadersComplete) {
+  HttpParser p{HttpParser::kResponse};
   int callbacks = 0;
   p.status.connect([&](std::string_view status) {
-    REQUIRE(status == "OK");
-    REQUIRE(p.GetStatusCode() == 200u);
+    ASSERT_EQ(status, "OK");
+    ASSERT_EQ(p.GetStatusCode(), 200u);
     ++callbacks;
   });
   p.Execute("HTTP/1.1 200");
   p.Execute(" OK");
-  REQUIRE(callbacks == 0);
+  ASSERT_EQ(callbacks, 0);
   p.Execute("\r\n\r\n");
-  REQUIRE(callbacks == 1);
-  REQUIRE(p.GetStatusCode() == 200u);
-  REQUIRE_FALSE(p.HasError());
+  ASSERT_EQ(callbacks, 1);
+  ASSERT_EQ(p.GetStatusCode(), 200u);
+  ASSERT_FALSE(p.HasError());
 }
 
-TEST_CASE("HttpParserTest StatusHeader", "[http][parser]") {
-  HttpParser p{HttpParser::Type::RESPONSE};
+TEST(HttpParserTest, StatusHeader) {
+  HttpParser p{HttpParser::kResponse};
   int callbacks = 0;
   p.status.connect([&](std::string_view status) {
-    REQUIRE(status == "OK");
-    REQUIRE(p.GetStatusCode() == 200u);
+    ASSERT_EQ(status, "OK");
+    ASSERT_EQ(p.GetStatusCode(), 200u);
     ++callbacks;
   });
   p.Execute("HTTP/1.1 200");
   p.Execute(" OK\r\n");
-  REQUIRE(callbacks == 0);
+  ASSERT_EQ(callbacks, 0);
   p.Execute("F");
-  REQUIRE(callbacks == 1);
-  REQUIRE(p.GetStatusCode() == 200u);
-  REQUIRE_FALSE(p.HasError());
+  ASSERT_EQ(callbacks, 1);
+  ASSERT_EQ(p.GetStatusCode(), 200u);
+  ASSERT_FALSE(p.HasError());
 }
 
-TEST_CASE("HttpParserTest HeaderFieldComplete", "[http][parser]") {
-  HttpParser p{HttpParser::Type::REQUEST};
+TEST(HttpParserTest, HeaderFieldComplete) {
+  HttpParser p{HttpParser::kRequest};
   int callbacks = 0;
   p.header.connect([&](std::string_view name, std::string_view value) {
-    REQUIRE(name == "Foo");
-    REQUIRE(value == "Bar");
+    ASSERT_EQ(name, "Foo");
+    ASSERT_EQ(value, "Bar");
     ++callbacks;
   });
   p.Execute("GET / HTTP/1.1\r\n");
-  REQUIRE(callbacks == 0);
+  ASSERT_EQ(callbacks, 0);
   p.Execute("Fo");
-  REQUIRE(callbacks == 0);
+  ASSERT_EQ(callbacks, 0);
   p.Execute("o: ");
-  REQUIRE(callbacks == 0);
+  ASSERT_EQ(callbacks, 0);
   p.Execute("Bar");
-  REQUIRE(callbacks == 0);
+  ASSERT_EQ(callbacks, 0);
   p.Execute("\r\n");
-  REQUIRE(callbacks == 0);
+  ASSERT_EQ(callbacks, 0);
   p.Execute("\r\n");
-  REQUIRE(callbacks == 1);
-  REQUIRE_FALSE(p.HasError());
+  ASSERT_EQ(callbacks, 1);
+  ASSERT_FALSE(p.HasError());
 }
 
-TEST_CASE("HttpParserTest HeaderFieldNext", "[http][parser]") {
-  HttpParser p{HttpParser::Type::REQUEST};
+TEST(HttpParserTest, HeaderFieldNext) {
+  HttpParser p{HttpParser::kRequest};
   int callbacks = 0;
   p.header.connect([&](std::string_view name, std::string_view value) {
-    REQUIRE(name == "Foo");
-    REQUIRE(value == "Bar");
+    ASSERT_EQ(name, "Foo");
+    ASSERT_EQ(value, "Bar");
     ++callbacks;
   });
   p.Execute("GET / HTTP/1.1\r\n");
-  REQUIRE(callbacks == 0);
+  ASSERT_EQ(callbacks, 0);
   p.Execute("Fo");
-  REQUIRE(callbacks == 0);
+  ASSERT_EQ(callbacks, 0);
   p.Execute("o: ");
-  REQUIRE(callbacks == 0);
+  ASSERT_EQ(callbacks, 0);
   p.Execute("Bar");
-  REQUIRE(callbacks == 0);
+  ASSERT_EQ(callbacks, 0);
   p.Execute("\r\n");
-  REQUIRE(callbacks == 0);
+  ASSERT_EQ(callbacks, 0);
   p.Execute("F");
-  REQUIRE(callbacks == 1);
-  REQUIRE_FALSE(p.HasError());
+  ASSERT_EQ(callbacks, 1);
+  ASSERT_FALSE(p.HasError());
 }
 
-TEST_CASE("HttpParserTest HeadersComplete", "[http][parser]") {
-  HttpParser p{HttpParser::Type::REQUEST};
+TEST(HttpParserTest, HeadersComplete) {
+  HttpParser p{HttpParser::kRequest};
   int callbacks = 0;
   p.headersComplete.connect([&](bool keepAlive) {
-    REQUIRE(keepAlive == false);
+    ASSERT_EQ(keepAlive, false);
     ++callbacks;
   });
   p.Execute("GET / HTTP/1.0\r\n");
-  REQUIRE(callbacks == 0);
+  ASSERT_EQ(callbacks, 0);
   p.Execute("\r\n");
-  REQUIRE(callbacks == 1);
-  REQUIRE_FALSE(p.HasError());
+  ASSERT_EQ(callbacks, 1);
+  ASSERT_FALSE(p.HasError());
 }
 
-TEST_CASE("HttpParserTest HeadersCompleteHTTP11", "[http][parser]") {
-  HttpParser p{HttpParser::Type::REQUEST};
+TEST(HttpParserTest, HeadersCompleteHTTP11) {
+  HttpParser p{HttpParser::kRequest};
   int callbacks = 0;
   p.headersComplete.connect([&](bool keepAlive) {
-    REQUIRE(keepAlive == true);
+    ASSERT_EQ(keepAlive, true);
     ++callbacks;
   });
   p.Execute("GET / HTTP/1.1\r\n");
-  REQUIRE(callbacks == 0);
+  ASSERT_EQ(callbacks, 0);
   p.Execute("\r\n");
-  REQUIRE(callbacks == 1);
-  REQUIRE_FALSE(p.HasError());
+  ASSERT_EQ(callbacks, 1);
+  ASSERT_FALSE(p.HasError());
 }
 
-TEST_CASE("HttpParserTest HeadersCompleteKeepAlive", "[http][parser]") {
-  HttpParser p{HttpParser::Type::REQUEST};
+TEST(HttpParserTest, HeadersCompleteKeepAlive) {
+  HttpParser p{HttpParser::kRequest};
   int callbacks = 0;
   p.headersComplete.connect([&](bool keepAlive) {
-    REQUIRE(keepAlive == true);
+    ASSERT_EQ(keepAlive, true);
     ++callbacks;
   });
   p.Execute("GET / HTTP/1.0\r\n");
-  REQUIRE(callbacks == 0);
+  ASSERT_EQ(callbacks, 0);
   p.Execute("Connection: Keep-Alive\r\n");
-  REQUIRE(callbacks == 0);
+  ASSERT_EQ(callbacks, 0);
   p.Execute("\r\n");
-  REQUIRE(callbacks == 1);
-  REQUIRE_FALSE(p.HasError());
+  ASSERT_EQ(callbacks, 1);
+  ASSERT_FALSE(p.HasError());
 }
 
-TEST_CASE("HttpParserTest HeadersCompleteUpgrade", "[http][parser]") {
-  HttpParser p{HttpParser::Type::REQUEST};
+TEST(HttpParserTest, HeadersCompleteUpgrade) {
+  HttpParser p{HttpParser::kRequest};
   int callbacks = 0;
   p.headersComplete.connect([&](bool) {
-    REQUIRE(p.IsUpgrade());
+    ASSERT_TRUE(p.IsUpgrade());
     ++callbacks;
   });
   p.Execute("GET / HTTP/1.0\r\n");
-  REQUIRE(callbacks == 0);
+  ASSERT_EQ(callbacks, 0);
   p.Execute("Connection: Upgrade\r\n");
   p.Execute("Upgrade: websocket\r\n");
-  REQUIRE(callbacks == 0);
+  ASSERT_EQ(callbacks, 0);
   p.Execute("\r\n");
-  REQUIRE(callbacks == 1);
-  REQUIRE_FALSE(p.HasError());
+  ASSERT_EQ(callbacks, 1);
+  ASSERT_FALSE(p.HasError());
 }
 
-TEST_CASE("HttpParserTest Reset", "[http][parser]") {
-  HttpParser p{HttpParser::Type::REQUEST};
+TEST(HttpParserTest, Reset) {
+  HttpParser p{HttpParser::kRequest};
   int callbacks = 0;
   p.headersComplete.connect([&](bool) { ++callbacks; });
   p.Execute("GET / HTTP/1.1\r\n");
-  REQUIRE(callbacks == 0);
+  ASSERT_EQ(callbacks, 0);
   p.Execute("\r\n");
-  REQUIRE(callbacks == 1);
-  p.Reset(HttpParser::Type::REQUEST);
+  ASSERT_EQ(callbacks, 1);
+  p.Reset(HttpParser::kRequest);
   p.Execute("GET / HTTP/1.1\r\n");
-  REQUIRE(callbacks == 1);
+  ASSERT_EQ(callbacks, 1);
   p.Execute("\r\n");
-  REQUIRE(callbacks == 2);
-  REQUIRE_FALSE(p.HasError());
+  ASSERT_EQ(callbacks, 2);
+  ASSERT_FALSE(p.HasError());
 }
 
-}  // namespace wpi::net
+}  // namespace wpi

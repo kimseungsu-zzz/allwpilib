@@ -2,21 +2,19 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-// clang-format off
-#include "wpi/net/WebSocketServer.hpp"
-// clang-format on
+#include "wpinet/WebSocketServer.h"  // NOLINT(build/include_order)
 
 #include <vector>
 
-#include "WebSocketTest.hpp"
-#include "wpi/util/SmallString.hpp"
+#include <wpi/SmallString.h>
 
-namespace wpi::net {
+#include "WebSocketTest.h"
+
+namespace wpi {
 
 class WebSocketIntegrationTest : public WebSocketTest {};
 
-TEST_CASE_METHOD(WebSocketIntegrationTest, "WebSocketIntegrationTest Open",
-                 "[websocket][integration][handshake]") {
+TEST_F(WebSocketIntegrationTest, Open) {
   int gotServerOpen = 0;
   int gotClientOpen = 0;
 
@@ -25,7 +23,7 @@ TEST_CASE_METHOD(WebSocketIntegrationTest, "WebSocketIntegrationTest Open",
     auto server = WebSocketServer::Create(*conn);
     server->connected.connect([&](std::string_view url, WebSocket&) {
       ++gotServerOpen;
-      REQUIRE(url == "/test");
+      ASSERT_EQ(url, "/test");
     });
   });
 
@@ -34,7 +32,7 @@ TEST_CASE_METHOD(WebSocketIntegrationTest, "WebSocketIntegrationTest Open",
     ws->closed.connect([&](uint16_t code, std::string_view reason) {
       Finish();
       if (code != 1005 && code != 1006) {
-        FAIL("Code: " << code << " Reason: " << reason);
+        FAIL() << "Code: " << code << " Reason: " << reason;
       }
     });
     ws->open.connect([&, s = ws.get()](std::string_view) {
@@ -45,12 +43,11 @@ TEST_CASE_METHOD(WebSocketIntegrationTest, "WebSocketIntegrationTest Open",
 
   loop->Run();
 
-  REQUIRE(gotServerOpen == 1);
-  REQUIRE(gotClientOpen == 1);
+  ASSERT_EQ(gotServerOpen, 1);
+  ASSERT_EQ(gotClientOpen, 1);
 }
 
-TEST_CASE_METHOD(WebSocketIntegrationTest, "WebSocketIntegrationTest Protocol",
-                 "[websocket][integration][protocol]") {
+TEST_F(WebSocketIntegrationTest, Protocol) {
   int gotServerOpen = 0;
   int gotClientOpen = 0;
 
@@ -59,7 +56,7 @@ TEST_CASE_METHOD(WebSocketIntegrationTest, "WebSocketIntegrationTest Protocol",
     auto server = WebSocketServer::Create(*conn, {"proto1", "proto2"});
     server->connected.connect([&](std::string_view, WebSocket& ws) {
       ++gotServerOpen;
-      REQUIRE(ws.GetProtocol() == "proto1");
+      ASSERT_EQ(ws.GetProtocol(), "proto1");
     });
   });
 
@@ -69,25 +66,23 @@ TEST_CASE_METHOD(WebSocketIntegrationTest, "WebSocketIntegrationTest Protocol",
     ws->closed.connect([&](uint16_t code, std::string_view reason) {
       Finish();
       if (code != 1005 && code != 1006) {
-        FAIL("Code: " << code << " Reason: " << reason);
+        FAIL() << "Code: " << code << " Reason: " << reason;
       }
     });
     ws->open.connect([&, s = ws.get()](std::string_view protocol) {
       ++gotClientOpen;
       s->Close();
-      REQUIRE(protocol == "proto1");
+      ASSERT_EQ(protocol, "proto1");
     });
   });
 
   loop->Run();
 
-  REQUIRE(gotServerOpen == 1);
-  REQUIRE(gotClientOpen == 1);
+  ASSERT_EQ(gotServerOpen, 1);
+  ASSERT_EQ(gotClientOpen, 1);
 }
 
-TEST_CASE_METHOD(WebSocketIntegrationTest,
-                 "WebSocketIntegrationTest ServerSendBinary",
-                 "[websocket][integration][data]") {
+TEST_F(WebSocketIntegrationTest, ServerSendBinary) {
   int gotData = 0;
 
   serverPipe->Listen([&]() {
@@ -104,25 +99,23 @@ TEST_CASE_METHOD(WebSocketIntegrationTest,
     ws->closed.connect([&](uint16_t code, std::string_view reason) {
       Finish();
       if (code != 1005 && code != 1006) {
-        FAIL("Code: " << code << " Reason: " << reason);
+        FAIL() << "Code: " << code << " Reason: " << reason;
       }
     });
     ws->binary.connect([&](auto data, bool) {
       ++gotData;
       std::vector<uint8_t> recvData{data.begin(), data.end()};
       std::vector<uint8_t> expectData{0x03, 0x04};
-      REQUIRE(recvData == expectData);
+      ASSERT_EQ(recvData, expectData);
     });
   });
 
   loop->Run();
 
-  REQUIRE(gotData == 1);
+  ASSERT_EQ(gotData, 1);
 }
 
-TEST_CASE_METHOD(WebSocketIntegrationTest,
-                 "WebSocketIntegrationTest ClientSendText",
-                 "[websocket][integration][data]") {
+TEST_F(WebSocketIntegrationTest, ClientSendText) {
   int gotData = 0;
 
   serverPipe->Listen([&]() {
@@ -131,7 +124,7 @@ TEST_CASE_METHOD(WebSocketIntegrationTest,
     server->connected.connect([&](std::string_view, WebSocket& ws) {
       ws.text.connect([&](std::string_view data, bool) {
         ++gotData;
-        REQUIRE(data == "hello");
+        ASSERT_EQ(data, "hello");
       });
     });
   });
@@ -141,7 +134,7 @@ TEST_CASE_METHOD(WebSocketIntegrationTest,
     ws->closed.connect([&](uint16_t code, std::string_view reason) {
       Finish();
       if (code != 1005 && code != 1006) {
-        FAIL("Code: " << code << " Reason: " << reason);
+        FAIL() << "Code: " << code << " Reason: " << reason;
       }
     });
     ws->open.connect([&, s = ws.get()](std::string_view) {
@@ -152,12 +145,10 @@ TEST_CASE_METHOD(WebSocketIntegrationTest,
 
   loop->Run();
 
-  REQUIRE(gotData == 1);
+  ASSERT_EQ(gotData, 1);
 }
 
-TEST_CASE_METHOD(WebSocketIntegrationTest,
-                 "WebSocketIntegrationTest ServerSendPing",
-                 "[websocket][integration][control]") {
+TEST_F(WebSocketIntegrationTest, ServerSendPing) {
   int gotPing = 0;
   int gotPong = 0;
   int gotData = 0;
@@ -174,7 +165,7 @@ TEST_CASE_METHOD(WebSocketIntegrationTest,
         ++gotPong;
         std::vector<uint8_t> recvData{data.begin(), data.end()};
         std::vector<uint8_t> expectData{0x03, 0x04};
-        REQUIRE(recvData == expectData);
+        ASSERT_EQ(recvData, expectData);
         if (gotPong == 2) {
           ws.Close();
         }
@@ -187,26 +178,26 @@ TEST_CASE_METHOD(WebSocketIntegrationTest,
     ws->closed.connect([&](uint16_t code, std::string_view reason) {
       Finish();
       if (code != 1005 && code != 1006) {
-        FAIL("Code: " << code << " Reason: " << reason);
+        FAIL() << "Code: " << code << " Reason: " << reason;
       }
     });
     ws->ping.connect([&](auto data) {
       ++gotPing;
       std::vector<uint8_t> recvData{data.begin(), data.end()};
       std::vector<uint8_t> expectData{0x03, 0x04};
-      REQUIRE(recvData == expectData);
+      ASSERT_EQ(recvData, expectData);
     });
     ws->text.connect([&](std::string_view data, bool) {
       ++gotData;
-      REQUIRE(data == "hello");
+      ASSERT_EQ(data, "hello");
     });
   });
 
   loop->Run();
 
-  REQUIRE(gotPing == 2);
-  REQUIRE(gotPong == 2);
-  REQUIRE(gotData == 2);
+  ASSERT_EQ(gotPing, 2);
+  ASSERT_EQ(gotPong, 2);
+  ASSERT_EQ(gotData, 2);
 }
 
-}  // namespace wpi::net
+}  // namespace wpi

@@ -21,7 +21,7 @@
    limitations under the License
 */
 
-#include "wpi/net/TCPConnector.h"
+#include "wpinet/TCPConnector.h"
 
 #include <fcntl.h>
 
@@ -40,13 +40,13 @@
 #include <unistd.h>
 #endif
 
-#include "wpi/util/Logger.hpp"
-#include "wpi/util/SmallString.hpp"
+#include <wpi/Logger.h>
+#include <wpi/SmallString.h>
 
-#include "wpi/net/SocketError.hpp"
-#include "wpi/net/TCPStream.h"
+#include "wpinet/SocketError.h"
+#include "wpinet/TCPStream.h"
 
-using namespace wpi::net;
+using namespace wpi;
 
 static int ResolveHostName(const char* hostname, struct in_addr* addr) {
   struct addrinfo hints;
@@ -71,7 +71,7 @@ static int ResolveHostName(const char* hostname, struct in_addr* addr) {
 }
 
 std::unique_ptr<NetworkStream> TCPConnector::connect(const char* server,
-                                                     int port, wpi::util::Logger& logger,
+                                                     int port, Logger& logger,
                                                      int timeout) {
 #ifdef _WIN32
   struct WSAHelper {
@@ -90,7 +90,7 @@ std::unique_ptr<NetworkStream> TCPConnector::connect(const char* server,
   address.sin_family = AF_INET;
   if (ResolveHostName(server, &(address.sin_addr)) != 0) {
 #ifdef _WIN32
-    wpi::util::SmallString<128> addr_copy(server);
+    SmallString<128> addr_copy(server);
     addr_copy.push_back('\0');
     int res = InetPton(PF_INET, addr_copy.data(), &(address.sin_addr));
 #else

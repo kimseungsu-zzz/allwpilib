@@ -2,19 +2,18 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "PropertyContainer.hpp"
+#include "PropertyContainer.h"
 
 #include <memory>
 #include <string>
-#include <utility>
 #include <vector>
 
-#include "wpi/util/Logger.hpp"
-#include "wpi/util/SmallString.hpp"
-#include "wpi/util/SmallVector.hpp"
-#include "wpi/util/json.hpp"
+#include <wpi/Logger.h>
+#include <wpi/SmallString.h>
+#include <wpi/SmallVector.h>
+#include <wpi/json.h>
 
-using namespace wpi::cs;
+using namespace cs;
 
 int PropertyContainer::GetPropertyIndex(std::string_view name) const {
   // We can't fail, so instead we create a new index if caching fails.
@@ -33,7 +32,7 @@ int PropertyContainer::GetPropertyIndex(std::string_view name) const {
 }
 
 std::span<int> PropertyContainer::EnumerateProperties(
-    wpi::util::SmallVectorImpl<int>& vec, CS_Status* status) const {
+    wpi::SmallVectorImpl<int>& vec, CS_Status* status) const {
   if (!m_properties_cached && !CacheProperties(status)) {
     return {};
   }
@@ -60,8 +59,7 @@ CS_PropertyKind PropertyContainer::GetPropertyKind(int property) const {
 }
 
 std::string_view PropertyContainer::GetPropertyName(
-    int property, wpi::util::SmallVectorImpl<char>& buf,
-    CS_Status* status) const {
+    int property, wpi::SmallVectorImpl<char>& buf, CS_Status* status) const {
   if (!m_properties_cached && !CacheProperties(status)) {
     return {};
   }
@@ -170,8 +168,7 @@ int PropertyContainer::GetPropertyDefault(int property,
 }
 
 std::string_view PropertyContainer::GetStringProperty(
-    int property, wpi::util::SmallVectorImpl<char>& buf,
-    CS_Status* status) const {
+    int property, wpi::SmallVectorImpl<char>& buf, CS_Status* status) const {
   if (!m_properties_cached && !CacheProperties(status)) {
     return {};
   }
@@ -241,15 +238,15 @@ bool PropertyContainer::CacheProperties(CS_Status* status) const {
   return true;
 }
 
-bool PropertyContainer::SetPropertiesJson(const wpi::util::json& config,
-                                          wpi::util::Logger& logger,
+bool PropertyContainer::SetPropertiesJson(const wpi::json& config,
+                                          wpi::Logger& logger,
                                           std::string_view logName,
                                           CS_Status* status) {
-  for (auto&& prop : config.get_array()) {
+  for (auto&& prop : config) {
     std::string name;
     try {
-      name = prop.at("name").get_string();
-    } catch (const std::logic_error& e) {
+      name = prop.at("name").get<std::string>();
+    } catch (const wpi::json::exception& e) {
       WPI_WARNING(logger, "{}: SetConfigJson: could not read property name: {}",
                   logName, e.what());
       continue;
@@ -258,22 +255,22 @@ bool PropertyContainer::SetPropertiesJson(const wpi::util::json& config,
     try {
       auto& v = prop.at("value");
       if (v.is_string()) {
-        std::string val = v.get_string();
+        std::string val = v.get<std::string>();
         WPI_INFO(logger, "{}: SetConfigJson: setting property '{}' to '{}'",
                  logName, name, val);
         SetStringProperty(n, val, status);
-      } else if (v.is_bool()) {
-        bool val = v.get_bool();
+      } else if (v.is_boolean()) {
+        bool val = v.get<bool>();
         WPI_INFO(logger, "{}: SetConfigJson: setting property '{}' to {}",
                  logName, name, val);
         SetProperty(n, val, status);
       } else {
-        int val = v.get_int();
+        int val = v.get<int>();
         WPI_INFO(logger, "{}: SetConfigJson: setting property '{}' to {}",
                  logName, name, val);
         SetProperty(n, val, status);
       }
-    } catch (const std::logic_error& e) {
+    } catch (const wpi::json::exception& e) {
       WPI_WARNING(logger,
                   "{}: SetConfigJson: could not read property value: {}",
                   logName, e.what());
@@ -284,28 +281,28 @@ bool PropertyContainer::SetPropertiesJson(const wpi::util::json& config,
   return true;
 }
 
-wpi::util::json PropertyContainer::GetPropertiesJsonObject(CS_Status* status) {
-  wpi::util::json j;
-  wpi::util::SmallVector<int, 32> propVec;
+wpi::json PropertyContainer::GetPropertiesJsonObject(CS_Status* status) {
+  wpi::json j;
+  wpi::SmallVector<int, 32> propVec;
   for (int p : EnumerateProperties(propVec, status)) {
-    wpi::util::json prop;
-    wpi::util::SmallString<128> strBuf;
-    prop["name"] = GetPropertyName(p, strBuf, status);
+    wpi::json prop;
+    wpi::SmallString<128> strBuf;
+    prop.emplace("name", GetPropertyName(p, strBuf, status));
     switch (GetPropertyKind(p)) {
       case CS_PROP_BOOLEAN:
-        prop["value"] = static_cast<bool>(GetProperty(p, status));
+        prop.emplace("value", static_cast<bool>(GetProperty(p, status)));
         break;
       case CS_PROP_INTEGER:
       case CS_PROP_ENUM:
-        prop["value"] = GetProperty(p, status);
+        prop.emplace("value", GetProperty(p, status));
         break;
       case CS_PROP_STRING:
-        prop["value"] = GetStringProperty(p, strBuf, status);
+        prop.emplace("value", GetStringProperty(p, strBuf, status));
         break;
       default:
         continue;
     }
-    j.emplace_back(std::move(prop));
+    j.emplace_back(prop);
   }
 
   return j;

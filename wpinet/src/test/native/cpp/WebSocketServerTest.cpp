@@ -2,23 +2,20 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-// clang-format off
-#include "wpi/net/WebSocket.hpp"
-// clang-format on
+#include "wpinet/WebSocket.h"  // NOLINT(build/include_order)
 
 #include <functional>
 #include <memory>
 #include <vector>
 
-#include <catch2/generators/catch_generators.hpp>
+#include <wpi/Base64.h>
+#include <wpi/SmallString.h>
+#include <wpi/sha1.h>
 
-#include "WebSocketTest.hpp"
-#include "wpi/net/HttpParser.hpp"
-#include "wpi/util/Base64.hpp"
-#include "wpi/util/SmallString.hpp"
-#include "wpi/util/sha1.hpp"
+#include "WebSocketTest.h"
+#include "wpinet/HttpParser.h"
 
-namespace wpi::net {
+namespace wpi {
 
 class WebSocketServerTest : public WebSocketTest {
  public:
@@ -41,8 +38,8 @@ class WebSocketServerTest : public WebSocketTest {
           if (resp.HasError()) {
             Finish();
           }
-          UNSCOPED_INFO(llhttp_errno_name(resp.GetError()));
-          REQUIRE(resp.GetError() == HPE_PAUSED_UPGRADE);
+          ASSERT_EQ(resp.GetError(), HPE_OK)
+              << http_errno_name(resp.GetError());
           if (data.empty()) {
             return;
           }
@@ -60,7 +57,7 @@ class WebSocketServerTest : public WebSocketTest {
   std::function<void(std::string_view)> handleData;
   std::vector<uint8_t> wireData;
   std::shared_ptr<WebSocket> ws;
-  HttpParser resp{HttpParser::Type::RESPONSE};
+  HttpParser resp{HttpParser::kResponse};
   bool headersDone = false;
 };
 
@@ -68,73 +65,66 @@ class WebSocketServerTest : public WebSocketTest {
 // Terminate closes the endpoint but doesn't send a close frame.
 //
 
-TEST_CASE_METHOD(WebSocketServerTest, "WebSocketServerTest Terminate",
-                 "[websocket][server][terminate]") {
+TEST_F(WebSocketServerTest, Terminate) {
   int gotClosed = 0;
   setupWebSocket = [&] {
     ws->open.connect([&](std::string_view) { ws->Terminate(); });
     ws->closed.connect([&](uint16_t code, std::string_view reason) {
       ++gotClosed;
-      UNSCOPED_INFO("reason: " << reason);
-      REQUIRE(code == 1006);
+      ASSERT_EQ(code, 1006) << "reason: " << reason;
     });
   };
 
   loop->Run();
 
-  REQUIRE(wireData.empty());  // terminate doesn't send data
-  REQUIRE(gotClosed == 1);
+  ASSERT_TRUE(wireData.empty());  // terminate doesn't send data
+  ASSERT_EQ(gotClosed, 1);
 }
 
-TEST_CASE_METHOD(WebSocketServerTest, "WebSocketServerTest TerminateCode",
-                 "[websocket][server][terminate]") {
+TEST_F(WebSocketServerTest, TerminateCode) {
   int gotClosed = 0;
   setupWebSocket = [&] {
     ws->open.connect([&](std::string_view) { ws->Terminate(1000); });
     ws->closed.connect([&](uint16_t code, std::string_view reason) {
       ++gotClosed;
-      UNSCOPED_INFO("reason: " << reason);
-      REQUIRE(code == 1000);
+      ASSERT_EQ(code, 1000) << "reason: " << reason;
     });
   };
 
   loop->Run();
 
-  REQUIRE(wireData.empty());  // terminate doesn't send data
-  REQUIRE(gotClosed == 1);
+  ASSERT_TRUE(wireData.empty());  // terminate doesn't send data
+  ASSERT_EQ(gotClosed, 1);
 }
 
-TEST_CASE_METHOD(WebSocketServerTest, "WebSocketServerTest TerminateReason",
-                 "[websocket][server][terminate]") {
+TEST_F(WebSocketServerTest, TerminateReason) {
   int gotClosed = 0;
   setupWebSocket = [&] {
     ws->open.connect([&](std::string_view) { ws->Terminate(1000, "reason"); });
     ws->closed.connect([&](uint16_t code, std::string_view reason) {
       ++gotClosed;
-      REQUIRE(code == 1000);
-      REQUIRE(reason == "reason");
+      ASSERT_EQ(code, 1000);
+      ASSERT_EQ(reason, "reason");
     });
   };
 
   loop->Run();
 
-  REQUIRE(wireData.empty());  // terminate doesn't send data
-  REQUIRE(gotClosed == 1);
+  ASSERT_TRUE(wireData.empty());  // terminate doesn't send data
+  ASSERT_EQ(gotClosed, 1);
 }
 
 //
 // Close() sends a close frame.
 //
 
-TEST_CASE_METHOD(WebSocketServerTest, "WebSocketServerTest CloseBasic",
-                 "[websocket][server][close]") {
+TEST_F(WebSocketServerTest, CloseBasic) {
   int gotClosed = 0;
   setupWebSocket = [&] {
     ws->open.connect([&](std::string_view) { ws->Close(); });
     ws->closed.connect([&](uint16_t code, std::string_view reason) {
       ++gotClosed;
-      UNSCOPED_INFO("reason: " << reason);
-      REQUIRE(code == 1005);
+      ASSERT_EQ(code, 1005) << "reason: " << reason;
     });
   };
   // need to respond with close for server to finish shutdown
@@ -146,19 +136,17 @@ TEST_CASE_METHOD(WebSocketServerTest, "WebSocketServerTest CloseBasic",
   loop->Run();
 
   auto expectData = BuildMessage(0x08, true, false, {});
-  REQUIRE(wireData == expectData);
-  REQUIRE(gotClosed == 1);
+  ASSERT_EQ(wireData, expectData);
+  ASSERT_EQ(gotClosed, 1);
 }
 
-TEST_CASE_METHOD(WebSocketServerTest, "WebSocketServerTest CloseCode",
-                 "[websocket][server][close]") {
+TEST_F(WebSocketServerTest, CloseCode) {
   int gotClosed = 0;
   setupWebSocket = [&] {
     ws->open.connect([&](std::string_view) { ws->Close(1000); });
     ws->closed.connect([&](uint16_t code, std::string_view reason) {
       ++gotClosed;
-      UNSCOPED_INFO("reason: " << reason);
-      REQUIRE(code == 1000);
+      ASSERT_EQ(code, 1000) << "reason: " << reason;
     });
   };
   // need to respond with close for server to finish shutdown
@@ -171,19 +159,18 @@ TEST_CASE_METHOD(WebSocketServerTest, "WebSocketServerTest CloseCode",
   loop->Run();
 
   auto expectData = BuildMessage(0x08, true, false, contents);
-  REQUIRE(wireData == expectData);
-  REQUIRE(gotClosed == 1);
+  ASSERT_EQ(wireData, expectData);
+  ASSERT_EQ(gotClosed, 1);
 }
 
-TEST_CASE_METHOD(WebSocketServerTest, "WebSocketServerTest CloseReason",
-                 "[websocket][server][close]") {
+TEST_F(WebSocketServerTest, CloseReason) {
   int gotClosed = 0;
   setupWebSocket = [&] {
     ws->open.connect([&](std::string_view) { ws->Close(1000, "hangup"); });
     ws->closed.connect([&](uint16_t code, std::string_view reason) {
       ++gotClosed;
-      REQUIRE(code == 1000);
-      REQUIRE(reason == "remote close: hangup");
+      ASSERT_EQ(code, 1000);
+      ASSERT_EQ(reason, "remote close: hangup");
     });
   };
   // need to respond with close for server to finish shutdown
@@ -196,22 +183,20 @@ TEST_CASE_METHOD(WebSocketServerTest, "WebSocketServerTest CloseReason",
   loop->Run();
 
   auto expectData = BuildMessage(0x08, true, false, contents);
-  REQUIRE(wireData == expectData);
-  REQUIRE(gotClosed == 1);
+  ASSERT_EQ(wireData, expectData);
+  ASSERT_EQ(gotClosed, 1);
 }
 
 //
 // Receiving a close frame results in closure and echoing the close frame.
 //
 
-TEST_CASE_METHOD(WebSocketServerTest, "WebSocketServerTest ReceiveCloseBasic",
-                 "[websocket][server][close]") {
+TEST_F(WebSocketServerTest, ReceiveCloseBasic) {
   int gotClosed = 0;
   setupWebSocket = [&] {
     ws->closed.connect([&](uint16_t code, std::string_view reason) {
       ++gotClosed;
-      UNSCOPED_INFO("reason: " << reason);
-      REQUIRE(code == 1005);
+      ASSERT_EQ(code, 1005) << "reason: " << reason;
     });
   };
   auto message = BuildMessage(0x08, true, true, {});
@@ -223,18 +208,16 @@ TEST_CASE_METHOD(WebSocketServerTest, "WebSocketServerTest ReceiveCloseBasic",
 
   // the endpoint should echo the message
   auto expectData = BuildMessage(0x08, true, false, {});
-  REQUIRE(wireData == expectData);
-  REQUIRE(gotClosed == 1);
+  ASSERT_EQ(wireData, expectData);
+  ASSERT_EQ(gotClosed, 1);
 }
 
-TEST_CASE_METHOD(WebSocketServerTest, "WebSocketServerTest ReceiveCloseCode",
-                 "[websocket][server][close]") {
+TEST_F(WebSocketServerTest, ReceiveCloseCode) {
   int gotClosed = 0;
   setupWebSocket = [&] {
     ws->closed.connect([&](uint16_t code, std::string_view reason) {
       ++gotClosed;
-      UNSCOPED_INFO("reason: " << reason);
-      REQUIRE(code == 1000);
+      ASSERT_EQ(code, 1000) << "reason: " << reason;
     });
   };
   const uint8_t contents[] = {0x03u, 0xe8u};
@@ -247,18 +230,17 @@ TEST_CASE_METHOD(WebSocketServerTest, "WebSocketServerTest ReceiveCloseCode",
 
   // the endpoint should echo the message
   auto expectData = BuildMessage(0x08, true, false, contents);
-  REQUIRE(wireData == expectData);
-  REQUIRE(gotClosed == 1);
+  ASSERT_EQ(wireData, expectData);
+  ASSERT_EQ(gotClosed, 1);
 }
 
-TEST_CASE_METHOD(WebSocketServerTest, "WebSocketServerTest ReceiveCloseReason",
-                 "[websocket][server][close]") {
+TEST_F(WebSocketServerTest, ReceiveCloseReason) {
   int gotClosed = 0;
   setupWebSocket = [&] {
     ws->closed.connect([&](uint16_t code, std::string_view reason) {
       ++gotClosed;
-      REQUIRE(code == 1000);
-      REQUIRE(reason == "remote close: hangup");
+      ASSERT_EQ(code, 1000);
+      ASSERT_EQ(reason, "remote close: hangup");
     });
   };
   const uint8_t contents[] = {0x03u, 0xe8u, 'h', 'a', 'n', 'g', 'u', 'p'};
@@ -271,8 +253,8 @@ TEST_CASE_METHOD(WebSocketServerTest, "WebSocketServerTest ReceiveCloseReason",
 
   // the endpoint should echo the message
   auto expectData = BuildMessage(0x08, true, false, contents);
-  REQUIRE(wireData == expectData);
-  REQUIRE(gotClosed == 1);
+  ASSERT_EQ(wireData, expectData);
+  ASSERT_EQ(gotClosed, 1);
 }
 
 //
@@ -280,59 +262,63 @@ TEST_CASE_METHOD(WebSocketServerTest, "WebSocketServerTest ReceiveCloseReason",
 // WebSocket Connection_.
 //
 
-class WebSocketServerBadOpcodeTest : public WebSocketServerTest {};
+class WebSocketServerBadOpcodeTest
+    : public WebSocketServerTest,
+      public ::testing::WithParamInterface<uint8_t> {};
 
-TEST_CASE_METHOD(WebSocketServerBadOpcodeTest,
-                 "WebSocketServerBadOpcodeTest Receive",
-                 "[websocket][server][protocol]") {
+INSTANTIATE_TEST_SUITE_P(WebSocketServerBadOpcodeTests,
+                         WebSocketServerBadOpcodeTest,
+                         ::testing::Values(3, 4, 5, 6, 7, 0xb, 0xc, 0xd, 0xe,
+                                           0xf));
+
+TEST_P(WebSocketServerBadOpcodeTest, Receive) {
   int gotCallback = 0;
-  auto opcode =
-      static_cast<uint8_t>(GENERATE(3, 4, 5, 6, 7, 0xb, 0xc, 0xd, 0xe, 0xf));
   std::vector<uint8_t> data(4, 0x03);
   setupWebSocket = [&] {
     ws->closed.connect([&](uint16_t code, std::string_view reason) {
       ++gotCallback;
-      UNSCOPED_INFO("reason: " << reason);
-      REQUIRE(code == 1002);
+      ASSERT_EQ(code, 1002) << "reason: " << reason;
     });
   };
-  auto message = BuildMessage(opcode, true, true, data);
+  auto message = BuildMessage(GetParam(), true, true, data);
   resp.headersComplete.connect([&](bool) {
     clientPipe->Write({{message}}, [&](auto bufs, uv::Error) {});
   });
 
   loop->Run();
 
-  REQUIRE(gotCallback == 1);
+  ASSERT_EQ(gotCallback, 1);
 }
 
 //
 // Control frames themselves MUST NOT be fragmented.
 //
 
-class WebSocketServerControlFrameTest : public WebSocketServerTest {};
+class WebSocketServerControlFrameTest
+    : public WebSocketServerTest,
+      public ::testing::WithParamInterface<uint8_t> {};
 
-TEST_CASE_METHOD(WebSocketServerControlFrameTest,
-                 "WebSocketServerControlFrameTest ReceiveFragment",
-                 "[websocket][server][control][fragment]") {
+INSTANTIATE_TEST_SUITE_P(WebSocketServerControlFrameTests,
+                         WebSocketServerControlFrameTest,
+                         ::testing::Values(0x8, 0x9, 0xa));
+
+TEST_P(WebSocketServerControlFrameTest, ReceiveFragment) {
   int gotCallback = 0;
-  auto opcode = static_cast<uint8_t>(GENERATE(0x8, 0x9, 0xa));
   std::vector<uint8_t> data(4, 0x03);
   setupWebSocket = [&] {
     ws->closed.connect([&](uint16_t code, std::string_view reason) {
       ++gotCallback;
-      UNSCOPED_INFO("reason: " << reason);
-      REQUIRE(code == 1002);
+      ASSERT_EQ(code, 1002) << "reason: " << reason;
     });
   };
-  auto message = BuildMessage(opcode, false, true, data);
+  auto message = BuildMessage(GetParam(), false, true, data);
   resp.headersComplete.connect([&](bool) {
     clientPipe->Write({{message}}, [&](auto bufs, uv::Error) {});
   });
 
   loop->Run();
 
-  REQUIRE(gotCallback == 1);
+  ASSERT_EQ(gotCallback, 1);
 }
 
 //
@@ -343,16 +329,13 @@ TEST_CASE_METHOD(WebSocketServerControlFrameTest,
 //
 
 // No previous message
-TEST_CASE_METHOD(WebSocketServerTest,
-                 "WebSocketServerTest ReceiveFragmentInvalidNoPrevFrame",
-                 "[websocket][server][fragment][protocol]") {
+TEST_F(WebSocketServerTest, ReceiveFragmentInvalidNoPrevFrame) {
   int gotCallback = 0;
   std::vector<uint8_t> data(4, 0x03);
   setupWebSocket = [&] {
     ws->closed.connect([&](uint16_t code, std::string_view reason) {
       ++gotCallback;
-      UNSCOPED_INFO("reason: " << reason);
-      REQUIRE(code == 1002);
+      ASSERT_EQ(code, 1002) << "reason: " << reason;
     });
   };
   auto message = BuildMessage(0x00, false, true, data);
@@ -362,20 +345,17 @@ TEST_CASE_METHOD(WebSocketServerTest,
 
   loop->Run();
 
-  REQUIRE(gotCallback == 1);
+  ASSERT_EQ(gotCallback, 1);
 }
 
 // No previous message with FIN=1.
-TEST_CASE_METHOD(WebSocketServerTest,
-                 "WebSocketServerTest ReceiveFragmentInvalidNoPrevFragment",
-                 "[websocket][server][fragment][protocol]") {
+TEST_F(WebSocketServerTest, ReceiveFragmentInvalidNoPrevFragment) {
   int gotCallback = 0;
   std::vector<uint8_t> data(4, 0x03);
   setupWebSocket = [&] {
     ws->closed.connect([&](uint16_t code, std::string_view reason) {
       ++gotCallback;
-      UNSCOPED_INFO("reason: " << reason);
-      REQUIRE(code == 1002);
+      ASSERT_EQ(code, 1002) << "reason: " << reason;
     });
   };
   auto message = BuildMessage(0x01, true, true, {});  // FIN=1
@@ -386,19 +366,16 @@ TEST_CASE_METHOD(WebSocketServerTest,
 
   loop->Run();
 
-  REQUIRE(gotCallback == 1);
+  ASSERT_EQ(gotCallback, 1);
 }
 
 // Incomplete fragment
-TEST_CASE_METHOD(WebSocketServerTest,
-                 "WebSocketServerTest ReceiveFragmentInvalidIncomplete",
-                 "[websocket][server][fragment][protocol]") {
+TEST_F(WebSocketServerTest, ReceiveFragmentInvalidIncomplete) {
   int gotCallback = 0;
   setupWebSocket = [&] {
     ws->closed.connect([&](uint16_t code, std::string_view reason) {
       ++gotCallback;
-      UNSCOPED_INFO("reason: " << reason);
-      REQUIRE(code == 1002);
+      ASSERT_EQ(code, 1002) << "reason: " << reason;
     });
   };
   auto message = BuildMessage(0x01, false, true, {});
@@ -411,12 +388,11 @@ TEST_CASE_METHOD(WebSocketServerTest,
 
   loop->Run();
 
-  REQUIRE(gotCallback == 1);
+  ASSERT_EQ(gotCallback, 1);
 }
 
 // Normally fragments are combined into a single callback
-TEST_CASE_METHOD(WebSocketServerTest, "WebSocketServerTest ReceiveFragment",
-                 "[websocket][server][fragment]") {
+TEST_F(WebSocketServerTest, ReceiveFragment) {
   int gotCallback = 0;
 
   std::vector<uint8_t> data(4, 0x03);
@@ -437,9 +413,9 @@ TEST_CASE_METHOD(WebSocketServerTest, "WebSocketServerTest ReceiveFragment",
     ws->binary.connect([&](auto inData, bool fin) {
       ++gotCallback;
       ws->Terminate();
-      REQUIRE(fin);
+      ASSERT_TRUE(fin);
       std::vector<uint8_t> recvData{inData.begin(), inData.end()};
-      REQUIRE(combData == recvData);
+      ASSERT_EQ(combData, recvData);
     });
   };
 
@@ -453,13 +429,11 @@ TEST_CASE_METHOD(WebSocketServerTest, "WebSocketServerTest ReceiveFragment",
 
   loop->Run();
 
-  REQUIRE(gotCallback == 1);
+  ASSERT_EQ(gotCallback, 1);
 }
 
 // But can be configured for multiple callbacks
-TEST_CASE_METHOD(WebSocketServerTest,
-                 "WebSocketServerTest ReceiveFragmentSeparate",
-                 "[websocket][server][fragment]") {
+TEST_F(WebSocketServerTest, ReceiveFragmentSeparate) {
   int gotCallback = 0;
 
   std::vector<uint8_t> data(4, 0x03);
@@ -475,20 +449,20 @@ TEST_CASE_METHOD(WebSocketServerTest,
       std::vector<uint8_t> recvData{inData.begin(), inData.end()};
       switch (++gotCallback) {
         case 1:
-          REQUIRE_FALSE(fin);
-          REQUIRE(data == recvData);
+          ASSERT_FALSE(fin);
+          ASSERT_EQ(data, recvData);
           break;
         case 2:
-          REQUIRE_FALSE(fin);
-          REQUIRE(data2 == recvData);
+          ASSERT_FALSE(fin);
+          ASSERT_EQ(data2, recvData);
           break;
         case 3:
           ws->Terminate();
-          REQUIRE(fin);
-          REQUIRE(data3 == recvData);
+          ASSERT_TRUE(fin);
+          ASSERT_EQ(data3, recvData);
           break;
         default:
-          FAIL("too many callbacks");
+          FAIL() << "too many callbacks";
           break;
       }
     });
@@ -504,13 +478,11 @@ TEST_CASE_METHOD(WebSocketServerTest,
 
   loop->Run();
 
-  REQUIRE(gotCallback == 3);
+  ASSERT_EQ(gotCallback, 3);
 }
 
 // Control frames can happen in the middle of a fragmented message
-TEST_CASE_METHOD(WebSocketServerTest,
-                 "WebSocketServerTest ReceiveFragmentWithControl",
-                 "[websocket][server][fragment][control]") {
+TEST_F(WebSocketServerTest, ReceiveFragmentWithControl) {
   int gotCallback = 0;
   int gotPongCallback = 0;
 
@@ -531,15 +503,15 @@ TEST_CASE_METHOD(WebSocketServerTest,
 
   setupWebSocket = [&] {
     ws->binary.connect([&](auto inData, bool fin) {
-      REQUIRE(gotPongCallback);
+      ASSERT_TRUE(gotPongCallback);
       ++gotCallback;
       ws->Terminate();
-      REQUIRE(fin);
+      ASSERT_TRUE(fin);
       std::vector<uint8_t> recvData{inData.begin(), inData.end()};
-      REQUIRE(combData == recvData);
+      ASSERT_EQ(combData, recvData);
     });
     ws->pong.connect([&](auto inData) {
-      REQUIRE_FALSE(gotCallback);
+      ASSERT_FALSE(gotCallback);
       ++gotPongCallback;
     });
   };
@@ -555,8 +527,8 @@ TEST_CASE_METHOD(WebSocketServerTest,
 
   loop->Run();
 
-  REQUIRE(gotCallback == 1);
-  REQUIRE(gotPongCallback == 1);
+  ASSERT_EQ(gotCallback, 1);
+  ASSERT_EQ(gotPongCallback, 1);
 }
 
 //
@@ -564,20 +536,18 @@ TEST_CASE_METHOD(WebSocketServerTest,
 //
 
 // Single message
-TEST_CASE_METHOD(WebSocketServerTest, "WebSocketServerTest ReceiveTooLarge",
-                 "[websocket][server][limits]") {
+TEST_F(WebSocketServerTest, ReceiveTooLarge) {
   int gotCallback = 0;
   std::vector<uint8_t> data(2048, 0x03u);
   setupWebSocket = [&] {
     ws->SetMaxMessageSize(1024);
     ws->binary.connect([&](auto, bool) {
       ws->Terminate();
-      FAIL("Should not have gotten unmasked message");
+      FAIL() << "Should not have gotten unmasked message";
     });
     ws->closed.connect([&](uint16_t code, std::string_view reason) {
       ++gotCallback;
-      UNSCOPED_INFO("reason: " << reason);
-      REQUIRE(code == 1009);
+      ASSERT_EQ(code, 1009) << "reason: " << reason;
     });
   };
   auto message = BuildMessage(0x01, true, true, data);
@@ -587,25 +557,22 @@ TEST_CASE_METHOD(WebSocketServerTest, "WebSocketServerTest ReceiveTooLarge",
 
   loop->Run();
 
-  REQUIRE(gotCallback == 1);
+  ASSERT_EQ(gotCallback, 1);
 }
 
 // Applied across fragments if combining
-TEST_CASE_METHOD(WebSocketServerTest,
-                 "WebSocketServerTest ReceiveTooLargeFragmented",
-                 "[websocket][server][limits][fragment]") {
+TEST_F(WebSocketServerTest, ReceiveTooLargeFragmented) {
   int gotCallback = 0;
   std::vector<uint8_t> data(768, 0x03u);
   setupWebSocket = [&] {
     ws->SetMaxMessageSize(1024);
     ws->binary.connect([&](auto, bool) {
       ws->Terminate();
-      FAIL("Should not have gotten unmasked message");
+      FAIL() << "Should not have gotten unmasked message";
     });
     ws->closed.connect([&](uint16_t code, std::string_view reason) {
       ++gotCallback;
-      UNSCOPED_INFO("reason: " << reason);
-      REQUIRE(code == 1009);
+      ASSERT_EQ(code, 1009) << "reason: " << reason;
     });
   };
   auto message = BuildMessage(0x01, false, true, data);
@@ -616,59 +583,29 @@ TEST_CASE_METHOD(WebSocketServerTest,
 
   loop->Run();
 
-  REQUIRE(gotCallback == 1);
-}
-
-TEST_CASE_METHOD(WebSocketServerTest,
-                 "WebSocketServerTest RejectsInvalid64BitLength",
-                 "[websocket][server][limits]") {
-  int gotCallback = 0;
-  setupWebSocket = [&] {
-    ws->SetMaxMessageSize(1024);
-    ws->binary.connect([&](auto, bool) {
-      ws->Terminate();
-      FAIL("Should not have received an invalid-length message");
-    });
-    ws->closed.connect([&](uint16_t code, std::string_view reason) {
-      ++gotCallback;
-      UNSCOPED_INFO("reason: " << reason);
-      REQUIRE(code == 1002);
-    });
-  };
-
-  std::vector<uint8_t> data{0x03};
-  auto firstFragment = BuildMessage(0x02, false, true, data);
-  auto invalidContinuation = BuildHeader(0x00, true, true, UINT64_MAX);
-  invalidContinuation.push_back(0);
-  resp.headersComplete.connect([&](bool) {
-    clientPipe->Write({{firstFragment}, {invalidContinuation}},
-                      [&](auto, uv::Error) {});
-  });
-
-  loop->Run();
-
-  REQUIRE(gotCallback == 1);
+  ASSERT_EQ(gotCallback, 1);
 }
 
 //
 // Send and receive data.
 //
 
-class WebSocketServerDataTest : public WebSocketServerTest {};
+class WebSocketServerDataTest : public WebSocketServerTest,
+                                public ::testing::WithParamInterface<size_t> {};
 
-TEST_CASE_METHOD(WebSocketServerDataTest, "WebSocketServerDataTest SendText",
-                 "[websocket][server][data]") {
+INSTANTIATE_TEST_SUITE_P(WebSocketServerDataTests, WebSocketServerDataTest,
+                         ::testing::Values(0, 1, 125, 126, 65535, 65536));
+
+TEST_P(WebSocketServerDataTest, SendText) {
   int gotCallback = 0;
-  std::vector<uint8_t> data(GENERATE(size_t{0}, size_t{1}, size_t{125},
-                                     size_t{126}, size_t{65535}, size_t{65536}),
-                            ' ');
+  std::vector<uint8_t> data(GetParam(), ' ');
   setupWebSocket = [&] {
     ws->open.connect([&](std::string_view) {
       ws->SendText({{data}}, [&](auto bufs, uv::Error) {
         ++gotCallback;
         ws->Terminate();
-        REQUIRE_FALSE(bufs.empty());
-        REQUIRE(bufs[0].base == reinterpret_cast<const char*>(data.data()));
+        ASSERT_FALSE(bufs.empty());
+        ASSERT_EQ(bufs[0].base, reinterpret_cast<const char*>(data.data()));
       });
     });
   };
@@ -676,23 +613,20 @@ TEST_CASE_METHOD(WebSocketServerDataTest, "WebSocketServerDataTest SendText",
   loop->Run();
 
   auto expectData = BuildMessage(0x01, true, false, data);
-  REQUIRE(wireData == expectData);
-  REQUIRE(gotCallback == 1);
+  ASSERT_EQ(wireData, expectData);
+  ASSERT_EQ(gotCallback, 1);
 }
 
-TEST_CASE_METHOD(WebSocketServerDataTest, "WebSocketServerDataTest SendBinary",
-                 "[websocket][server][data]") {
+TEST_P(WebSocketServerDataTest, SendBinary) {
   int gotCallback = 0;
-  std::vector<uint8_t> data(GENERATE(size_t{0}, size_t{1}, size_t{125},
-                                     size_t{126}, size_t{65535}, size_t{65536}),
-                            0x03u);
+  std::vector<uint8_t> data(GetParam(), 0x03u);
   setupWebSocket = [&] {
     ws->open.connect([&](std::string_view) {
       ws->SendBinary({{data}}, [&](auto bufs, uv::Error) {
         ++gotCallback;
         ws->Terminate();
-        REQUIRE_FALSE(bufs.empty());
-        REQUIRE(bufs[0].base == reinterpret_cast<const char*>(data.data()));
+        ASSERT_FALSE(bufs.empty());
+        ASSERT_EQ(bufs[0].base, reinterpret_cast<const char*>(data.data()));
       });
     });
   };
@@ -700,23 +634,20 @@ TEST_CASE_METHOD(WebSocketServerDataTest, "WebSocketServerDataTest SendBinary",
   loop->Run();
 
   auto expectData = BuildMessage(0x02, true, false, data);
-  REQUIRE(wireData == expectData);
-  REQUIRE(gotCallback == 1);
+  ASSERT_EQ(wireData, expectData);
+  ASSERT_EQ(gotCallback, 1);
 }
 
-TEST_CASE_METHOD(WebSocketServerDataTest, "WebSocketServerDataTest SendPing",
-                 "[websocket][server][control]") {
+TEST_P(WebSocketServerDataTest, SendPing) {
   int gotCallback = 0;
-  std::vector<uint8_t> data(GENERATE(size_t{0}, size_t{1}, size_t{125},
-                                     size_t{126}, size_t{65535}, size_t{65536}),
-                            0x03u);
+  std::vector<uint8_t> data(GetParam(), 0x03u);
   setupWebSocket = [&] {
     ws->open.connect([&](std::string_view) {
       ws->SendPing({{data}}, [&](auto bufs, uv::Error) {
         ++gotCallback;
         ws->Terminate();
-        REQUIRE_FALSE(bufs.empty());
-        REQUIRE(bufs[0].base == reinterpret_cast<const char*>(data.data()));
+        ASSERT_FALSE(bufs.empty());
+        ASSERT_EQ(bufs[0].base, reinterpret_cast<const char*>(data.data()));
       });
     });
   };
@@ -724,23 +655,20 @@ TEST_CASE_METHOD(WebSocketServerDataTest, "WebSocketServerDataTest SendPing",
   loop->Run();
 
   auto expectData = BuildMessage(0x09, true, false, data);
-  REQUIRE(wireData == expectData);
-  REQUIRE(gotCallback == 1);
+  ASSERT_EQ(wireData, expectData);
+  ASSERT_EQ(gotCallback, 1);
 }
 
-TEST_CASE_METHOD(WebSocketServerDataTest, "WebSocketServerDataTest SendPong",
-                 "[websocket][server][control]") {
+TEST_P(WebSocketServerDataTest, SendPong) {
   int gotCallback = 0;
-  std::vector<uint8_t> data(GENERATE(size_t{0}, size_t{1}, size_t{125},
-                                     size_t{126}, size_t{65535}, size_t{65536}),
-                            0x03u);
+  std::vector<uint8_t> data(GetParam(), 0x03u);
   setupWebSocket = [&] {
     ws->open.connect([&](std::string_view) {
       ws->SendPong({{data}}, [&](auto bufs, uv::Error) {
         ++gotCallback;
         ws->Terminate();
-        REQUIRE_FALSE(bufs.empty());
-        REQUIRE(bufs[0].base == reinterpret_cast<const char*>(data.data()));
+        ASSERT_FALSE(bufs.empty());
+        ASSERT_EQ(bufs[0].base, reinterpret_cast<const char*>(data.data()));
       });
     });
   };
@@ -748,24 +676,21 @@ TEST_CASE_METHOD(WebSocketServerDataTest, "WebSocketServerDataTest SendPong",
   loop->Run();
 
   auto expectData = BuildMessage(0x0a, true, false, data);
-  REQUIRE(wireData == expectData);
-  REQUIRE(gotCallback == 1);
+  ASSERT_EQ(wireData, expectData);
+  ASSERT_EQ(gotCallback, 1);
 }
 
-TEST_CASE_METHOD(WebSocketServerDataTest, "WebSocketServerDataTest ReceiveText",
-                 "[websocket][server][data]") {
+TEST_P(WebSocketServerDataTest, ReceiveText) {
   int gotCallback = 0;
-  std::vector<uint8_t> data(GENERATE(size_t{0}, size_t{1}, size_t{125},
-                                     size_t{126}, size_t{65535}, size_t{65536}),
-                            ' ');
+  std::vector<uint8_t> data(GetParam(), ' ');
   setupWebSocket = [&] {
     ws->text.connect([&](std::string_view inData, bool fin) {
       ++gotCallback;
       ws->Terminate();
-      REQUIRE(fin);
+      ASSERT_TRUE(fin);
       std::vector<uint8_t> recvData;
       recvData.insert(recvData.end(), inData.begin(), inData.end());
-      REQUIRE(data == recvData);
+      ASSERT_EQ(data, recvData);
     });
   };
   auto message = BuildMessage(0x01, true, true, data);
@@ -775,23 +700,19 @@ TEST_CASE_METHOD(WebSocketServerDataTest, "WebSocketServerDataTest ReceiveText",
 
   loop->Run();
 
-  REQUIRE(gotCallback == 1);
+  ASSERT_EQ(gotCallback, 1);
 }
 
-TEST_CASE_METHOD(WebSocketServerDataTest,
-                 "WebSocketServerDataTest ReceiveBinary",
-                 "[websocket][server][data]") {
+TEST_P(WebSocketServerDataTest, ReceiveBinary) {
   int gotCallback = 0;
-  std::vector<uint8_t> data(GENERATE(size_t{0}, size_t{1}, size_t{125},
-                                     size_t{126}, size_t{65535}, size_t{65536}),
-                            0x03u);
+  std::vector<uint8_t> data(GetParam(), 0x03u);
   setupWebSocket = [&] {
     ws->binary.connect([&](auto inData, bool fin) {
       ++gotCallback;
       ws->Terminate();
-      REQUIRE(fin);
+      ASSERT_TRUE(fin);
       std::vector<uint8_t> recvData{inData.begin(), inData.end()};
-      REQUIRE(data == recvData);
+      ASSERT_EQ(data, recvData);
     });
   };
   auto message = BuildMessage(0x02, true, true, data);
@@ -801,21 +722,18 @@ TEST_CASE_METHOD(WebSocketServerDataTest,
 
   loop->Run();
 
-  REQUIRE(gotCallback == 1);
+  ASSERT_EQ(gotCallback, 1);
 }
 
-TEST_CASE_METHOD(WebSocketServerDataTest, "WebSocketServerDataTest ReceivePing",
-                 "[websocket][server][control]") {
+TEST_P(WebSocketServerDataTest, ReceivePing) {
   int gotCallback = 0;
-  std::vector<uint8_t> data(GENERATE(size_t{0}, size_t{1}, size_t{125},
-                                     size_t{126}, size_t{65535}, size_t{65536}),
-                            0x03u);
+  std::vector<uint8_t> data(GetParam(), 0x03u);
   setupWebSocket = [&] {
     ws->ping.connect([&](auto inData) {
       ++gotCallback;
       ws->Terminate();
       std::vector<uint8_t> recvData{inData.begin(), inData.end()};
-      REQUIRE(data == recvData);
+      ASSERT_EQ(data, recvData);
     });
   };
   auto message = BuildMessage(0x09, true, true, data);
@@ -825,21 +743,18 @@ TEST_CASE_METHOD(WebSocketServerDataTest, "WebSocketServerDataTest ReceivePing",
 
   loop->Run();
 
-  REQUIRE(gotCallback == 1);
+  ASSERT_EQ(gotCallback, 1);
 }
 
-TEST_CASE_METHOD(WebSocketServerDataTest, "WebSocketServerDataTest ReceivePong",
-                 "[websocket][server][control]") {
+TEST_P(WebSocketServerDataTest, ReceivePong) {
   int gotCallback = 0;
-  std::vector<uint8_t> data(GENERATE(size_t{0}, size_t{1}, size_t{125},
-                                     size_t{126}, size_t{65535}, size_t{65536}),
-                            0x03u);
+  std::vector<uint8_t> data(GetParam(), 0x03u);
   setupWebSocket = [&] {
     ws->pong.connect([&](auto inData) {
       ++gotCallback;
       ws->Terminate();
       std::vector<uint8_t> recvData{inData.begin(), inData.end()};
-      REQUIRE(data == recvData);
+      ASSERT_EQ(data, recvData);
     });
   };
   auto message = BuildMessage(0x0a, true, true, data);
@@ -849,29 +764,24 @@ TEST_CASE_METHOD(WebSocketServerDataTest, "WebSocketServerDataTest ReceivePong",
 
   loop->Run();
 
-  REQUIRE(gotCallback == 1);
+  ASSERT_EQ(gotCallback, 1);
 }
 
 //
 // The server must close the connection if an unmasked frame is received.
 //
 
-TEST_CASE_METHOD(WebSocketServerDataTest,
-                 "WebSocketServerDataTest ReceiveUnmasked",
-                 "[websocket][server][data][protocol]") {
+TEST_P(WebSocketServerDataTest, ReceiveUnmasked) {
   int gotCallback = 0;
-  std::vector<uint8_t> data(GENERATE(size_t{0}, size_t{1}, size_t{125},
-                                     size_t{126}, size_t{65535}, size_t{65536}),
-                            ' ');
+  std::vector<uint8_t> data(GetParam(), ' ');
   setupWebSocket = [&] {
     ws->text.connect([&](std::string_view, bool) {
       ws->Terminate();
-      FAIL("Should not have gotten unmasked message");
+      FAIL() << "Should not have gotten unmasked message";
     });
     ws->closed.connect([&](uint16_t code, std::string_view reason) {
       ++gotCallback;
-      UNSCOPED_INFO("reason: " << reason);
-      REQUIRE(code == 1002);
+      ASSERT_EQ(code, 1002) << "reason: " << reason;
     });
   };
   auto message = BuildMessage(0x01, true, false, data);
@@ -881,7 +791,7 @@ TEST_CASE_METHOD(WebSocketServerDataTest,
 
   loop->Run();
 
-  REQUIRE(gotCallback == 1);
+  ASSERT_EQ(gotCallback, 1);
 }
 
-}  // namespace wpi::net
+}  // namespace wpi

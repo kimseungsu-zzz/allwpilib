@@ -2,30 +2,23 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/simulation/CallbackStore.hpp"
+#include "frc/simulation/CallbackStore.h"
 
 #include <utility>
 
-using namespace wpi;
-using namespace wpi::sim;
+using namespace frc;
+using namespace frc::sim;
 
-void wpi::sim::CallbackStoreThunk(const char* name, void* param,
+void frc::sim::CallbackStoreThunk(const char* name, void* param,
                                   const HAL_Value* value) {
   reinterpret_cast<CallbackStore*>(param)->callback(name, value);
 }
 
-void wpi::sim::ConstBufferCallbackStoreThunk(const char* name, void* param,
+void frc::sim::ConstBufferCallbackStoreThunk(const char* name, void* param,
                                              const unsigned char* buffer,
                                              unsigned int count) {
   reinterpret_cast<CallbackStore*>(param)->constBufferCallback(name, buffer,
                                                                count);
-}
-
-void wpi::sim::OpModeOptionsCallbackStoreThunk(const char* name, void* param,
-                                               const HAL_OpModeOption* opmodes,
-                                               int32_t count) {
-  reinterpret_cast<CallbackStore*>(param)->opModeOptionsCallback(
-      name, {opmodes, opmodes + count});
 }
 
 CallbackStore::CallbackStore(int32_t i, NotifyCallback cb,
@@ -71,12 +64,6 @@ CallbackStore::CallbackStore(int32_t i, int32_t c, int32_t u,
       constBufferCallback(std::move(cb)),
       cancelType(Channel) {
   this->cccf = ccf;
-}
-
-CallbackStore::CallbackStore(int32_t u, OpModeOptionsCallback cb,
-                             CancelCallbackNoIndexFunc ccf)
-    : uid{u}, opModeOptionsCallback{std::move(cb)}, cancelType{NoIndex} {
-  this->ccnif = ccf;
 }
 
 CallbackStore::~CallbackStore() {

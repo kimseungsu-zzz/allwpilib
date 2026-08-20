@@ -2,16 +2,16 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "Notifier.hpp"
+#include "Notifier.h"
 
 #include <utility>
 
-#include "Handle.hpp"
-#include "Instance.hpp"
-#include "SinkImpl.hpp"
-#include "SourceImpl.hpp"
+#include "Handle.h"
+#include "Instance.h"
+#include "SinkImpl.h"
+#include "SourceImpl.h"
 
-using namespace wpi::cs;
+using namespace cs;
 
 Notifier::Notifier() {}
 
@@ -53,7 +53,7 @@ void Notifier::NotifySourceProperty(const SourceImpl& source, CS_EventKind kind,
   auto handleData = Instance::GetInstance().FindSource(source);
   Send(UINT_MAX, propertyName, handleData.first,
        static_cast<RawEvent::Kind>(kind),
-       Handle{handleData.first, property, Handle::PROPERTY}, propertyKind,
+       Handle{handleData.first, property, Handle::kProperty}, propertyKind,
        value, valueStr);
 }
 
@@ -81,7 +81,7 @@ void Notifier::NotifySinkProperty(const SinkImpl& sink, CS_EventKind kind,
   auto handleData = Instance::GetInstance().FindSink(sink);
   Send(UINT_MAX, propertyName, handleData.first,
        static_cast<RawEvent::Kind>(kind),
-       Handle{handleData.first, property, Handle::SINK_PROPERTY}, propertyKind,
+       Handle{handleData.first, property, Handle::kSinkProperty}, propertyKind,
        value, valueStr);
 }
 

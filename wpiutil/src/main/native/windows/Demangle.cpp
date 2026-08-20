@@ -2,22 +2,23 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/util/Demangle.hpp"
+#include "wpi/Demangle.h"
 
-#include <windows.h>
+#include <windows.h>  // NOLINT(build/include_order)
+
 #include <dbghelp.h>
 
 #include <string>
 
-#include "wpi/util/SmallString.hpp"
-#include "wpi/util/mutex.hpp"
+#include "wpi/SmallString.h"
+#include "wpi/mutex.h"
 
 #pragma comment(lib, "Dbghelp.lib")
 
-namespace wpi::util {
+namespace wpi {
 
 std::string Demangle(std::string_view mangledSymbol) {
-  static wpi::util::mutex m;
+  static wpi::mutex m;
   std::scoped_lock lock(m);
   SmallString<128> buf{mangledSymbol};
   char buffer[256];
@@ -29,4 +30,4 @@ std::string Demangle(std::string_view mangledSymbol) {
   return std::string(buffer, sz);
 }
 
-}  // namespace wpi::util
+}  // namespace wpi

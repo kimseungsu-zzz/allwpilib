@@ -2,19 +2,19 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "../PortsInternal.hpp"
-#include "CTREPCMDataInternal.hpp"
+#include "../PortsInternal.h"
+#include "CTREPCMDataInternal.h"
 
-using namespace wpi::hal;
+using namespace hal;
 
-namespace wpi::hal::init {
+namespace hal::init {
 void InitializeCTREPCMData() {
   static CTREPCMData spd[kNumCTREPCMModules];
-  ::wpi::hal::SimCTREPCMData = spd;
+  ::hal::SimCTREPCMData = spd;
 }
-}  // namespace wpi::hal::init
+}  // namespace hal::init
 
-CTREPCMData* wpi::hal::SimCTREPCMData;
+CTREPCMData* hal::SimCTREPCMData;
 void CTREPCMData::ResetData() {
   for (int i = 0; i < kNumCTRESolenoidChannels; i++) {
     solenoidOutput[i].Reset(false);

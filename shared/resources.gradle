@@ -1,33 +1,25 @@
-ext.createGenerateResourcesTask = { name, prefix, namespace, project, inputDirOverride = null, includes = ['**/*'] ->
+import groovy.io.FileType
+
+ext.createGenerateResourcesTask = { name, prefix, namespace, project ->
     def generatedOutputDir = file("$buildDir/generated/$name/cpp")
 
-    def inputDir = inputDirOverride == null ?
-        file("$projectDir/src/$name/native/resources") :
-        project.file(inputDirOverride)
-    def includePatterns = includes instanceof String ? [includes] : includes
-    def resourceFiles = {
-        project.fileTree(inputDir) {
-            includePatterns.each {
-                include it
-            }
-        }
-    }
+    def inputDir = file("$projectDir/src/$name/native/resources")
 
     if (!prefix.isEmpty()) prefix += '_'
 
-    def task = project.tasks.register("generateResources-$name") {
+    def task = project.tasks.create("generateResources-$name") {
         outputs.dir generatedOutputDir
-        inputs.files resourceFiles()
+        inputs.dir inputDir
 
         doLast {
-            delete generatedOutputDir
             generatedOutputDir.mkdirs()
-            resourceFiles().each { inputFile ->
+            inputDir.eachFileRecurse (FileType.FILES) { inputFile ->
                 if (inputFile.name.startsWith('.')) return
-                def fileBytes = inputFile.bytes
+                    def fileBytes = inputFile.bytes
                 def outputFile = file("$generatedOutputDir/${inputFile.name}.cpp")
                 def funcName = "GetResource_" + inputFile.name.replaceAll('[^a-zA-Z0-9]', '_')
                 outputFile.withWriter { out ->
+                    def inputBytes = inputFile.bytes
                     out.print '''#include <stddef.h>
 #include <string_view>
 extern "C" {

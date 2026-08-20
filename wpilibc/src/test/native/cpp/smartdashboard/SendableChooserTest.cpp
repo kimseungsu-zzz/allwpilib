@@ -2,40 +2,39 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/smartdashboard/SendableChooser.hpp"
+#include <frc/simulation/SendableChooserSim.h>
+#include <frc/smartdashboard/SendableChooser.h>
+#include <frc/smartdashboard/SmartDashboard.h>
 
-#include <format>
 #include <string>
 
-#include <catch2/catch_test_macros.hpp>
-#include <catch2/generators/catch_generators.hpp>
+#include <fmt/format.h>
+#include <gtest/gtest.h>
+#include <networktables/NetworkTableInstance.h>
+#include <networktables/StringTopic.h>
 
-#include "wpi/simulation/SendableChooserSim.hpp"
-#include "wpi/smartdashboard/SmartDashboard.hpp"
+class SendableChooserTest : public ::testing::TestWithParam<int> {};
 
-TEST_CASE("SendableChooserTest returns selected", "[wpilibc][smartdashboard]") {
-  auto selected = GENERATE(0, 1, 2, 3);
-
-  wpi::SendableChooser<int> chooser;
-  wpi::sim::SendableChooserSim chooserSim{
-      std::format("/SmartDashboard/ReturnsSelectedChooser{}/", selected)};
+TEST_P(SendableChooserTest, ReturnsSelected) {
+  frc::SendableChooser<int> chooser;
+  frc::sim::SendableChooserSim chooserSim{
+      fmt::format("/SmartDashboard/ReturnsSelectedChooser{}/", GetParam())};
 
   for (int i = 1; i <= 3; i++) {
     chooser.AddOption(std::to_string(i), i);
   }
   chooser.SetDefaultOption("0", 0);
 
-  wpi::SmartDashboard::PutData(
-      std::format("ReturnsSelectedChooser{}", selected), &chooser);
-  wpi::SmartDashboard::UpdateValues();
-  chooserSim.SetSelected(std::to_string(selected));
-  wpi::SmartDashboard::UpdateValues();
-  CHECK(selected == chooser.GetSelected());
+  frc::SmartDashboard::PutData(
+      fmt::format("ReturnsSelectedChooser{}", GetParam()), &chooser);
+  frc::SmartDashboard::UpdateValues();
+  chooserSim.SetSelected(std::to_string(GetParam()));
+  frc::SmartDashboard::UpdateValues();
+  EXPECT_EQ(GetParam(), chooser.GetSelected());
 }
 
-TEST_CASE("SendableChooserTest default is returned on no select",
-          "[wpilibc][smartdashboard]") {
-  wpi::SendableChooser<int> chooser;
+TEST(SendableChooserTest, DefaultIsReturnedOnNoSelect) {
+  frc::SendableChooser<int> chooser;
 
   for (int i = 1; i <= 3; i++) {
     chooser.AddOption(std::to_string(i), i);
@@ -44,25 +43,23 @@ TEST_CASE("SendableChooserTest default is returned on no select",
   // Use 4 here rather than 0 to make sure it's not default-init int.
   chooser.SetDefaultOption("4", 4);
 
-  CHECK(4 == chooser.GetSelected());
+  EXPECT_EQ(4, chooser.GetSelected());
 }
 
-TEST_CASE(
-    "SendableChooserTest default constructible is returned on no select "
-    "and no default",
-    "[wpilibc][smartdashboard]") {
-  wpi::SendableChooser<int> chooser;
+TEST(SendableChooserTest,
+     DefaultConstructableIsReturnedOnNoSelectAndNoDefault) {
+  frc::SendableChooser<int> chooser;
 
   for (int i = 1; i <= 3; i++) {
     chooser.AddOption(std::to_string(i), i);
   }
 
-  CHECK(0 == chooser.GetSelected());
+  EXPECT_EQ(0, chooser.GetSelected());
 }
 
-TEST_CASE("SendableChooserTest change listener", "[wpilibc][smartdashboard]") {
-  wpi::SendableChooser<int> chooser;
-  wpi::sim::SendableChooserSim chooserSim{
+TEST(SendableChooserTest, ChangeListener) {
+  frc::SendableChooser<int> chooser;
+  frc::sim::SendableChooserSim chooserSim{
       "/SmartDashboard/ChangeListenerChooser/"};
 
   for (int i = 1; i <= 3; i++) {
@@ -71,10 +68,13 @@ TEST_CASE("SendableChooserTest change listener", "[wpilibc][smartdashboard]") {
   int currentVal = 0;
   chooser.OnChange([&](int val) { currentVal = val; });
 
-  wpi::SmartDashboard::PutData("ChangeListenerChooser", &chooser);
-  wpi::SmartDashboard::UpdateValues();
+  frc::SmartDashboard::PutData("ChangeListenerChooser", &chooser);
+  frc::SmartDashboard::UpdateValues();
   chooserSim.SetSelected("3");
-  wpi::SmartDashboard::UpdateValues();
+  frc::SmartDashboard::UpdateValues();
 
-  CHECK(3 == currentVal);
+  EXPECT_EQ(3, currentVal);
 }
+
+INSTANTIATE_TEST_SUITE_P(SendableChooserTests, SendableChooserTest,
+                         ::testing::Values(0, 1, 2, 3));

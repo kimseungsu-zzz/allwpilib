@@ -2,15 +2,13 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/math/estimator/SteadyStateKalmanFilter.hpp"
+#include "frc/estimator/SteadyStateKalmanFilter.h"
 
-#include "wpi/util/SymbolExports.hpp"
-
-namespace wpi::math {
+namespace frc {
 
 template class EXPORT_TEMPLATE_DEFINE(WPILIB_DLLEXPORT)
     SteadyStateKalmanFilter<1, 1, 1>;
 template class EXPORT_TEMPLATE_DEFINE(WPILIB_DLLEXPORT)
     SteadyStateKalmanFilter<2, 1, 1>;
 
-}  // namespace wpi::math
+}  // namespace frc

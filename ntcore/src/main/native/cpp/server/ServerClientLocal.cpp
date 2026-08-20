@@ -2,11 +2,11 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "ServerClientLocal.hpp"
+#include "ServerClientLocal.h"
 
-#include "server/ServerImpl.hpp"
+#include "server/ServerImpl.h"
 
-using namespace wpi::nt::server;
+using namespace nt::server;
 
 // Suppress false positive -Wmaybe-uninitialized warning from GCC 14
 #if defined(__GNUC__) && !defined(__clang__)
@@ -14,7 +14,7 @@ using namespace wpi::nt::server;
 #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
 #endif
 ServerClientLocal::ServerClientLocal(ServerStorage& storage, int id,
-                                     wpi::util::Logger& logger)
+                                     wpi::Logger& logger)
     : ServerClient4Base{"", "", true, [](uint32_t) {}, storage, id, logger} {
   // create local client meta topics
   m_metaPub = storage.CreateMetaTopic("$serverpub");
@@ -39,11 +39,7 @@ void ServerClientLocal::SendAnnounce(ServerTopic* topic,
                                      std::optional<int> pubuid) {
   if (m_local) {
     auto& sent = m_announceSent[topic];
-    // Allow publish-triggered announcements (with pubuid) even if a
-    // subscription-triggered announcement was already sent, as the spec
-    // requires the server to respond to publish messages with an announcement
-    // containing the pubuid.
-    if (sent && !pubuid.has_value()) {
+    if (sent) {
       return;
     }
     sent = true;
@@ -65,7 +61,7 @@ void ServerClientLocal::SendUnannounce(ServerTopic* topic) {
 }
 
 void ServerClientLocal::SendPropertiesUpdate(ServerTopic* topic,
-                                             const wpi::util::json& update,
+                                             const wpi::json& update,
                                              bool ack) {
   if (m_local) {
     if (!m_announceSent.lookup(topic)) {

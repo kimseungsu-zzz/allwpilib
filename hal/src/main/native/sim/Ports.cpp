@@ -2,25 +2,28 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/hal/Ports.h"
+#include "hal/Ports.h"
 
-#include "PortsInternal.hpp"
+#include "PortsInternal.h"
 
-using namespace wpi::hal;
+using namespace hal;
 
-namespace wpi::hal::init {
+namespace hal::init {
 void InitializePorts() {}
-}  // namespace wpi::hal::init
+}  // namespace hal::init
 
 extern "C" {
-int32_t HAL_GetNumCanBuses(void) {
-  return kNumCanBuses;
+int32_t HAL_GetNumAccumulators(void) {
+  return kNumAccumulators;
 }
-int32_t HAL_GetNumSmartIo(void) {
-  return kNumSmartIo;
+int32_t HAL_GetNumAnalogTriggers(void) {
+  return kNumAnalogTriggers;
 }
 int32_t HAL_GetNumAnalogInputs(void) {
   return kNumAnalogInputs;
+}
+int32_t HAL_GetNumAnalogOutputs(void) {
+  return kNumAnalogOutputs;
 }
 int32_t HAL_GetNumCounters(void) {
   return kNumCounters;
@@ -45,6 +48,12 @@ int32_t HAL_GetNumEncoders(void) {
 }
 int32_t HAL_GetNumInterrupts(void) {
   return kNumInterrupts;
+}
+int32_t HAL_GetNumRelayChannels(void) {
+  return kNumRelayChannels;
+}
+int32_t HAL_GetNumRelayHeaders(void) {
+  return kNumRelayHeaders;
 }
 int32_t HAL_GetNumCTREPCMModules(void) {
   return kNumCTREPCMModules;

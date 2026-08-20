@@ -179,8 +179,6 @@ std::map<std::string, std::string> KvPairsFromEnv(
   return value;
 }
 
-namespace {
-
 // Parses a string as a command line flag.  The string should have
 // the format "--flag=value".  When def_optional is true, the "=value"
 // part can be omitted.
@@ -218,8 +216,6 @@ const char* ParseFlagValue(const char* str, const char* flag,
   // Returns the string after "=".
   return flag_end + 1;
 }
-
-}  // end namespace
 
 BENCHMARK_EXPORT
 bool ParseBoolFlag(const char* str, const char* flag, bool* value) {

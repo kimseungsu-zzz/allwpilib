@@ -18,7 +18,8 @@ def copy_upstream_src(wpilib_root: Path):
 
     # Copy Sleipnir files into allwpilib
     walk_cwd_and_copy_if(
-        lambda dp, f: has_prefix(dp, Path("include")) or has_prefix(dp, Path("src")),
+        lambda dp, f: (has_prefix(dp, Path("include")) or has_prefix(dp, Path("src")))
+        and f not in [".styleguide", ".styleguide-license"],
         wpimath / "src/main/native/thirdparty/sleipnir",
     )
 
@@ -28,25 +29,28 @@ def copy_upstream_src(wpilib_root: Path):
         wpimath / "src/main/native/thirdparty/sleipnir/include/gch/small_vector.hpp",
         "w",
     ) as f:
-        f.write("""// Copyright (c) Sleipnir contributors
+        f.write(
+            """// Copyright (c) Sleipnir contributors
 
 #pragma once
 
-#include <wpi/util/SmallVector.hpp>
+#include <wpi/SmallVector.h>
 
 namespace gch {
 
 template <typename T>
-using small_vector = wpi::util::SmallVector<T>;
+using small_vector = wpi::SmallVector<T>;
 
 }  // namespace gch
-""")
+"""
+        )
 
 
 def main():
     name = "sleipnir"
     url = "https://github.com/SleipnirGroup/Sleipnir"
-    tag = "v0.6.5"
+    # main on 2025-09-19
+    tag = "7f89d5547702a09e3617bc31fe5bafe6add04fab"
 
     sleipnir = Lib(name, url, tag, copy_upstream_src)
     sleipnir.main()

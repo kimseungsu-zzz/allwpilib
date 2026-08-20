@@ -1,7 +1,7 @@
 ext {
     useJava = true
     useCpp = false
-    baseId = 'javac-plugin'
+    baseId = 'wpilibj-javac-plugin'
     groupId = 'org.wpilib'
 
     nativeName = ''
@@ -12,6 +12,6 @@ apply from: "${rootDir}/shared/java/javacommon.gradle"
 
 dependencies {
     implementation project(':wpiannotations')
-    testImplementation libs.compile.testing
-    testImplementation project(':commandsv2')
+    testImplementation 'com.google.testing.compile:compile-testing:+'
+    testImplementation project(':wpilibNewCommands')
 }

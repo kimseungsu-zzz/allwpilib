@@ -2,22 +2,22 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include <catch2/catch_test_macros.hpp>
+#include <gtest/gtest.h>
 
-#include "wpi/math/controller/BangBangController.hpp"
+#include "frc/controller/BangBangController.h"
 
-TEST_CASE("BangBangToleranceTest InTolerance", "[wpimath]") {
-  wpi::math::BangBangController controller{0.1};
+TEST(BangBangToleranceTest, InTolerance) {
+  frc::BangBangController controller{0.1};
 
   controller.SetSetpoint(1);
   controller.Calculate(1);
-  CHECK(controller.AtSetpoint());
+  EXPECT_TRUE(controller.AtSetpoint());
 }
 
-TEST_CASE("BangBangToleranceTest OutOfTolerance", "[wpimath]") {
-  wpi::math::BangBangController controller{0.1};
+TEST(BangBangToleranceTest, OutOfTolerance) {
+  frc::BangBangController controller{0.1};
 
   controller.SetSetpoint(1);
   controller.Calculate(0);
-  CHECK_FALSE(controller.AtSetpoint());
+  EXPECT_FALSE(controller.AtSetpoint());
 }

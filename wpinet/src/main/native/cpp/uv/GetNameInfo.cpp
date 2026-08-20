@@ -2,16 +2,16 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/net/uv/GetNameInfo.hpp"
+#include "wpinet/uv/GetNameInfo.h"
 
 #include <functional>
 #include <memory>
 #include <utility>
 
-#include "wpi/net/uv/Loop.hpp"
-#include "wpi/net/uv/util.hpp"
+#include "wpinet/uv/Loop.h"
+#include "wpinet/uv/util.h"
 
-namespace wpi::net::uv {
+namespace wpi::uv {
 
 GetNameInfoReq::GetNameInfoReq() {
   error = [this](Error err) { GetLoop().error(err); };
@@ -98,4 +98,4 @@ void GetNameInfo6(Loop& loop,
   }
 }
 
-}  // namespace wpi::net::uv
+}  // namespace wpi::uv

@@ -2,224 +2,222 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/drive/MecanumDrive.hpp"
+#include <gtest/gtest.h>
 
-#include <catch2/catch_test_macros.hpp>
-#include <catch2/matchers/catch_matchers_floating_point.hpp>
+#include "frc/drive/MecanumDrive.h"
+#include "motorcontrol/MockPWMMotorController.h"
 
-#include "motorcontrol/MockPWMMotorController.hpp"
-
-TEST_CASE("MecanumDriveTest CartesianIK", "[wpilibc][drive]") {
+TEST(MecanumDriveTest, CartesianIK) {
   // Forward
-  auto velocities = wpi::MecanumDrive::DriveCartesianIK(1.0, 0.0, 0.0);
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(velocities.frontLeft, 4));
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(velocities.frontRight, 4));
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(velocities.rearLeft, 4));
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(velocities.rearRight, 4));
+  auto speeds = frc::MecanumDrive::DriveCartesianIK(1.0, 0.0, 0.0);
+  EXPECT_DOUBLE_EQ(1.0, speeds.frontLeft);
+  EXPECT_DOUBLE_EQ(1.0, speeds.frontRight);
+  EXPECT_DOUBLE_EQ(1.0, speeds.rearLeft);
+  EXPECT_DOUBLE_EQ(1.0, speeds.rearRight);
 
   // Left
-  velocities = wpi::MecanumDrive::DriveCartesianIK(0.0, -1.0, 0.0);
-  CHECK_THAT(-1.0, Catch::Matchers::WithinULP(velocities.frontLeft, 4));
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(velocities.frontRight, 4));
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(velocities.rearLeft, 4));
-  CHECK_THAT(-1.0, Catch::Matchers::WithinULP(velocities.rearRight, 4));
+  speeds = frc::MecanumDrive::DriveCartesianIK(0.0, -1.0, 0.0);
+  EXPECT_DOUBLE_EQ(-1.0, speeds.frontLeft);
+  EXPECT_DOUBLE_EQ(1.0, speeds.frontRight);
+  EXPECT_DOUBLE_EQ(1.0, speeds.rearLeft);
+  EXPECT_DOUBLE_EQ(-1.0, speeds.rearRight);
 
   // Right
-  velocities = wpi::MecanumDrive::DriveCartesianIK(0.0, 1.0, 0.0);
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(velocities.frontLeft, 4));
-  CHECK_THAT(-1.0, Catch::Matchers::WithinULP(velocities.frontRight, 4));
-  CHECK_THAT(-1.0, Catch::Matchers::WithinULP(velocities.rearLeft, 4));
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(velocities.rearRight, 4));
+  speeds = frc::MecanumDrive::DriveCartesianIK(0.0, 1.0, 0.0);
+  EXPECT_DOUBLE_EQ(1.0, speeds.frontLeft);
+  EXPECT_DOUBLE_EQ(-1.0, speeds.frontRight);
+  EXPECT_DOUBLE_EQ(-1.0, speeds.rearLeft);
+  EXPECT_DOUBLE_EQ(1.0, speeds.rearRight);
 
   // Rotate CCW
-  velocities = wpi::MecanumDrive::DriveCartesianIK(0.0, 0.0, -1.0);
-  CHECK_THAT(-1.0, Catch::Matchers::WithinULP(velocities.frontLeft, 4));
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(velocities.frontRight, 4));
-  CHECK_THAT(-1.0, Catch::Matchers::WithinULP(velocities.rearLeft, 4));
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(velocities.rearRight, 4));
+  speeds = frc::MecanumDrive::DriveCartesianIK(0.0, 0.0, -1.0);
+  EXPECT_DOUBLE_EQ(-1.0, speeds.frontLeft);
+  EXPECT_DOUBLE_EQ(1.0, speeds.frontRight);
+  EXPECT_DOUBLE_EQ(-1.0, speeds.rearLeft);
+  EXPECT_DOUBLE_EQ(1.0, speeds.rearRight);
 
   // Rotate CW
-  velocities = wpi::MecanumDrive::DriveCartesianIK(0.0, 0.0, 1.0);
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(velocities.frontLeft, 4));
-  CHECK_THAT(-1.0, Catch::Matchers::WithinULP(velocities.frontRight, 4));
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(velocities.rearLeft, 4));
-  CHECK_THAT(-1.0, Catch::Matchers::WithinULP(velocities.rearRight, 4));
+  speeds = frc::MecanumDrive::DriveCartesianIK(0.0, 0.0, 1.0);
+  EXPECT_DOUBLE_EQ(1.0, speeds.frontLeft);
+  EXPECT_DOUBLE_EQ(-1.0, speeds.frontRight);
+  EXPECT_DOUBLE_EQ(1.0, speeds.rearLeft);
+  EXPECT_DOUBLE_EQ(-1.0, speeds.rearRight);
 }
 
-TEST_CASE("MecanumDriveTest CartesianIKGyro90CW", "[wpilibc][drive]") {
+TEST(MecanumDriveTest, CartesianIKGyro90CW) {
   // Forward in global frame; left in robot frame
-  auto velocities = wpi::MecanumDrive::DriveCartesianIK(1.0, 0.0, 0.0, 90_deg);
-  CHECK_THAT(-1.0, Catch::Matchers::WithinULP(velocities.frontLeft, 4));
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(velocities.frontRight, 4));
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(velocities.rearLeft, 4));
-  CHECK_THAT(-1.0, Catch::Matchers::WithinULP(velocities.rearRight, 4));
+  auto speeds = frc::MecanumDrive::DriveCartesianIK(1.0, 0.0, 0.0, 90_deg);
+  EXPECT_DOUBLE_EQ(-1.0, speeds.frontLeft);
+  EXPECT_DOUBLE_EQ(1.0, speeds.frontRight);
+  EXPECT_DOUBLE_EQ(1.0, speeds.rearLeft);
+  EXPECT_DOUBLE_EQ(-1.0, speeds.rearRight);
 
   // Left in global frame; backward in robot frame
-  velocities = wpi::MecanumDrive::DriveCartesianIK(0.0, -1.0, 0.0, 90_deg);
-  CHECK_THAT(-1.0, Catch::Matchers::WithinULP(velocities.frontLeft, 4));
-  CHECK_THAT(-1.0, Catch::Matchers::WithinULP(velocities.frontRight, 4));
-  CHECK_THAT(-1.0, Catch::Matchers::WithinULP(velocities.rearLeft, 4));
-  CHECK_THAT(-1.0, Catch::Matchers::WithinULP(velocities.rearRight, 4));
+  speeds = frc::MecanumDrive::DriveCartesianIK(0.0, -1.0, 0.0, 90_deg);
+  EXPECT_DOUBLE_EQ(-1.0, speeds.frontLeft);
+  EXPECT_DOUBLE_EQ(-1.0, speeds.frontRight);
+  EXPECT_DOUBLE_EQ(-1.0, speeds.rearLeft);
+  EXPECT_DOUBLE_EQ(-1.0, speeds.rearRight);
 
   // Right in global frame; forward in robot frame
-  velocities = wpi::MecanumDrive::DriveCartesianIK(0.0, 1.0, 0.0, 90_deg);
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(velocities.frontLeft, 4));
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(velocities.frontRight, 4));
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(velocities.rearLeft, 4));
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(velocities.rearRight, 4));
+  speeds = frc::MecanumDrive::DriveCartesianIK(0.0, 1.0, 0.0, 90_deg);
+  EXPECT_DOUBLE_EQ(1.0, speeds.frontLeft);
+  EXPECT_DOUBLE_EQ(1.0, speeds.frontRight);
+  EXPECT_DOUBLE_EQ(1.0, speeds.rearLeft);
+  EXPECT_DOUBLE_EQ(1.0, speeds.rearRight);
 
   // Rotate CCW
-  velocities = wpi::MecanumDrive::DriveCartesianIK(0.0, 0.0, -1.0, 90_deg);
-  CHECK_THAT(-1.0, Catch::Matchers::WithinULP(velocities.frontLeft, 4));
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(velocities.frontRight, 4));
-  CHECK_THAT(-1.0, Catch::Matchers::WithinULP(velocities.rearLeft, 4));
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(velocities.rearRight, 4));
+  speeds = frc::MecanumDrive::DriveCartesianIK(0.0, 0.0, -1.0, 90_deg);
+  EXPECT_DOUBLE_EQ(-1.0, speeds.frontLeft);
+  EXPECT_DOUBLE_EQ(1.0, speeds.frontRight);
+  EXPECT_DOUBLE_EQ(-1.0, speeds.rearLeft);
+  EXPECT_DOUBLE_EQ(1.0, speeds.rearRight);
 
   // Rotate CW
-  velocities = wpi::MecanumDrive::DriveCartesianIK(0.0, 0.0, 1.0, 90_deg);
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(velocities.frontLeft, 4));
-  CHECK_THAT(-1.0, Catch::Matchers::WithinULP(velocities.frontRight, 4));
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(velocities.rearLeft, 4));
-  CHECK_THAT(-1.0, Catch::Matchers::WithinULP(velocities.rearRight, 4));
+  speeds = frc::MecanumDrive::DriveCartesianIK(0.0, 0.0, 1.0, 90_deg);
+  EXPECT_DOUBLE_EQ(1.0, speeds.frontLeft);
+  EXPECT_DOUBLE_EQ(-1.0, speeds.frontRight);
+  EXPECT_DOUBLE_EQ(1.0, speeds.rearLeft);
+  EXPECT_DOUBLE_EQ(-1.0, speeds.rearRight);
 }
 
-TEST_CASE("MecanumDriveTest Cartesian", "[wpilibc][drive]") {
-  wpi::MockPWMMotorController fl;
-  wpi::MockPWMMotorController rl;
-  wpi::MockPWMMotorController fr;
-  wpi::MockPWMMotorController rr;
-  wpi::MecanumDrive drive{[&](double output) { fl.SetThrottle(output); },
-                          [&](double output) { rl.SetThrottle(output); },
-                          [&](double output) { fr.SetThrottle(output); },
-                          [&](double output) { rr.SetThrottle(output); }};
+TEST(MecanumDriveTest, Cartesian) {
+  frc::MockPWMMotorController fl;
+  frc::MockPWMMotorController rl;
+  frc::MockPWMMotorController fr;
+  frc::MockPWMMotorController rr;
+  frc::MecanumDrive drive{[&](double output) { fl.Set(output); },
+                          [&](double output) { rl.Set(output); },
+                          [&](double output) { fr.Set(output); },
+                          [&](double output) { rr.Set(output); }};
   drive.SetDeadband(0.0);
 
   // Forward
   drive.DriveCartesian(1.0, 0.0, 0.0);
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(fl.GetThrottle(), 4));
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(fr.GetThrottle(), 4));
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(rl.GetThrottle(), 4));
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(rr.GetThrottle(), 4));
+  EXPECT_DOUBLE_EQ(1.0, fl.Get());
+  EXPECT_DOUBLE_EQ(1.0, fr.Get());
+  EXPECT_DOUBLE_EQ(1.0, rl.Get());
+  EXPECT_DOUBLE_EQ(1.0, rr.Get());
 
   // Left
   drive.DriveCartesian(0.0, -1.0, 0.0);
-  CHECK_THAT(-1.0, Catch::Matchers::WithinULP(fl.GetThrottle(), 4));
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(fr.GetThrottle(), 4));
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(rl.GetThrottle(), 4));
-  CHECK_THAT(-1.0, Catch::Matchers::WithinULP(rr.GetThrottle(), 4));
+  EXPECT_DOUBLE_EQ(-1.0, fl.Get());
+  EXPECT_DOUBLE_EQ(1.0, fr.Get());
+  EXPECT_DOUBLE_EQ(1.0, rl.Get());
+  EXPECT_DOUBLE_EQ(-1.0, rr.Get());
 
   // Right
   drive.DriveCartesian(0.0, 1.0, 0.0);
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(fl.GetThrottle(), 4));
-  CHECK_THAT(-1.0, Catch::Matchers::WithinULP(fr.GetThrottle(), 4));
-  CHECK_THAT(-1.0, Catch::Matchers::WithinULP(rl.GetThrottle(), 4));
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(rr.GetThrottle(), 4));
+  EXPECT_DOUBLE_EQ(1.0, fl.Get());
+  EXPECT_DOUBLE_EQ(-1.0, fr.Get());
+  EXPECT_DOUBLE_EQ(-1.0, rl.Get());
+  EXPECT_DOUBLE_EQ(1.0, rr.Get());
 
   // Rotate CCW
   drive.DriveCartesian(0.0, 0.0, -1.0);
-  CHECK_THAT(-1.0, Catch::Matchers::WithinULP(fl.GetThrottle(), 4));
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(fr.GetThrottle(), 4));
-  CHECK_THAT(-1.0, Catch::Matchers::WithinULP(rl.GetThrottle(), 4));
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(rr.GetThrottle(), 4));
+  EXPECT_DOUBLE_EQ(-1.0, fl.Get());
+  EXPECT_DOUBLE_EQ(1.0, fr.Get());
+  EXPECT_DOUBLE_EQ(-1.0, rl.Get());
+  EXPECT_DOUBLE_EQ(1.0, rr.Get());
 
   // Rotate CW
   drive.DriveCartesian(0.0, 0.0, 1.0);
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(fl.GetThrottle(), 4));
-  CHECK_THAT(-1.0, Catch::Matchers::WithinULP(fr.GetThrottle(), 4));
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(rl.GetThrottle(), 4));
-  CHECK_THAT(-1.0, Catch::Matchers::WithinULP(rr.GetThrottle(), 4));
+  EXPECT_DOUBLE_EQ(1.0, fl.Get());
+  EXPECT_DOUBLE_EQ(-1.0, fr.Get());
+  EXPECT_DOUBLE_EQ(1.0, rl.Get());
+  EXPECT_DOUBLE_EQ(-1.0, rr.Get());
 }
 
-TEST_CASE("MecanumDriveTest CartesianGyro90CW", "[wpilibc][drive]") {
-  wpi::MockPWMMotorController fl;
-  wpi::MockPWMMotorController rl;
-  wpi::MockPWMMotorController fr;
-  wpi::MockPWMMotorController rr;
-  wpi::MecanumDrive drive{[&](double output) { fl.SetThrottle(output); },
-                          [&](double output) { rl.SetThrottle(output); },
-                          [&](double output) { fr.SetThrottle(output); },
-                          [&](double output) { rr.SetThrottle(output); }};
+TEST(MecanumDriveTest, CartesianGyro90CW) {
+  frc::MockPWMMotorController fl;
+  frc::MockPWMMotorController rl;
+  frc::MockPWMMotorController fr;
+  frc::MockPWMMotorController rr;
+  frc::MecanumDrive drive{[&](double output) { fl.Set(output); },
+                          [&](double output) { rl.Set(output); },
+                          [&](double output) { fr.Set(output); },
+                          [&](double output) { rr.Set(output); }};
   drive.SetDeadband(0.0);
 
   // Forward in global frame; left in robot frame
   drive.DriveCartesian(1.0, 0.0, 0.0, 90_deg);
-  CHECK_THAT(-1.0, Catch::Matchers::WithinULP(fl.GetThrottle(), 4));
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(fr.GetThrottle(), 4));
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(rl.GetThrottle(), 4));
-  CHECK_THAT(-1.0, Catch::Matchers::WithinULP(rr.GetThrottle(), 4));
+  EXPECT_DOUBLE_EQ(-1.0, fl.Get());
+  EXPECT_DOUBLE_EQ(1.0, fr.Get());
+  EXPECT_DOUBLE_EQ(1.0, rl.Get());
+  EXPECT_DOUBLE_EQ(-1.0, rr.Get());
 
   // Left in global frame; backward in robot frame
   drive.DriveCartesian(0.0, -1.0, 0.0, 90_deg);
-  CHECK_THAT(-1.0, Catch::Matchers::WithinULP(fl.GetThrottle(), 4));
-  CHECK_THAT(-1.0, Catch::Matchers::WithinULP(fr.GetThrottle(), 4));
-  CHECK_THAT(-1.0, Catch::Matchers::WithinULP(rl.GetThrottle(), 4));
-  CHECK_THAT(-1.0, Catch::Matchers::WithinULP(rr.GetThrottle(), 4));
+  EXPECT_DOUBLE_EQ(-1.0, fl.Get());
+  EXPECT_DOUBLE_EQ(-1.0, fr.Get());
+  EXPECT_DOUBLE_EQ(-1.0, rl.Get());
+  EXPECT_DOUBLE_EQ(-1.0, rr.Get());
 
   // Right in global frame; forward in robot frame
   drive.DriveCartesian(0.0, 1.0, 0.0, 90_deg);
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(fl.GetThrottle(), 4));
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(fr.GetThrottle(), 4));
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(rl.GetThrottle(), 4));
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(rr.GetThrottle(), 4));
+  EXPECT_DOUBLE_EQ(1.0, fl.Get());
+  EXPECT_DOUBLE_EQ(1.0, fr.Get());
+  EXPECT_DOUBLE_EQ(1.0, rl.Get());
+  EXPECT_DOUBLE_EQ(1.0, rr.Get());
 
   // Rotate CCW
   drive.DriveCartesian(0.0, 0.0, -1.0, 90_deg);
-  CHECK_THAT(-1.0, Catch::Matchers::WithinULP(fl.GetThrottle(), 4));
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(fr.GetThrottle(), 4));
-  CHECK_THAT(-1.0, Catch::Matchers::WithinULP(rl.GetThrottle(), 4));
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(rr.GetThrottle(), 4));
+  EXPECT_DOUBLE_EQ(-1.0, fl.Get());
+  EXPECT_DOUBLE_EQ(1.0, fr.Get());
+  EXPECT_DOUBLE_EQ(-1.0, rl.Get());
+  EXPECT_DOUBLE_EQ(1.0, rr.Get());
 
   // Rotate CW
   drive.DriveCartesian(0.0, 0.0, 1.0, 90_deg);
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(fl.GetThrottle(), 4));
-  CHECK_THAT(-1.0, Catch::Matchers::WithinULP(fr.GetThrottle(), 4));
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(rl.GetThrottle(), 4));
-  CHECK_THAT(-1.0, Catch::Matchers::WithinULP(rr.GetThrottle(), 4));
+  EXPECT_DOUBLE_EQ(1.0, fl.Get());
+  EXPECT_DOUBLE_EQ(-1.0, fr.Get());
+  EXPECT_DOUBLE_EQ(1.0, rl.Get());
+  EXPECT_DOUBLE_EQ(-1.0, rr.Get());
 }
 
-TEST_CASE("MecanumDriveTest Polar", "[wpilibc][drive]") {
-  wpi::MockPWMMotorController fl;
-  wpi::MockPWMMotorController rl;
-  wpi::MockPWMMotorController fr;
-  wpi::MockPWMMotorController rr;
-  wpi::MecanumDrive drive{[&](double output) { fl.SetThrottle(output); },
-                          [&](double output) { rl.SetThrottle(output); },
-                          [&](double output) { fr.SetThrottle(output); },
-                          [&](double output) { rr.SetThrottle(output); }};
+TEST(MecanumDriveTest, Polar) {
+  frc::MockPWMMotorController fl;
+  frc::MockPWMMotorController rl;
+  frc::MockPWMMotorController fr;
+  frc::MockPWMMotorController rr;
+  frc::MecanumDrive drive{[&](double output) { fl.Set(output); },
+                          [&](double output) { rl.Set(output); },
+                          [&](double output) { fr.Set(output); },
+                          [&](double output) { rr.Set(output); }};
   drive.SetDeadband(0.0);
 
   // Forward
   drive.DrivePolar(1.0, 0_deg, 0.0);
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(fl.GetThrottle(), 4));
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(fr.GetThrottle(), 4));
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(rl.GetThrottle(), 4));
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(rr.GetThrottle(), 4));
+  EXPECT_DOUBLE_EQ(1.0, fl.Get());
+  EXPECT_DOUBLE_EQ(1.0, fr.Get());
+  EXPECT_DOUBLE_EQ(1.0, rl.Get());
+  EXPECT_DOUBLE_EQ(1.0, rr.Get());
 
   // Left
   drive.DrivePolar(1.0, -90_deg, 0.0);
-  CHECK_THAT(-1.0, Catch::Matchers::WithinULP(fl.GetThrottle(), 4));
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(fr.GetThrottle(), 4));
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(rl.GetThrottle(), 4));
-  CHECK_THAT(-1.0, Catch::Matchers::WithinULP(rr.GetThrottle(), 4));
+  EXPECT_DOUBLE_EQ(-1.0, fl.Get());
+  EXPECT_DOUBLE_EQ(1.0, fr.Get());
+  EXPECT_DOUBLE_EQ(1.0, rl.Get());
+  EXPECT_DOUBLE_EQ(-1.0, rr.Get());
 
   // Right
   drive.DrivePolar(1.0, 90_deg, 0.0);
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(fl.GetThrottle(), 4));
-  CHECK_THAT(-1.0, Catch::Matchers::WithinULP(fr.GetThrottle(), 4));
-  CHECK_THAT(-1.0, Catch::Matchers::WithinULP(rl.GetThrottle(), 4));
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(rr.GetThrottle(), 4));
+  EXPECT_DOUBLE_EQ(1.0, fl.Get());
+  EXPECT_DOUBLE_EQ(-1.0, fr.Get());
+  EXPECT_DOUBLE_EQ(-1.0, rl.Get());
+  EXPECT_DOUBLE_EQ(1.0, rr.Get());
 
   // Rotate CCW
   drive.DrivePolar(0.0, 0_deg, -1.0);
-  CHECK_THAT(-1.0, Catch::Matchers::WithinULP(fl.GetThrottle(), 4));
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(fr.GetThrottle(), 4));
-  CHECK_THAT(-1.0, Catch::Matchers::WithinULP(rl.GetThrottle(), 4));
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(rr.GetThrottle(), 4));
+  EXPECT_DOUBLE_EQ(-1.0, fl.Get());
+  EXPECT_DOUBLE_EQ(1.0, fr.Get());
+  EXPECT_DOUBLE_EQ(-1.0, rl.Get());
+  EXPECT_DOUBLE_EQ(1.0, rr.Get());
 
   // Rotate CW
   drive.DrivePolar(0.0, 0_deg, 1.0);
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(fl.GetThrottle(), 4));
-  CHECK_THAT(-1.0, Catch::Matchers::WithinULP(fr.GetThrottle(), 4));
-  CHECK_THAT(1.0, Catch::Matchers::WithinULP(rl.GetThrottle(), 4));
-  CHECK_THAT(-1.0, Catch::Matchers::WithinULP(rr.GetThrottle(), 4));
+  EXPECT_DOUBLE_EQ(1.0, fl.Get());
+  EXPECT_DOUBLE_EQ(-1.0, fr.Get());
+  EXPECT_DOUBLE_EQ(1.0, rl.Get());
+  EXPECT_DOUBLE_EQ(-1.0, rr.Get());
 }

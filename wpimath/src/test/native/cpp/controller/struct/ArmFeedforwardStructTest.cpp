@@ -2,15 +2,15 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include <catch2/catch_test_macros.hpp>
+#include <gtest/gtest.h>
 
-#include "wpi/math/controller/ArmFeedforward.hpp"
+#include "frc/controller/ArmFeedforward.h"
 
-using namespace wpi::math;
+using namespace frc;
 
 namespace {
 
-using StructType = wpi::util::Struct<wpi::math::ArmFeedforward>;
+using StructType = wpi::Struct<frc::ArmFeedforward>;
 
 static constexpr auto Ks = 1.91_V;
 static constexpr auto Kg = 2.29_V;
@@ -19,15 +19,15 @@ static constexpr auto Ka = 1.74_V * 1_s * 1_s / 1_rad;
 const ArmFeedforward kExpectedData{Ks, Kg, Kv, Ka};
 }  // namespace
 
-TEST_CASE("ArmFeedforwardStructTest Roundtrip", "[wpimath]") {
+TEST(ArmFeedforwardStructTest, Roundtrip) {
   uint8_t buffer[StructType::GetSize()];
   std::memset(buffer, 0, StructType::GetSize());
   StructType::Pack(buffer, kExpectedData);
 
   ArmFeedforward unpacked_data = StructType::Unpack(buffer);
 
-  CHECK(kExpectedData.GetKs().value() == unpacked_data.GetKs().value());
-  CHECK(kExpectedData.GetKg().value() == unpacked_data.GetKg().value());
-  CHECK(kExpectedData.GetKv().value() == unpacked_data.GetKv().value());
-  CHECK(kExpectedData.GetKa().value() == unpacked_data.GetKa().value());
+  EXPECT_EQ(kExpectedData.GetKs().value(), unpacked_data.GetKs().value());
+  EXPECT_EQ(kExpectedData.GetKg().value(), unpacked_data.GetKg().value());
+  EXPECT_EQ(kExpectedData.GetKv().value(), unpacked_data.GetKv().value());
+  EXPECT_EQ(kExpectedData.GetKa().value(), unpacked_data.GetKa().value());
 }

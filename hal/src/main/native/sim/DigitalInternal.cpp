@@ -2,14 +2,15 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "DigitalInternal.hpp"
+#include "DigitalInternal.h"
 
-#include "PortsInternal.hpp"
-#include "wpi/hal/Errors.h"
-#include "wpi/hal/handles/DigitalHandleResource.hpp"
-#include "wpi/hal/handles/HandlesInternal.hpp"
+#include "PortsInternal.h"
+#include "hal/AnalogTrigger.h"
+#include "hal/Errors.h"
+#include "hal/handles/DigitalHandleResource.h"
+#include "hal/handles/HandlesInternal.h"
 
-namespace wpi::hal {
+namespace hal {
 
 DigitalHandleResource<HAL_DigitalHandle, DigitalPort,
                       kNumDigitalChannels + kNumPWMHeaders>*
@@ -23,6 +24,33 @@ void InitializeDigitalInternal() {
   digitalChannelHandles = &dcH;
 }
 }  // namespace init
+
+bool remapDigitalSource(HAL_Handle digitalSourceHandle,
+                        HAL_AnalogTriggerType analogTriggerType,
+                        uint8_t& channel, uint8_t& module,
+                        bool& analogTrigger) {
+  if (isHandleType(digitalSourceHandle, HAL_HandleEnum::AnalogTrigger)) {
+    // If handle passed, index is not negative
+    int32_t index = getHandleIndex(digitalSourceHandle);
+    channel = (index << 2) + analogTriggerType;
+    module = channel >> 4;
+    analogTrigger = true;
+    return true;
+  } else if (isHandleType(digitalSourceHandle, HAL_HandleEnum::DIO)) {
+    int32_t index = getHandleIndex(digitalSourceHandle);
+    if (index >= kNumDigitalHeaders) {
+      channel = remapMXPChannel(index);
+      module = 1;
+    } else {
+      channel = index;
+      module = 0;
+    }
+    analogTrigger = false;
+    return true;
+  } else {
+    return false;
+  }
+}
 
 int32_t remapMXPChannel(int32_t channel) {
   return channel - 10;
@@ -45,4 +73,4 @@ int32_t GetDigitalInputChannel(HAL_DigitalHandle handle, int32_t* status) {
 
   return digital->channel;
 }
-}  // namespace wpi::hal
+}  // namespace hal

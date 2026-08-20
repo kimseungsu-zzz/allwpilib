@@ -2,11 +2,11 @@
 
 #pragma once
 
-#include <wpi/util/SmallVector.hpp>
+#include <wpi/SmallVector.h>
 
 namespace gch {
 
 template <typename T>
-using small_vector = wpi::util::SmallVector<T>;
+using small_vector = wpi::SmallVector<T>;
 
 }  // namespace gch

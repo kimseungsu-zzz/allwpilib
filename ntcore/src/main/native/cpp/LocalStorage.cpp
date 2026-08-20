@@ -2,11 +2,11 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "LocalStorage.hpp"
+#include "LocalStorage.h"
 
 #include <vector>
 
-using namespace wpi::nt;
+using namespace nt;
 
 std::vector<NT_Topic> LocalStorage::GetTopics(std::string_view prefix,
                                               unsigned int types) {
@@ -48,16 +48,16 @@ std::vector<TopicInfo> LocalStorage::GetTopicInfo(
 
 void LocalStorage::Release(NT_Handle pubsubentryHandle) {
   switch (Handle{pubsubentryHandle}.GetType()) {
-    case Handle::ENTRY:
+    case Handle::kEntry:
       ReleaseEntry(pubsubentryHandle);
       break;
-    case Handle::PUBLISHER:
+    case Handle::kPublisher:
       Unpublish(pubsubentryHandle);
       break;
-    case Handle::SUBSCRIBER:
+    case Handle::kSubscriber:
       Unsubscribe(pubsubentryHandle);
       break;
-    case Handle::MULTI_SUBSCRIBER:
+    case Handle::kMultiSubscriber:
       UnsubscribeMultiple(pubsubentryHandle);
       break;
     default:

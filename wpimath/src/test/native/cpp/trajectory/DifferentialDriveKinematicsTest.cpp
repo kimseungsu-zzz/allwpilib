@@ -2,22 +2,19 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/math/kinematics/DifferentialDriveKinematics.hpp"
+#include <memory>
+#include <vector>
 
-#include <catch2/catch_test_macros.hpp>
+#include <gtest/gtest.h>
 
-#include "wpi/math/trajectory/DifferentialSample.hpp"
-#include "wpi/math/trajectory/TestDrivetrainSplineTrajectory.hpp"
-#include "wpi/math/trajectory/TrajectoryConfig.hpp"
-#include "wpi/math/trajectory/constraint/DifferentialDriveKinematicsConstraint.hpp"
-#include "wpi/units/acceleration.hpp"
-#include "wpi/units/length.hpp"
-#include "wpi/units/time.hpp"
-#include "wpi/units/velocity.hpp"
+#include "frc/kinematics/DifferentialDriveKinematics.h"
+#include "frc/trajectory/constraint/DifferentialDriveKinematicsConstraint.h"
+#include "trajectory/TestTrajectory.h"
+#include "units/time.h"
 
-using namespace wpi::math;
+using namespace frc;
 
-TEST_CASE("DifferentialDriveKinematicsConstraintTest Constraint", "[wpimath]") {
+TEST(DifferentialDriveKinematicsConstraintTest, Constraint) {
   const auto maxVelocity = 12_fps;
   const DifferentialDriveKinematics kinematics{27_in};
 
@@ -25,14 +22,22 @@ TEST_CASE("DifferentialDriveKinematicsConstraintTest Constraint", "[wpimath]") {
   config.AddConstraint(
       DifferentialDriveKinematicsConstraint(kinematics, maxVelocity));
 
-  auto trajectory = TestDrivetrainSplineTrajectory::GetTrajectory(config);
+  auto trajectory = TestTrajectory::GetTrajectory(config);
 
-  for (auto t = 0_s; t < trajectory.Duration(); t += 20_ms) {
-    auto point = trajectory.SampleAt(t);
+  units::second_t time = 0_s;
+  units::second_t dt = 20_ms;
+  units::second_t duration = trajectory.TotalTime();
 
-    const DifferentialSample differentialSample{point, kinematics};
+  while (time < duration) {
+    const Trajectory::State point = trajectory.Sample(time);
+    time += dt;
 
-    CHECK(differentialSample.leftVelocity < maxVelocity + 0.05_mps);
-    CHECK(differentialSample.rightVelocity < maxVelocity + 0.05_mps);
+    const ChassisSpeeds chassisSpeeds{point.velocity, 0_mps,
+                                      point.velocity * point.curvature};
+
+    auto [left, right] = kinematics.ToWheelSpeeds(chassisSpeeds);
+
+    EXPECT_TRUE(left < maxVelocity + 0.05_mps);
+    EXPECT_TRUE(right < maxVelocity + 0.05_mps);
   }
 }

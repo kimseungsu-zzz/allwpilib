@@ -2,7 +2,7 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/net/MulticastServiceAnnouncer.hpp"
+#include "wpinet/MulticastServiceAnnouncer.h"
 
 #include <arpa/inet.h>
 
@@ -10,10 +10,11 @@
 #include <string>
 #include <utility>
 
-#include "dns_sd.h"
-#include "wpi/util/SmallString.hpp"
+#include <wpi/SmallString.h>
 
-using namespace wpi::net;
+#include "dns_sd.h"
+
+using namespace wpi;
 
 struct MulticastServiceAnnouncer::Impl {
   std::string serviceName;
@@ -57,7 +58,7 @@ MulticastServiceAnnouncer::MulticastServiceAnnouncer(
   pImpl->serviceType = serviceType;
   pImpl->port = port;
 
-  wpi::util::SmallString<64> key;
+  wpi::SmallString<64> key;
 
   for (auto&& i : txt) {
     key.clear();

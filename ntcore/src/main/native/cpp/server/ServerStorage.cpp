@@ -2,29 +2,30 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "ServerStorage.hpp"
+#include "ServerStorage.h"
 
-#include <format>
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
 
-#include "Log.hpp"
-#include "server/MessagePackWriter.hpp"
-#include "server/ServerClient.hpp"
-#include "wpi/util/Base64.hpp"
-#include "wpi/util/MessagePack.hpp"
-#include "wpi/util/json.hpp"
+#include <fmt/format.h>
+#include <wpi/Base64.h>
+#include <wpi/MessagePack.h>
+#include <wpi/json.h>
 
-using namespace wpi::nt;
-using namespace wpi::nt::server;
+#include "Log.h"
+#include "server/MessagePackWriter.h"
+#include "server/ServerClient.h"
+
+using namespace nt;
+using namespace nt::server;
 using namespace mpack;
 
 ServerTopic* ServerStorage::CreateTopic(ServerClient* client,
                                         std::string_view name,
                                         std::string_view typeStr,
-                                        const wpi::util::json& properties,
+                                        const wpi::json& properties,
                                         bool special) {
   auto& topic = m_nameTopics[name];
   if (topic) {
@@ -35,8 +36,6 @@ ServerTopic* ServerStorage::CreateTopic(ServerClient* client,
       }
     }
   } else {
-    DEBUG4("creating topic '{}' with type '{}' and properties {}", name,
-           typeStr, properties.to_string());
     // new topic
     unsigned int id = m_topics.emplace_back(
         std::make_unique<ServerTopic>(m_logger, name, typeStr, properties));
@@ -48,8 +47,8 @@ ServerTopic* ServerStorage::CreateTopic(ServerClient* client,
 
     // create meta topics; don't create if topic is itself a meta topic
     if (!special) {
-      topic->metaPub = CreateMetaTopic(std::format("$pub${}", name));
-      topic->metaSub = CreateMetaTopic(std::format("$sub${}", name));
+      topic->metaPub = CreateMetaTopic(fmt::format("$pub${}", name));
+      topic->metaSub = CreateMetaTopic(fmt::format("$sub${}", name));
       UpdateMetaTopicPub(topic);
       UpdateMetaTopicSub(topic);
     }
@@ -59,8 +58,7 @@ ServerTopic* ServerStorage::CreateTopic(ServerClient* client,
 }
 
 ServerTopic* ServerStorage::CreateMetaTopic(std::string_view name) {
-  return CreateTopic(nullptr, name, "msgpack",
-                     wpi::util::json::object("retained", true), true);
+  return CreateTopic(nullptr, name, "msgpack", {{"retained", true}}, true);
 }
 
 void ServerStorage::DeleteTopic(ServerTopic* topic) {
@@ -90,9 +88,9 @@ void ServerStorage::DeleteTopic(ServerTopic* topic) {
 }
 
 void ServerStorage::SetProperties(ServerClient* client, ServerTopic* topic,
-                                  const wpi::util::json& update) {
+                                  const wpi::json& update) {
   DEBUG4("SetProperties({}, {}, {})", client ? client->GetId() : -1,
-         topic->name, update.to_string());
+         topic->name, update.dump());
   bool wasPersistent = topic->persistent;
   if (topic->SetProperties(update)) {
     // update persistentChanged flag
@@ -110,12 +108,11 @@ void ServerStorage::SetFlags(ServerClient* client, ServerTopic* topic,
     // update persistentChanged flag
     if (topic->persistent != wasPersistent) {
       m_persistentChanged = true;
-      wpi::util::json update;
+      wpi::json update;
       if (topic->persistent) {
-        update = wpi::util::json::object("persistent", true);
+        update = {{"persistent", true}};
       } else {
-        update =
-            wpi::util::json::object("persistent", wpi::util::json::object());
+        update = {{"persistent", wpi::json::object()}};
       }
       PropertiesChanged(client, topic, update);
     }
@@ -149,7 +146,7 @@ void ServerStorage::SetValue(ServerClient* client, ServerTopic* topic,
 
 void ServerStorage::RemoveClient(ServerClient* client) {
   // remove all publishers and subscribers for this client
-  wpi::util::SmallVector<ServerTopic*, 16> toDelete;
+  wpi::SmallVector<ServerTopic*, 16> toDelete;
   for (auto&& topic : m_topics) {
     bool pubChanged = false;
     bool subChanged = false;
@@ -225,7 +222,7 @@ void ServerStorage::UpdateMetaTopicSub(ServerTopic* topic) {
 }
 
 void ServerStorage::PropertiesChanged(ServerClient* client, ServerTopic* topic,
-                                      const wpi::util::json& update) {
+                                      const wpi::json& update) {
   // removing some properties can result in the topic being unpublished
   if (!topic->IsPublished()) {
     DeleteTopic(topic);
@@ -237,27 +234,34 @@ void ServerStorage::PropertiesChanged(ServerClient* client, ServerTopic* topic,
   }
 }
 
-static void DumpValue(wpi::util::raw_ostream& os, const Value& value) {
+static void DumpValue(wpi::raw_ostream& os, const Value& value,
+                      wpi::json::serializer& s) {
   switch (value.type()) {
     case NT_BOOLEAN:
-      wpi::util::json::stringify_bool(os, value.GetBoolean());
+      if (value.GetBoolean()) {
+        os << "true";
+      } else {
+        os << "false";
+      }
       break;
     case NT_DOUBLE:
-      wpi::util::json::stringify_double(os, value.GetDouble());
+      s.dump_float(value.GetDouble());
       break;
     case NT_FLOAT:
-      wpi::util::json::stringify_float(os, value.GetFloat());
+      s.dump_float(value.GetFloat());
       break;
     case NT_INTEGER:
-      wpi::util::json::stringify_int(os, value.GetInteger());
+      s.dump_integer(value.GetInteger());
       break;
     case NT_STRING:
-      wpi::util::json::stringify_string(os, value.GetString());
+      os << '"';
+      s.dump_escaped(value.GetString(), false);
+      os << '"';
       break;
     case NT_RAW:
     case NT_RPC:
       os << '"';
-      wpi::util::Base64Encode(os, value.GetRaw());
+      wpi::Base64Encode(os, value.GetRaw());
       os << '"';
       break;
     case NT_BOOLEAN_ARRAY: {
@@ -269,7 +273,11 @@ static void DumpValue(wpi::util::raw_ostream& os, const Value& value) {
         } else {
           os << ", ";
         }
-        wpi::util::json::stringify_bool(os, v);
+        if (v) {
+          os << "true";
+        } else {
+          os << "false";
+        }
       }
       os << ']';
       break;
@@ -283,7 +291,7 @@ static void DumpValue(wpi::util::raw_ostream& os, const Value& value) {
         } else {
           os << ", ";
         }
-        wpi::util::json::stringify_double(os, v);
+        s.dump_float(v);
       }
       os << ']';
       break;
@@ -297,7 +305,7 @@ static void DumpValue(wpi::util::raw_ostream& os, const Value& value) {
         } else {
           os << ", ";
         }
-        wpi::util::json::stringify_float(os, v);
+        s.dump_float(v);
       }
       os << ']';
       break;
@@ -311,7 +319,7 @@ static void DumpValue(wpi::util::raw_ostream& os, const Value& value) {
         } else {
           os << ", ";
         }
-        wpi::util::json::stringify_int(os, v);
+        s.dump_integer(v);
       }
       os << ']';
       break;
@@ -325,7 +333,9 @@ static void DumpValue(wpi::util::raw_ostream& os, const Value& value) {
         } else {
           os << ", ";
         }
-        wpi::util::json::stringify_string(os, v);
+        os << '"';
+        s.dump_escaped(v, false);
+        os << '"';
       }
       os << ']';
       break;
@@ -336,7 +346,8 @@ static void DumpValue(wpi::util::raw_ostream& os, const Value& value) {
   }
 }
 
-void ServerStorage::DumpPersistent(wpi::util::raw_ostream& os) {
+void ServerStorage::DumpPersistent(wpi::raw_ostream& os) {
+  wpi::json::serializer s{os, ' ', 16};
   os << "[\n";
   bool first = true;
   for (const auto& topic : m_topics) {
@@ -348,31 +359,31 @@ void ServerStorage::DumpPersistent(wpi::util::raw_ostream& os) {
     } else {
       os << ",\n";
     }
-    os << "  {\n    \"name\": ";
-    wpi::util::json::stringify_string(os, topic->name);
-    os << ",\n    \"type\": ";
-    wpi::util::json::stringify_string(os, topic->typeStr);
-    os << ",\n    \"value\": ";
-    DumpValue(os, topic->lastValue);
+    os << "  {\n    \"name\": \"";
+    s.dump_escaped(topic->name, false);
+    os << "\",\n    \"type\": \"";
+    s.dump_escaped(topic->typeStr, false);
+    os << "\",\n    \"value\": ";
+    DumpValue(os, topic->lastValue, s);
     os << ",\n    \"properties\": ";
-    topic->properties.marshal(os, true);
+    s.dump(topic->properties, true, false, 2, 4);
     os << "\n  }";
   }
   os << "\n]\n";
 }
 
-static std::string* ObjGetString(wpi::util::json& obj, std::string_view key,
+static std::string* ObjGetString(wpi::json::object_t& obj, std::string_view key,
                                  std::string* error) {
-  auto value = obj.lookup(key);
-  if (!value) {
-    *error = std::format("no {} key", key);
+  auto it = obj.find(key);
+  if (it == obj.end()) {
+    *error = fmt::format("no {} key", key);
     return nullptr;
   }
-  if (!value->is_string()) {
-    *error = std::format("{} must be a string", key);
-    return nullptr;
+  auto val = it->second.get_ptr<std::string*>();
+  if (!val) {
+    *error = fmt::format("{} must be a string", key);
   }
-  return &value->get_string();
+  return val;
 }
 
 std::string ServerStorage::LoadPersistent(std::string_view in) {
@@ -380,12 +391,14 @@ std::string ServerStorage::LoadPersistent(std::string_view in) {
     return {};
   }
 
-  auto j = wpi::util::json::parse(in);
-  if (!j) {
-    return std::format("could not decode JSON: {}", j.error());
+  wpi::json j;
+  try {
+    j = wpi::json::parse(in);
+  } catch (wpi::json::parse_error& err) {
+    return fmt::format("could not decode JSON: {}", err.what());
   }
 
-  if (!j->is_array()) {
+  if (!j.is_array()) {
     return "expected JSON array at top level";
   }
 
@@ -393,47 +406,49 @@ std::string ServerStorage::LoadPersistent(std::string_view in) {
 
   std::string allerrors;
   int i = -1;
-  auto time = wpi::nt::Now();
-  for (auto&& jitem : j->get_array()) {
+  auto time = nt::Now();
+  for (auto&& jitem : j) {
     ++i;
     std::string error;
     {
-      if (!jitem.is_object()) {
+      auto obj = jitem.get_ptr<wpi::json::object_t*>();
+      if (!obj) {
         error = "expected item to be an object";
         goto err;
       }
 
       // name
-      auto name = ObjGetString(jitem, "name", &error);
+      auto name = ObjGetString(*obj, "name", &error);
       if (!name) {
         goto err;
       }
 
       // type
-      auto typeStr = ObjGetString(jitem, "type", &error);
+      auto typeStr = ObjGetString(*obj, "type", &error);
       if (!typeStr) {
         goto err;
       }
 
       // properties
-      auto props = jitem.lookup("properties");
-      if (!props) {
+      auto propsIt = obj->find("properties");
+      if (propsIt == obj->end()) {
         error = "no properties key";
         goto err;
       }
-      if (!props->is_object()) {
+      auto& props = propsIt->second;
+      if (!props.is_object()) {
         error = "properties must be an object";
         goto err;
       }
 
       // check to make sure persistent property is set
-      auto persistent = props->lookup("persistent");
-      if (!persistent) {
+      auto persistentIt = props.find("persistent");
+      if (persistentIt == props.end()) {
         error = "no persistent property";
         goto err;
       }
-      if (persistent->is_bool()) {
-        if (!persistent->get_bool()) {
+      if (auto v = persistentIt->get_ptr<bool*>()) {
+        if (!*v) {
           error = "persistent property is false";
           goto err;
         }
@@ -443,112 +458,121 @@ std::string ServerStorage::LoadPersistent(std::string_view in) {
       }
 
       // value
-      auto jvalue = jitem.lookup("value");
-      if (!jvalue) {
+      auto valueIt = obj->find("value");
+      if (valueIt == obj->end()) {
         error = "no value key";
         goto err;
       }
       Value value;
       if (*typeStr == "boolean") {
-        if (jvalue->is_bool()) {
-          value = Value::MakeBoolean(jvalue->get_bool(), time);
+        if (auto v = valueIt->second.get_ptr<bool*>()) {
+          value = Value::MakeBoolean(*v, time);
         } else {
           error = "value type mismatch, expected boolean";
           goto err;
         }
       } else if (*typeStr == "int") {
-        if (jvalue->is_int()) {
-          value = Value::MakeInteger(jvalue->get_int(), time);
+        if (auto v = valueIt->second.get_ptr<int64_t*>()) {
+          value = Value::MakeInteger(*v, time);
+        } else if (auto v = valueIt->second.get_ptr<uint64_t*>()) {
+          value = Value::MakeInteger(*v, time);
         } else {
           error = "value type mismatch, expected int";
           goto err;
         }
       } else if (*typeStr == "float") {
-        if (jvalue->is_number()) {
-          value = Value::MakeFloat(jvalue->get_number(), time);
+        if (auto v = valueIt->second.get_ptr<double*>()) {
+          value = Value::MakeFloat(*v, time);
         } else {
           error = "value type mismatch, expected float";
           goto err;
         }
       } else if (*typeStr == "double") {
-        if (jvalue->is_number()) {
-          value = Value::MakeDouble(jvalue->get_number(), time);
+        if (auto v = valueIt->second.get_ptr<double*>()) {
+          value = Value::MakeDouble(*v, time);
         } else {
           error = "value type mismatch, expected double";
           goto err;
         }
       } else if (*typeStr == "string" || *typeStr == "json") {
-        if (jvalue->is_string()) {
-          value = Value::MakeString(jvalue->get_string(), time);
+        if (auto v = valueIt->second.get_ptr<std::string*>()) {
+          value = Value::MakeString(*v, time);
         } else {
           error = "value type mismatch, expected string";
           goto err;
         }
       } else if (*typeStr == "boolean[]") {
-        if (!jvalue->is_array()) {
+        auto arr = valueIt->second.get_ptr<wpi::json::array_t*>();
+        if (!arr) {
           error = "value type mismatch, expected array";
           goto err;
         }
         std::vector<int> elems;
-        for (auto&& jelem : jvalue->get_array()) {
-          if (jelem.is_bool()) {
-            elems.push_back(jelem.get_bool());
+        for (auto&& jelem : valueIt->second) {
+          if (auto v = jelem.get_ptr<bool*>()) {
+            elems.push_back(*v);
           } else {
             error = "value type mismatch, expected boolean";
           }
         }
         value = Value::MakeBooleanArray(elems, time);
       } else if (*typeStr == "int[]") {
-        if (!jvalue->is_array()) {
+        auto arr = valueIt->second.get_ptr<wpi::json::array_t*>();
+        if (!arr) {
           error = "value type mismatch, expected array";
           goto err;
         }
         std::vector<int64_t> elems;
-        for (auto&& jelem : jvalue->get_array()) {
-          if (jelem.is_int()) {
-            elems.push_back(jelem.get_int());
+        for (auto&& jelem : valueIt->second) {
+          if (auto v = jelem.get_ptr<int64_t*>()) {
+            elems.push_back(*v);
+          } else if (auto v = jelem.get_ptr<uint64_t*>()) {
+            elems.push_back(*v);
           } else {
             error = "value type mismatch, expected int";
           }
         }
         value = Value::MakeIntegerArray(elems, time);
       } else if (*typeStr == "double[]") {
-        if (!jvalue->is_array()) {
+        auto arr = valueIt->second.get_ptr<wpi::json::array_t*>();
+        if (!arr) {
           error = "value type mismatch, expected array";
           goto err;
         }
         std::vector<double> elems;
-        for (auto&& jelem : jvalue->get_array()) {
-          if (jelem.is_number()) {
-            elems.push_back(jelem.get_number());
+        for (auto&& jelem : valueIt->second) {
+          if (auto v = jelem.get_ptr<double*>()) {
+            elems.push_back(*v);
           } else {
             error = "value type mismatch, expected double";
           }
         }
         value = Value::MakeDoubleArray(elems, time);
       } else if (*typeStr == "float[]") {
-        if (!jvalue->is_array()) {
+        auto arr = valueIt->second.get_ptr<wpi::json::array_t*>();
+        if (!arr) {
           error = "value type mismatch, expected array";
           goto err;
         }
         std::vector<float> elems;
-        for (auto&& jelem : jvalue->get_array()) {
-          if (jelem.is_number()) {
-            elems.push_back(jelem.get_number());
+        for (auto&& jelem : valueIt->second) {
+          if (auto v = jelem.get_ptr<double*>()) {
+            elems.push_back(*v);
           } else {
             error = "value type mismatch, expected float";
           }
         }
         value = Value::MakeFloatArray(elems, time);
       } else if (*typeStr == "string[]") {
-        if (!jvalue->is_array()) {
+        auto arr = valueIt->second.get_ptr<wpi::json::array_t*>();
+        if (!arr) {
           error = "value type mismatch, expected array";
           goto err;
         }
         std::vector<std::string> elems;
-        for (auto&& jelem : jvalue->get_array()) {
-          if (jelem.is_string()) {
-            elems.push_back(jelem.get_string());
+        for (auto&& jelem : valueIt->second) {
+          if (auto v = jelem.get_ptr<std::string*>()) {
+            elems.emplace_back(*v);
           } else {
             error = "value type mismatch, expected string";
           }
@@ -556,9 +580,9 @@ std::string ServerStorage::LoadPersistent(std::string_view in) {
         value = Value::MakeStringArray(std::move(elems), time);
       } else {
         // raw
-        if (jvalue->is_string()) {
+        if (auto v = valueIt->second.get_ptr<std::string*>()) {
           std::vector<uint8_t> data;
-          wpi::util::Base64Decode(jvalue->get_string(), &data);
+          wpi::Base64Decode(*v, &data);
           value = Value::MakeRaw(std::move(data), time);
         } else {
           error = "value type mismatch, expected string";
@@ -567,7 +591,7 @@ std::string ServerStorage::LoadPersistent(std::string_view in) {
       }
 
       // create persistent topic
-      auto topic = CreateTopic(nullptr, *name, *typeStr, *props);
+      auto topic = CreateTopic(nullptr, *name, *typeStr, props);
 
       // set value
       SetValue(nullptr, topic, value);
@@ -575,7 +599,7 @@ std::string ServerStorage::LoadPersistent(std::string_view in) {
       continue;
     }
   err:
-    allerrors += std::format("{}: {}\n", i, error);
+    allerrors += fmt::format("{}: {}\n", i, error);
   }
 
   m_persistentChanged = persistentChanged;  // restore flag

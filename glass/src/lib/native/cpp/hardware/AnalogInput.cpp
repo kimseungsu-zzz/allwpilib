@@ -2,20 +2,20 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/glass/hardware/AnalogInput.hpp"
+#include "glass/hardware/AnalogInput.h"
 
 #include <string>
 
 #include <imgui.h>
+#include <wpi/StringExtras.h>
 
-#include "wpi/glass/Context.hpp"
-#include "wpi/glass/DataSource.hpp"
-#include "wpi/glass/Storage.hpp"
-#include "wpi/util/StringExtras.hpp"
+#include "glass/Context.h"
+#include "glass/DataSource.h"
+#include "glass/Storage.h"
 
-using namespace wpi::glass;
+using namespace glass;
 
-void wpi::glass::DisplayAnalogInput(AnalogInputModel* model, int index) {
+void glass::DisplayAnalogInput(AnalogInputModel* model, int index) {
   auto voltageData = model->GetVoltageData();
   if (!voltageData) {
     return;
@@ -25,13 +25,16 @@ void wpi::glass::DisplayAnalogInput(AnalogInputModel* model, int index) {
   std::string& name = GetStorage().GetString("name");
   char label[128];
   if (!name.empty()) {
-    wpi::util::format_to_n_c_str(label, sizeof(label), "{} [{}]###name", name,
-                                 index);
+    wpi::format_to_n_c_str(label, sizeof(label), "{} [{}]###name", name, index);
   } else {
-    wpi::util::format_to_n_c_str(label, sizeof(label), "In[{}]###name", index);
+    wpi::format_to_n_c_str(label, sizeof(label), "In[{}]###name", index);
   }
 
-  if (auto simDevice = model->GetSimDevice()) {
+  if (model->IsGyro()) {
+    ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(96, 96, 96, 255));
+    ImGui::LabelText(label, "AnalogGyro[%d]", index);
+    ImGui::PopStyleColor();
+  } else if (auto simDevice = model->GetSimDevice()) {
     ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(96, 96, 96, 255));
     ImGui::LabelText(label, "%s", simDevice);
     ImGui::PopStyleColor();
@@ -48,8 +51,8 @@ void wpi::glass::DisplayAnalogInput(AnalogInputModel* model, int index) {
   }
 }
 
-void wpi::glass::DisplayAnalogInputs(AnalogInputsModel* model,
-                                     std::string_view noneMsg) {
+void glass::DisplayAnalogInputs(AnalogInputsModel* model,
+                                std::string_view noneMsg) {
   ImGui::Text("(Use Ctrl+Click to edit value)");
   bool hasAny = false;
   bool first = true;

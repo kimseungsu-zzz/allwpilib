@@ -2,33 +2,31 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "../PortsInternal.hpp"
-#include "PWMDataInternal.hpp"
+#include "../PortsInternal.h"
+#include "PWMDataInternal.h"
 
-using namespace wpi::hal;
+using namespace hal;
 
-namespace wpi::hal::init {
+namespace hal::init {
 void InitializePWMData() {
   static PWMData spd[kNumPWMChannels];
-  ::wpi::hal::SimPWMData = spd;
+  ::hal::SimPWMData = spd;
 }
-}  // namespace wpi::hal::init
+}  // namespace hal::init
 
-PWMData* wpi::hal::SimPWMData;
+PWMData* hal::SimPWMData;
 void PWMData::ResetData() {
   initialized.Reset(false);
-  simDevice = 0;
   pulseMicrosecond.Reset(0);
-  outputPeriod.Reset(0);
+  speed.Reset(0);
+  position.Reset(0);
+  periodScale.Reset(0);
+  zeroLatch.Reset(false);
 }
 
 extern "C" {
 void HALSIM_ResetPWMData(int32_t index) {
   SimPWMData[index].ResetData();
-}
-
-HAL_SimDeviceHandle HALSIM_GetPWMSimDevice(int32_t index) {
-  return SimPWMData[index].simDevice;
 }
 
 #define DEFINE_CAPI(TYPE, CAPINAME, LOWERNAME)                          \
@@ -37,7 +35,10 @@ HAL_SimDeviceHandle HALSIM_GetPWMSimDevice(int32_t index) {
 
 DEFINE_CAPI(HAL_Bool, Initialized, initialized)
 DEFINE_CAPI(int32_t, PulseMicrosecond, pulseMicrosecond)
-DEFINE_CAPI(int32_t, OutputPeriod, outputPeriod)
+DEFINE_CAPI(double, Speed, speed)
+DEFINE_CAPI(double, Position, position)
+DEFINE_CAPI(int32_t, PeriodScale, periodScale)
+DEFINE_CAPI(HAL_Bool, ZeroLatch, zeroLatch)
 
 #define REGISTER(NAME) \
   SimPWMData[index].NAME.RegisterCallback(callback, param, initialNotify)
@@ -46,6 +47,9 @@ void HALSIM_RegisterPWMAllCallbacks(int32_t index, HAL_NotifyCallback callback,
                                     void* param, HAL_Bool initialNotify) {
   REGISTER(initialized);
   REGISTER(pulseMicrosecond);
-  REGISTER(outputPeriod);
+  REGISTER(speed);
+  REGISTER(position);
+  REGISTER(periodScale);
+  REGISTER(zeroLatch);
 }
 }  // extern "C"

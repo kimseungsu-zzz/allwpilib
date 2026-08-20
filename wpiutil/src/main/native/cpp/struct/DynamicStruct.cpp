@@ -2,38 +2,39 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/util/struct/DynamicStruct.hpp"
+#include "wpi/struct/DynamicStruct.h"
 
 #include <algorithm>
-#include <format>
 #include <string>
 #include <utility>
 
-#include "wpi/util/Endian.hpp"
-#include "wpi/util/SmallString.hpp"
-#include "wpi/util/SmallVector.hpp"
-#include "wpi/util/raw_ostream.hpp"
-#include "wpi/util/struct/SchemaParser.hpp"
+#include <fmt/format.h>
 
-using namespace wpi::util;
+#include "wpi/Endian.h"
+#include "wpi/SmallString.h"
+#include "wpi/SmallVector.h"
+#include "wpi/raw_ostream.h"
+#include "wpi/struct/SchemaParser.h"
+
+using namespace wpi;
 
 static size_t TypeToSize(StructFieldType type) {
   switch (type) {
-    case StructFieldType::BOOL:
-    case StructFieldType::CHAR:
-    case StructFieldType::INT8:
-    case StructFieldType::UINT8:
+    case StructFieldType::kBool:
+    case StructFieldType::kChar:
+    case StructFieldType::kInt8:
+    case StructFieldType::kUint8:
       return 1;
-    case StructFieldType::INT16:
-    case StructFieldType::UINT16:
+    case StructFieldType::kInt16:
+    case StructFieldType::kUint16:
       return 2;
-    case StructFieldType::INT32:
-    case StructFieldType::UINT32:
-    case StructFieldType::FLOAT:
+    case StructFieldType::kInt32:
+    case StructFieldType::kUint32:
+    case StructFieldType::kFloat:
       return 4;
-    case StructFieldType::INT64:
-    case StructFieldType::UINT64:
-    case StructFieldType::DOUBLE:
+    case StructFieldType::kInt64:
+    case StructFieldType::kUint64:
+    case StructFieldType::kDouble:
       return 8;
     default:
       return 0;
@@ -42,31 +43,31 @@ static size_t TypeToSize(StructFieldType type) {
 
 static StructFieldType TypeStringToType(std::string_view str) {
   if (str == "bool") {
-    return StructFieldType::BOOL;
+    return StructFieldType::kBool;
   } else if (str == "char") {
-    return StructFieldType::CHAR;
+    return StructFieldType::kChar;
   } else if (str == "int8") {
-    return StructFieldType::INT8;
+    return StructFieldType::kInt8;
   } else if (str == "int16") {
-    return StructFieldType::INT16;
+    return StructFieldType::kInt16;
   } else if (str == "int32") {
-    return StructFieldType::INT32;
+    return StructFieldType::kInt32;
   } else if (str == "int64") {
-    return StructFieldType::INT64;
+    return StructFieldType::kInt64;
   } else if (str == "uint8") {
-    return StructFieldType::UINT8;
+    return StructFieldType::kUint8;
   } else if (str == "uint16") {
-    return StructFieldType::UINT16;
+    return StructFieldType::kUint16;
   } else if (str == "uint32") {
-    return StructFieldType::UINT32;
+    return StructFieldType::kUint32;
   } else if (str == "uint64") {
-    return StructFieldType::UINT64;
+    return StructFieldType::kUint64;
   } else if (str == "float" || str == "float32") {
-    return StructFieldType::FLOAT;
+    return StructFieldType::kFloat;
   } else if (str == "double" || str == "float64") {
-    return StructFieldType::DOUBLE;
+    return StructFieldType::kDouble;
   } else {
-    return StructFieldType::STRUCT;
+    return StructFieldType::kStruct;
   }
 }
 
@@ -110,7 +111,7 @@ const StructFieldDescriptor* StructDescriptor::FindFieldByName(
 }
 
 bool StructDescriptor::CheckCircular(
-    wpi::util::SmallVectorImpl<const StructDescriptor*>& stack) const {
+    wpi::SmallVectorImpl<const StructDescriptor*>& stack) const {
   stack.emplace_back(this);
   for (auto&& ref : m_references) {
     if (std::find(stack.begin(), stack.end(), ref) != stack.end()) {
@@ -125,7 +126,7 @@ bool StructDescriptor::CheckCircular(
 }
 
 std::string StructDescriptor::CalculateOffsets(
-    wpi::util::SmallVectorImpl<const StructDescriptor*>& stack) {
+    wpi::SmallVectorImpl<const StructDescriptor*>& stack) {
   size_t offset = 0;
   unsigned int shift = 0;
   size_t prevBitfieldSize = 0;
@@ -144,7 +145,7 @@ std::string StructDescriptor::CalculateOffsets(
       }
       offset += field.m_size * field.m_arraySize;
     } else {
-      if (field.m_type == StructFieldType::BOOL && prevBitfieldSize != 0 &&
+      if (field.m_type == StructFieldType::kBool && prevBitfieldSize != 0 &&
           (shift + 1) <= (prevBitfieldSize * 8)) {
         // bool takes on size of preceding bitfield type (if it fits)
         field.m_size = prevBitfieldSize;
@@ -168,7 +169,7 @@ std::string StructDescriptor::CalculateOffsets(
   stack.emplace_back(this);
   for (auto&& ref : m_references) {
     if (std::find(stack.begin(), stack.end(), ref) != stack.end()) {
-      [[unlikely]] return std::format(
+      [[unlikely]] return fmt::format(
           "internal error (inconsistent data): circular struct reference "
           "between {} and {}",
           m_name, ref->m_name);
@@ -188,7 +189,7 @@ const StructDescriptor* StructDescriptorDatabase::Add(std::string_view name,
   structparser::Parser parser{schema};
   structparser::ParsedSchema parsed;
   if (!parser.Parse(&parsed)) {
-    *err = std::format("parse error: {}", parser.GetError());
+    *err = fmt::format("parse error: {}", parser.GetError());
     [[unlikely]] return nullptr;
   }
 
@@ -208,30 +209,31 @@ const StructDescriptor* StructDescriptorDatabase::Add(std::string_view name,
     // bitfield checks
     if (decl.bitWidth != 0) {
       // only integer or boolean types are allowed
-      if (type == StructFieldType::CHAR || type == StructFieldType::FLOAT ||
-          type == StructFieldType::DOUBLE || type == StructFieldType::STRUCT) {
-        *err = std::format("field {}: type {} cannot be bitfield", decl.name,
+      if (type == StructFieldType::kChar || type == StructFieldType::kFloat ||
+          type == StructFieldType::kDouble ||
+          type == StructFieldType::kStruct) {
+        *err = fmt::format("field {}: type {} cannot be bitfield", decl.name,
                            decl.typeString);
         [[unlikely]] return nullptr;
       }
 
       // bit width cannot be larger than field size
       if (decl.bitWidth > (size * 8)) {
-        *err = std::format("field {}: bit width {} exceeds type size",
+        *err = fmt::format("field {}: bit width {} exceeds type size",
                            decl.name, decl.bitWidth);
         [[unlikely]] return nullptr;
       }
 
       // bit width must be 1 for booleans
-      if (type == StructFieldType::BOOL && decl.bitWidth != 1) {
-        *err = std::format("field {}: bit width must be 1 for bool type",
+      if (type == StructFieldType::kBool && decl.bitWidth != 1) {
+        *err = fmt::format("field {}: bit width must be 1 for bool type",
                            decl.name);
         [[unlikely]] return nullptr;
       }
 
       // cannot combine array and bitfield (shouldn't parse, but double-check)
       if (decl.arraySize > 1) {
-        *err = std::format("field {}: cannot combine array and bitfield",
+        *err = fmt::format("field {}: cannot combine array and bitfield",
                            decl.name);
         [[unlikely]] return nullptr;
       }
@@ -239,10 +241,10 @@ const StructDescriptor* StructDescriptorDatabase::Add(std::string_view name,
 
     // struct handling
     const StructDescriptor* structDesc = nullptr;
-    if (type == StructFieldType::STRUCT) {
+    if (type == StructFieldType::kStruct) {
       // recursive definitions are not allowed
       if (decl.typeString == name) {
-        *err = std::format("field {}: recursive struct reference", decl.name);
+        *err = fmt::format("field {}: recursive struct reference", decl.name);
         [[unlikely]] return nullptr;
       }
 
@@ -267,7 +269,7 @@ const StructDescriptor* StructDescriptorDatabase::Add(std::string_view name,
     // create field
     if (!theStruct.m_fieldsByName.insert({decl.name, theStruct.m_fields.size()})
              .second) {
-      *err = std::format("duplicate field {}", decl.name);
+      *err = fmt::format("duplicate field {}", decl.name);
       [[unlikely]] return nullptr;
     }
 
@@ -280,7 +282,7 @@ const StructDescriptor* StructDescriptorDatabase::Add(std::string_view name,
   theStruct.m_valid = isValid;
   if (isValid) {
     // we have all the info needed, so calculate field offset & shift
-    wpi::util::SmallVector<const StructDescriptor*, 16> stack;
+    wpi::SmallVector<const StructDescriptor*, 16> stack;
     auto err2 = theStruct.CalculateOffsets(stack);
     if (!err2.empty()) {
       *err = std::move(err2);
@@ -288,17 +290,17 @@ const StructDescriptor* StructDescriptorDatabase::Add(std::string_view name,
     }
   } else {
     // check for circular reference
-    wpi::util::SmallVector<const StructDescriptor*, 16> stack;
+    wpi::SmallVector<const StructDescriptor*, 16> stack;
     if (!theStruct.CheckCircular(stack)) {
-      wpi::util::SmallString<128> buf;
-      wpi::util::raw_svector_ostream os{buf};
+      wpi::SmallString<128> buf;
+      wpi::raw_svector_ostream os{buf};
       for (auto&& elem : stack) {
         if (!buf.empty()) {
           os << " <- ";
         }
         os << elem->GetName();
       }
-      *err = std::format("circular struct reference: {}", os.str());
+      *err = fmt::format("circular struct reference: {}", os.str());
       [[unlikely]] return nullptr;
     }
   }
@@ -348,7 +350,7 @@ void MutableDynamicStruct::SetData(std::span<const uint8_t> data) {
 
 std::string_view DynamicStruct::GetStringField(
     const StructFieldDescriptor* field) const {
-  assert(field->m_type == StructFieldType::CHAR);
+  assert(field->m_type == StructFieldType::kChar);
   assert(field->m_parent == m_desc);
   assert(m_desc->IsValid());
   // Find last non zero character
@@ -405,7 +407,7 @@ std::string_view DynamicStruct::GetStringField(
 
 bool MutableDynamicStruct::SetStringField(const StructFieldDescriptor* field,
                                           std::string_view value) {
-  assert(field->m_type == StructFieldType::CHAR);
+  assert(field->m_type == StructFieldType::kChar);
   assert(field->m_parent == m_desc);
   assert(m_desc->IsValid());
   size_t len = (std::min)(field->m_arraySize, value.size());
@@ -420,7 +422,7 @@ bool MutableDynamicStruct::SetStringField(const StructFieldDescriptor* field,
 void MutableDynamicStruct::SetStructField(const StructFieldDescriptor* field,
                                           const DynamicStruct& value,
                                           size_t arrIndex) {
-  assert(field->m_type == StructFieldType::STRUCT);
+  assert(field->m_type == StructFieldType::kStruct);
   assert(field->m_parent == m_desc);
   assert(m_desc->IsValid());
   assert(value.GetDescriptor() == field->m_struct);

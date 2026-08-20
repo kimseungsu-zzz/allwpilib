@@ -2,11 +2,11 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/apriltag/AprilTagPoseEstimator.hpp"
+#include "frc/apriltag/AprilTagPoseEstimator.h"
 
 #include <Eigen/QR>
 
-#include "wpi/apriltag/AprilTagDetection.hpp"
+#include "frc/apriltag/AprilTagDetection.h"
 
 #ifdef _WIN32
 #pragma warning(disable : 4200)
@@ -19,7 +19,7 @@
 #include "apriltag.h"
 #include "apriltag_pose.h"
 
-using namespace wpi::apriltag;
+using namespace frc;
 
 static Eigen::Matrix3d OrthogonalizeRotationMatrix(
     const Eigen::Matrix3d& input) {
@@ -42,14 +42,14 @@ static Eigen::Matrix3d OrthogonalizeRotationMatrix(
   return Q;
 }
 
-static wpi::math::Transform3d MakePose(const apriltag_pose_t& pose) {
+static Transform3d MakePose(const apriltag_pose_t& pose) {
   if (!pose.R || !pose.t) {
     return {};
   }
-  return {wpi::math::Translation3d{wpi::units::meter_t{pose.t->data[0]},
-                                   wpi::units::meter_t{pose.t->data[1]},
-                                   wpi::units::meter_t{pose.t->data[2]}},
-          wpi::math::Rotation3d{OrthogonalizeRotationMatrix(
+  return {Translation3d{units::meter_t{pose.t->data[0]},
+                        units::meter_t{pose.t->data[1]},
+                        units::meter_t{pose.t->data[2]}},
+          Rotation3d{OrthogonalizeRotationMatrix(
               Eigen::Map<Eigen::Matrix<double, 3, 3, Eigen::RowMajor>>{
                   pose.R->data})}};
 }
@@ -80,7 +80,7 @@ static apriltag_detection_t MakeBasicDet(
   return detection;
 }
 
-static wpi::math::Transform3d DoEstimateHomography(
+static Transform3d DoEstimateHomography(
     const apriltag_detection_t* detection,
     const AprilTagPoseEstimator::Config& config) {
   auto info = MakeDetectionInfo(detection, config);
@@ -89,13 +89,13 @@ static wpi::math::Transform3d DoEstimateHomography(
   return MakePose(pose);
 }
 
-wpi::math::Transform3d AprilTagPoseEstimator::EstimateHomography(
+Transform3d AprilTagPoseEstimator::EstimateHomography(
     const AprilTagDetection& detection) const {
   return DoEstimateHomography(
       reinterpret_cast<const apriltag_detection_t*>(&detection), m_config);
 }
 
-wpi::math::Transform3d AprilTagPoseEstimator::EstimateHomography(
+Transform3d AprilTagPoseEstimator::EstimateHomography(
     std::span<const double, 9> homography) const {
   auto detection = MakeBasicDet(homography, nullptr);
   auto rv = DoEstimateHomography(&detection, m_config);
@@ -130,22 +130,21 @@ AprilTagPoseEstimate AprilTagPoseEstimator::EstimateOrthogonalIteration(
   return rv;
 }
 
-static wpi::math::Transform3d DoEstimate(
-    const apriltag_detection_t* detection,
-    const AprilTagPoseEstimator::Config& config) {
+static Transform3d DoEstimate(const apriltag_detection_t* detection,
+                              const AprilTagPoseEstimator::Config& config) {
   auto info = MakeDetectionInfo(detection, config);
   apriltag_pose_t pose;
   estimate_tag_pose(&info, &pose);
   return MakePose(pose);
 }
 
-wpi::math::Transform3d AprilTagPoseEstimator::Estimate(
+Transform3d AprilTagPoseEstimator::Estimate(
     const AprilTagDetection& detection) const {
   return DoEstimate(reinterpret_cast<const apriltag_detection_t*>(&detection),
                     m_config);
 }
 
-wpi::math::Transform3d AprilTagPoseEstimator::Estimate(
+Transform3d AprilTagPoseEstimator::Estimate(
     std::span<const double, 9> homography,
     std::span<const double, 8> corners) const {
   auto detection = MakeBasicDet(homography, &corners);

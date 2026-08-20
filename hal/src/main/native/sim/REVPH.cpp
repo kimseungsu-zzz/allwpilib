@@ -2,67 +2,73 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/hal/REVPH.h"
+#include "hal/REVPH.h"
 
 #include <string>
 
-#include "HALInitializer.hpp"
-#include "PortsInternal.hpp"
-#include "mockdata/REVPHDataInternal.hpp"
-#include "wpi/hal/ErrorHandling.hpp"
-#include "wpi/hal/Errors.h"
-#include "wpi/hal/handles/IndexedHandleResource.hpp"
+#include "HALInitializer.h"
+#include "HALInternal.h"
+#include "PortsInternal.h"
+#include "hal/Errors.h"
+#include "hal/handles/IndexedHandleResource.h"
+#include "mockdata/REVPHDataInternal.h"
 
-using namespace wpi::hal;
+using namespace hal;
 
 namespace {
 struct PCM {
   int32_t module;
-  wpi::util::mutex lock;
+  wpi::mutex lock;
   std::string previousAllocation;
 };
 }  // namespace
 
 static IndexedHandleResource<HAL_REVPHHandle, PCM, kNumREVPHModules,
-                             HAL_HandleEnum::REV_PH>* pcmHandles;
+                             HAL_HandleEnum::REVPH>* pcmHandles;
 
-namespace wpi::hal::init {
+namespace hal::init {
 void InitializeREVPH() {
   static IndexedHandleResource<HAL_REVPHHandle, PCM, kNumREVPHModules,
-                               HAL_HandleEnum::REV_PH>
+                               HAL_HandleEnum::REVPH>
       pH;
   pcmHandles = &pH;
 }
-}  // namespace wpi::hal::init
+}  // namespace hal::init
 
-HAL_REVPHHandle HAL_InitializeREVPH(int32_t busId, int32_t module,
+HAL_REVPHHandle HAL_InitializeREVPH(int32_t module,
                                     const char* allocationLocation,
                                     int32_t* status) {
-  wpi::hal::init::CheckInit();
+  hal::init::CheckInit();
 
   if (!HAL_CheckREVPHModuleNumber(module)) {
-    *status = MakeErrorIndexOutOfRange(HAL_RESOURCE_OUT_OF_RANGE,
-                                       "Invalid Index for REV PH", 1,
-                                       kNumREVPHModules, module);
-    return HAL_INVALID_HANDLE;
+    *status = RESOURCE_OUT_OF_RANGE;
+    hal::SetLastErrorIndexOutOfRange(status, "Invalid Index for REV PH", 1,
+                                     kNumREVPHModules, module);
+    return HAL_kInvalidHandle;
   }
 
+  HAL_REVPHHandle handle;
   // Module starts at 1
-  auto resource = pcmHandles->Allocate(module - 1, "REV PH", 1);
+  auto pcm = pcmHandles->Allocate(module - 1, &handle, status);
 
-  if (!resource) {
-    *status = resource.error();
-    return HAL_INVALID_HANDLE;  // failed to allocate. Pass error back.
+  if (*status != 0) {
+    if (pcm) {
+      hal::SetLastErrorPreviouslyAllocated(status, "REV PH", module,
+                                           pcm->previousAllocation);
+    } else {
+      hal::SetLastErrorIndexOutOfRange(status, "Invalid Index for REV PH", 1,
+                                       kNumREVPHModules, module);
+    }
+    return HAL_kInvalidHandle;  // failed to allocate. Pass error back.
   }
 
-  auto [handle, pcm] = *resource;
   pcm->previousAllocation = allocationLocation ? allocationLocation : "";
   pcm->module = module;
 
   SimREVPHData[module].initialized = true;
   // Enable closed loop
   SimREVPHData[module].compressorConfigType =
-      HAL_REVPH_COMPRESSOR_CONFIG_DIGITAL;
+      HAL_REVPHCompressorConfigType_kDigital;
 
   return handle;
 }
@@ -114,7 +120,7 @@ void HAL_SetREVPHClosedLoopControlDisabled(HAL_REVPHHandle handle,
     return;
   }
   SimREVPHData[pcm->module].compressorConfigType =
-      HAL_REVPH_COMPRESSOR_CONFIG_DISABLED;
+      HAL_REVPHCompressorConfigType_kDisabled;
 }
 
 void HAL_SetREVPHClosedLoopControlDigital(HAL_REVPHHandle handle,
@@ -125,7 +131,7 @@ void HAL_SetREVPHClosedLoopControlDigital(HAL_REVPHHandle handle,
     return;
   }
   SimREVPHData[pcm->module].compressorConfigType =
-      HAL_REVPH_COMPRESSOR_CONFIG_DIGITAL;
+      HAL_REVPHCompressorConfigType_kDigital;
 }
 
 void HAL_SetREVPHClosedLoopControlAnalog(HAL_REVPHHandle handle,
@@ -138,7 +144,7 @@ void HAL_SetREVPHClosedLoopControlAnalog(HAL_REVPHHandle handle,
     return;
   }
   SimREVPHData[pcm->module].compressorConfigType =
-      HAL_REVPH_COMPRESSOR_CONFIG_ANALOG;
+      HAL_REVPHCompressorConfigType_kAnalog;
 }
 
 void HAL_SetREVPHClosedLoopControlHybrid(HAL_REVPHHandle handle,
@@ -151,7 +157,7 @@ void HAL_SetREVPHClosedLoopControlHybrid(HAL_REVPHHandle handle,
     return;
   }
   SimREVPHData[pcm->module].compressorConfigType =
-      HAL_REVPH_COMPRESSOR_CONFIG_HYBRID;
+      HAL_REVPHCompressorConfigType_kHybrid;
 }
 
 HAL_REVPHCompressorConfigType HAL_GetREVPHCompressorConfig(
@@ -159,7 +165,7 @@ HAL_REVPHCompressorConfigType HAL_GetREVPHCompressorConfig(
   auto pcm = pcmHandles->Get(handle);
   if (pcm == nullptr) {
     *status = HAL_HANDLE_ERROR;
-    return HAL_REVPH_COMPRESSOR_CONFIG_DISABLED;
+    return HAL_REVPHCompressorConfigType_kDisabled;
   }
   return SimREVPHData[pcm->module].compressorConfigType;
 }

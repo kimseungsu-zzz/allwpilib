@@ -23,17 +23,15 @@
  * IN THE SOFTWARE.
  */
 
-// clang-format off
-#include "wpi/net/uv/GetNameInfo.hpp"
-// clang-format on
+#include "wpinet/uv/GetNameInfo.h"  // NOLINT(build/include_order)
 
-#include <catch2/catch_test_macros.hpp>
+#include <gtest/gtest.h>
 
-#include "wpi/net/uv/Loop.hpp"
+#include "wpinet/uv/Loop.h"
 
-namespace wpi::net::uv {
+namespace wpi::uv {
 
-TEST_CASE("UvGetNameInfoTest BasicIp4", "[uv][dns][nameinfo]") {
+TEST(UvGetNameInfoTest, BasicIp4) {
   int getnameinfo_cbs = 0;
 
   auto loop = Loop::Create();
@@ -42,18 +40,18 @@ TEST_CASE("UvGetNameInfoTest BasicIp4", "[uv][dns][nameinfo]") {
   GetNameInfo4(
       loop,
       [&](const char* hostname, const char* service) {
-        REQUIRE(hostname != nullptr);
-        REQUIRE(service != nullptr);
+        ASSERT_NE(hostname, nullptr);
+        ASSERT_NE(service, nullptr);
         getnameinfo_cbs++;
       },
       "127.0.0.1", 80);
 
   loop->Run();
 
-  REQUIRE(getnameinfo_cbs == 1);
+  ASSERT_EQ(getnameinfo_cbs, 1);
 }
 
-TEST_CASE("UvGetNameInfoTest BasicIp6", "[uv][dns][nameinfo]") {
+TEST(UvGetNameInfoTest, BasicIp6) {
   int getnameinfo_cbs = 0;
 
   auto loop = Loop::Create();
@@ -62,15 +60,15 @@ TEST_CASE("UvGetNameInfoTest BasicIp6", "[uv][dns][nameinfo]") {
   GetNameInfo6(
       loop,
       [&](const char* hostname, const char* service) {
-        REQUIRE(hostname != nullptr);
-        REQUIRE(service != nullptr);
+        ASSERT_NE(hostname, nullptr);
+        ASSERT_NE(service, nullptr);
         getnameinfo_cbs++;
       },
       "::1", 80);
 
   loop->Run();
 
-  REQUIRE(getnameinfo_cbs == 1);
+  ASSERT_EQ(getnameinfo_cbs, 1);
 }
 
-}  // namespace wpi::net::uv
+}  // namespace wpi::uv

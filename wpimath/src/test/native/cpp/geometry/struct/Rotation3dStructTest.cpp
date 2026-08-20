@@ -2,25 +2,25 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include <catch2/catch_test_macros.hpp>
+#include <gtest/gtest.h>
 
-#include "wpi/math/geometry/Rotation3d.hpp"
+#include "frc/geometry/Rotation3d.h"
 
-using namespace wpi::math;
+using namespace frc;
 
 namespace {
 
-using StructType = wpi::util::Struct<wpi::math::Rotation3d>;
+using StructType = wpi::Struct<frc::Rotation3d>;
 const Rotation3d kExpectedData{
     Rotation3d{Quaternion{2.29, 0.191, 0.191, 17.4}}};
 }  // namespace
 
-TEST_CASE("Rotation3dStructTest Roundtrip", "[wpimath]") {
+TEST(Rotation3dStructTest, Roundtrip) {
   uint8_t buffer[StructType::GetSize()];
   std::memset(buffer, 0, StructType::GetSize());
   StructType::Pack(buffer, kExpectedData);
 
   Rotation3d unpacked_data = StructType::Unpack(buffer);
 
-  CHECK(kExpectedData.GetQuaternion() == unpacked_data.GetQuaternion());
+  EXPECT_EQ(kExpectedData.GetQuaternion(), unpacked_data.GetQuaternion());
 }

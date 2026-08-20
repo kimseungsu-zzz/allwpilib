@@ -2,13 +2,11 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/math/estimator/SwerveDrivePoseEstimator3d.hpp"
+#include "frc/estimator/SwerveDrivePoseEstimator3d.h"
 
-#include "wpi/util/SymbolExports.hpp"
-
-namespace wpi::math {
+namespace frc {
 
 template class EXPORT_TEMPLATE_DEFINE(WPILIB_DLLEXPORT)
     SwerveDrivePoseEstimator3d<4>;
 
-}  // namespace wpi::math
+}  // namespace frc

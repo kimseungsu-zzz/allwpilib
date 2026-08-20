@@ -2,26 +2,26 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/cs/cscore_runloop.hpp"
-#include "wpi/util/Synchronization.hpp"
+#include <wpi/Synchronization.h>
 
-static wpi::util::Event& GetInstance() {
-  static wpi::util::Event event;
+#include "cscore_runloop.h"
+
+static wpi::Event& GetInstance() {
+  static wpi::Event event;
   return event;
 }
 
-namespace wpi::cs {
-
+namespace cs {
 void RunMainRunLoop() {
-  wpi::util::Event& event = GetInstance();
-  wpi::util::WaitForObject(event.GetHandle());
+  wpi::Event& event = GetInstance();
+  wpi::WaitForObject(event.GetHandle());
 }
 
-int RunMainRunLoopTimeout(double timeout) {
-  wpi::util::Event& event = GetInstance();
+int RunMainRunLoopTimeout(double timeoutSeconds) {
+  wpi::Event& event = GetInstance();
   bool timedOut = false;
   bool signaled =
-      wpi::util::WaitForObject(event.GetHandle(), timeout, &timedOut);
+      wpi::WaitForObject(event.GetHandle(), timeoutSeconds, &timedOut);
   if (timedOut) {
     return 3;
   }
@@ -32,8 +32,7 @@ int RunMainRunLoopTimeout(double timeout) {
 }
 
 void StopMainRunLoop() {
-  wpi::util::Event& event = GetInstance();
+  wpi::Event& event = GetInstance();
   event.Set();
 }
-
-}  // namespace wpi::cs
+}  // namespace cs

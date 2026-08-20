@@ -2,19 +2,19 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "../PortsInternal.hpp"
-#include "I2CDataInternal.hpp"
+#include "../PortsInternal.h"
+#include "I2CDataInternal.h"
 
-using namespace wpi::hal;
+using namespace hal;
 
-namespace wpi::hal::init {
+namespace hal::init {
 void InitializeI2CData() {
   static I2CData sid[kI2CPorts];
-  ::wpi::hal::SimI2CData = sid;
+  ::hal::SimI2CData = sid;
 }
-}  // namespace wpi::hal::init
+}  // namespace hal::init
 
-I2CData* wpi::hal::SimI2CData;
+I2CData* hal::SimI2CData;
 
 void I2CData::ResetData() {
   initialized.Reset(false);

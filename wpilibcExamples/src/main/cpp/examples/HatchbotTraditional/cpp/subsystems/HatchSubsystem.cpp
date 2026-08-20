@@ -2,30 +2,30 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "subsystems/HatchSubsystem.hpp"
+#include "subsystems/HatchSubsystem.h"
 
-#include "wpi/util/sendable/SendableBuilder.hpp"
+#include <wpi/sendable/SendableBuilder.h>
 
 using namespace HatchConstants;
 
 HatchSubsystem::HatchSubsystem()
-    : hatchSolenoid{wpi::CANBus::CAN_S0, wpi::PneumaticsModuleType::CTRE_PCM,
-                    kHatchSolenoidPorts[0], kHatchSolenoidPorts[1]} {}
+    : m_hatchSolenoid{frc::PneumaticsModuleType::CTREPCM,
+                      kHatchSolenoidPorts[0], kHatchSolenoidPorts[1]} {}
 
 void HatchSubsystem::GrabHatch() {
-  hatchSolenoid.Set(wpi::DoubleSolenoid::FORWARD);
+  m_hatchSolenoid.Set(frc::DoubleSolenoid::kForward);
 }
 
 void HatchSubsystem::ReleaseHatch() {
-  hatchSolenoid.Set(wpi::DoubleSolenoid::REVERSE);
+  m_hatchSolenoid.Set(frc::DoubleSolenoid::kReverse);
 }
 
-void HatchSubsystem::InitSendable(wpi::util::SendableBuilder& builder) {
+void HatchSubsystem::InitSendable(wpi::SendableBuilder& builder) {
   SubsystemBase::InitSendable(builder);
 
   // Publish the solenoid state to telemetry.
   builder.AddBooleanProperty(
       "extended",
-      [this] { return hatchSolenoid.Get() == wpi::DoubleSolenoid::FORWARD; },
+      [this] { return m_hatchSolenoid.Get() == frc::DoubleSolenoid::kForward; },
       nullptr);
 }

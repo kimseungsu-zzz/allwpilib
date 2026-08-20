@@ -2,19 +2,19 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "../PortsInternal.hpp"
-#include "DigitalPWMDataInternal.hpp"
+#include "../PortsInternal.h"
+#include "DigitalPWMDataInternal.h"
 
-using namespace wpi::hal;
+using namespace hal;
 
-namespace wpi::hal::init {
+namespace hal::init {
 void InitializeDigitalPWMData() {
   static DigitalPWMData sdpd[kNumDigitalPWMOutputs];
-  ::wpi::hal::SimDigitalPWMData = sdpd;
+  ::hal::SimDigitalPWMData = sdpd;
 }
-}  // namespace wpi::hal::init
+}  // namespace hal::init
 
-DigitalPWMData* wpi::hal::SimDigitalPWMData;
+DigitalPWMData* hal::SimDigitalPWMData;
 void DigitalPWMData::ResetData() {
   initialized.Reset(false);
   dutyCycle.Reset(0.0);

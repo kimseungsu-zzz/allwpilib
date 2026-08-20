@@ -2,15 +2,16 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "ServerPublisher.hpp"
+#include "ServerPublisher.h"
 
 #include <utility>
 
-#include "server/MessagePackWriter.hpp"
-#include "server/ServerTopic.hpp"
-#include "wpi/util/MessagePack.hpp"
+#include <wpi/MessagePack.h>
 
-using namespace wpi::nt::server;
+#include "server/MessagePackWriter.h"
+#include "server/ServerTopic.h"
+
+using namespace nt::server;
 using namespace mpack;
 
 void ServerPublisher::UpdateMeta() {

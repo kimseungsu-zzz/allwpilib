@@ -2,26 +2,23 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-// clang-format off
-#include "wpi/net/WebSocket.hpp"
-// clang-format on
+#include "wpinet/WebSocket.h"  // NOLINT(build/include_order)
 
 #include <functional>
 #include <memory>
 #include <string>
 #include <vector>
 
-#include <catch2/generators/catch_generators.hpp>
+#include <wpi/Base64.h>
+#include <wpi/SmallString.h>
+#include <wpi/StringExtras.h>
+#include <wpi/sha1.h>
 
-#include "WebSocketTest.hpp"
-#include "wpi/net/HttpParser.hpp"
-#include "wpi/net/raw_uv_ostream.hpp"
-#include "wpi/util/Base64.hpp"
-#include "wpi/util/SmallString.hpp"
-#include "wpi/util/StringExtras.hpp"
-#include "wpi/util/sha1.hpp"
+#include "WebSocketTest.h"
+#include "wpinet/HttpParser.h"
+#include "wpinet/raw_uv_ostream.h"
 
-namespace wpi::net {
+namespace wpi {
 
 class WebSocketClientTest : public WebSocketTest {
  public:
@@ -29,30 +26,29 @@ class WebSocketClientTest : public WebSocketTest {
     // Bare bones server
     req.header.connect([this](std::string_view name, std::string_view value) {
       // save key (required for valid response)
-      if (wpi::util::equals_lower(name, "sec-websocket-key")) {
+      if (equals_lower(name, "sec-websocket-key")) {
         clientKey = value;
       }
     });
     req.headersComplete.connect([this](bool) {
       // send response
-      wpi::util::SmallVector<uv::Buffer, 4> bufs;
+      SmallVector<uv::Buffer, 4> bufs;
       raw_uv_ostream os{bufs, 4096};
       os << "HTTP/1.1 101 Switching Protocols\r\n";
       os << "Upgrade: websocket\r\n";
       os << "Connection: Upgrade\r\n";
 
       // accept hash
-      wpi::util::SHA1 hash;
+      SHA1 hash;
       hash.Update(clientKey);
       hash.Update("258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
       if (mockBadAccept) {
         hash.Update("1");
       }
-      wpi::util::SmallString<64> hashBuf;
-      wpi::util::SmallString<64> acceptBuf;
+      SmallString<64> hashBuf;
+      SmallString<64> acceptBuf;
       os << "Sec-WebSocket-Accept: "
-         << wpi::util::Base64Encode(hash.RawFinal(hashBuf), acceptBuf)
-         << "\r\n";
+         << Base64Encode(hash.RawFinal(hashBuf), acceptBuf) << "\r\n";
 
       if (!mockProtocol.empty()) {
         os << "Sec-WebSocket-Protocol: " << mockProtocol << "\r\n";
@@ -82,8 +78,7 @@ class WebSocketClientTest : public WebSocketTest {
           if (req.HasError()) {
             Finish();
           }
-          UNSCOPED_INFO(llhttp_errno_name(req.GetError()));
-          REQUIRE(req.GetError() == HPE_PAUSED_UPGRADE);
+          ASSERT_EQ(req.GetError(), HPE_OK) << http_errno_name(req.GetError());
           if (data.empty()) {
             return;
           }
@@ -97,15 +92,14 @@ class WebSocketClientTest : public WebSocketTest {
   bool mockBadAccept = false;
   std::vector<uint8_t> wireData;
   std::shared_ptr<uv::Pipe> conn;
-  HttpParser req{HttpParser::Type::REQUEST};
-  wpi::util::SmallString<64> clientKey;
+  HttpParser req{HttpParser::kRequest};
+  SmallString<64> clientKey;
   std::string mockProtocol;
   bool serverHeadersDone = false;
   std::function<void()> connected;
 };
 
-TEST_CASE_METHOD(WebSocketClientTest, "WebSocketClientTest Open",
-                 "[websocket][client][handshake]") {
+TEST_F(WebSocketClientTest, Open) {
   int gotOpen = 0;
 
   clientPipe->Connect(pipeName, [&] {
@@ -113,22 +107,25 @@ TEST_CASE_METHOD(WebSocketClientTest, "WebSocketClientTest Open",
     ws->closed.connect([&](uint16_t code, std::string_view reason) {
       Finish();
       if (code != 1005 && code != 1006) {
-        FAIL("Code: " << code << " Reason: " << reason);
+        FAIL() << "Code: " << code << " Reason: " << reason;
       }
     });
     ws->open.connect([&](std::string_view protocol) {
       ++gotOpen;
       Finish();
-      REQUIRE(protocol.empty());
+      ASSERT_TRUE(protocol.empty());
     });
   });
 
   loop->Run();
-  REQUIRE(gotOpen == 1);
+
+  if (HasFatalFailure()) {
+    return;
+  }
+  ASSERT_EQ(gotOpen, 1);
 }
 
-TEST_CASE_METHOD(WebSocketClientTest, "WebSocketClientTest BadAccept",
-                 "[websocket][client][handshake][protocol]") {
+TEST_F(WebSocketClientTest, BadAccept) {
   int gotClosed = 0;
 
   mockBadAccept = true;
@@ -138,21 +135,23 @@ TEST_CASE_METHOD(WebSocketClientTest, "WebSocketClientTest BadAccept",
     ws->closed.connect([&](uint16_t code, std::string_view msg) {
       Finish();
       ++gotClosed;
-      UNSCOPED_INFO("Message: " << msg);
-      REQUIRE(code == 1002);
+      ASSERT_EQ(code, 1002) << "Message: " << msg;
     });
     ws->open.connect([&](std::string_view protocol) {
       Finish();
-      FAIL("Got open");
+      FAIL() << "Got open";
     });
   });
 
   loop->Run();
-  REQUIRE(gotClosed == 1);
+
+  if (HasFatalFailure()) {
+    return;
+  }
+  ASSERT_EQ(gotClosed, 1);
 }
 
-TEST_CASE_METHOD(WebSocketClientTest, "WebSocketClientTest ProtocolGood",
-                 "[websocket][client][protocol]") {
+TEST_F(WebSocketClientTest, ProtocolGood) {
   int gotOpen = 0;
 
   mockProtocol = "myProtocol";
@@ -163,22 +162,25 @@ TEST_CASE_METHOD(WebSocketClientTest, "WebSocketClientTest ProtocolGood",
     ws->closed.connect([&](uint16_t code, std::string_view msg) {
       Finish();
       if (code != 1005 && code != 1006) {
-        FAIL("Code: " << code << "Message: " << msg);
+        FAIL() << "Code: " << code << "Message: " << msg;
       }
     });
     ws->open.connect([&](std::string_view protocol) {
       ++gotOpen;
       Finish();
-      REQUIRE(protocol == "myProtocol");
+      ASSERT_EQ(protocol, "myProtocol");
     });
   });
 
   loop->Run();
-  REQUIRE(gotOpen == 1);
+
+  if (HasFatalFailure()) {
+    return;
+  }
+  ASSERT_EQ(gotOpen, 1);
 }
 
-TEST_CASE_METHOD(WebSocketClientTest, "WebSocketClientTest ProtocolRespNotReq",
-                 "[websocket][client][protocol]") {
+TEST_F(WebSocketClientTest, ProtocolRespNotReq) {
   int gotClosed = 0;
 
   mockProtocol = "myProtocol";
@@ -188,21 +190,23 @@ TEST_CASE_METHOD(WebSocketClientTest, "WebSocketClientTest ProtocolRespNotReq",
     ws->closed.connect([&](uint16_t code, std::string_view msg) {
       Finish();
       ++gotClosed;
-      UNSCOPED_INFO("Message: " << msg);
-      REQUIRE(code == 1003);
+      ASSERT_EQ(code, 1003) << "Message: " << msg;
     });
     ws->open.connect([&](std::string_view protocol) {
       Finish();
-      FAIL("Got open");
+      FAIL() << "Got open";
     });
   });
 
   loop->Run();
-  REQUIRE(gotClosed == 1);
+
+  if (HasFatalFailure()) {
+    return;
+  }
+  ASSERT_EQ(gotClosed, 1);
 }
 
-TEST_CASE_METHOD(WebSocketClientTest, "WebSocketClientTest ProtocolReqNotResp",
-                 "[websocket][client][protocol]") {
+TEST_F(WebSocketClientTest, ProtocolReqNotResp) {
   int gotClosed = 0;
 
   clientPipe->Connect(pipeName, [&] {
@@ -211,17 +215,20 @@ TEST_CASE_METHOD(WebSocketClientTest, "WebSocketClientTest ProtocolReqNotResp",
     ws->closed.connect([&](uint16_t code, std::string_view msg) {
       Finish();
       ++gotClosed;
-      UNSCOPED_INFO("Message: " << msg);
-      REQUIRE(code == 1002);
+      ASSERT_EQ(code, 1002) << "Message: " << msg;
     });
     ws->open.connect([&](std::string_view protocol) {
       Finish();
-      FAIL("Got open");
+      FAIL() << "Got open";
     });
   });
 
   loop->Run();
-  REQUIRE(gotClosed == 1);
+
+  if (HasFatalFailure()) {
+    return;
+  }
+  ASSERT_EQ(gotClosed, 1);
 }
 
 //
@@ -229,7 +236,8 @@ TEST_CASE_METHOD(WebSocketClientTest, "WebSocketClientTest ProtocolReqNotResp",
 // WebSocketServerTest, so only spot check differences like masking.
 //
 
-class WebSocketClientDataTest : public WebSocketClientTest {
+class WebSocketClientDataTest : public WebSocketClientTest,
+                                public ::testing::WithParamInterface<size_t> {
  public:
   WebSocketClientDataTest() {
     clientPipe->Connect(pipeName, [&] {
@@ -244,19 +252,19 @@ class WebSocketClientDataTest : public WebSocketClientTest {
   std::shared_ptr<WebSocket> ws;
 };
 
-TEST_CASE_METHOD(WebSocketClientDataTest, "WebSocketClientDataTest SendBinary",
-                 "[websocket][client][data]") {
+INSTANTIATE_TEST_SUITE_P(WebSocketClientDataTests, WebSocketClientDataTest,
+                         ::testing::Values(0, 1, 125, 126, 65535, 65536));
+
+TEST_P(WebSocketClientDataTest, SendBinary) {
   int gotCallback = 0;
-  std::vector<uint8_t> data(GENERATE(size_t{0}, size_t{1}, size_t{125},
-                                     size_t{126}, size_t{65535}, size_t{65536}),
-                            0x03u);
+  std::vector<uint8_t> data(GetParam(), 0x03u);
   setupWebSocket = [&] {
     ws->open.connect([&](std::string_view) {
       ws->SendBinary({{data}}, [&](auto bufs, uv::Error) {
         ++gotCallback;
         ws->Terminate();
-        REQUIRE_FALSE(bufs.empty());
-        REQUIRE(bufs[0].base == reinterpret_cast<const char*>(data.data()));
+        ASSERT_FALSE(bufs.empty());
+        ASSERT_EQ(bufs[0].base, reinterpret_cast<const char*>(data.data()));
       });
     });
   };
@@ -265,24 +273,20 @@ TEST_CASE_METHOD(WebSocketClientDataTest, "WebSocketClientDataTest SendBinary",
 
   auto expectData = BuildMessage(0x02, true, true, data);
   AdjustMasking(wireData);
-  REQUIRE(wireData == expectData);
-  REQUIRE(gotCallback == 1);
+  ASSERT_EQ(wireData, expectData);
+  ASSERT_EQ(gotCallback, 1);
 }
 
-TEST_CASE_METHOD(WebSocketClientDataTest,
-                 "WebSocketClientDataTest ReceiveBinary",
-                 "[websocket][client][data]") {
+TEST_P(WebSocketClientDataTest, ReceiveBinary) {
   int gotCallback = 0;
-  std::vector<uint8_t> data(GENERATE(size_t{0}, size_t{1}, size_t{125},
-                                     size_t{126}, size_t{65535}, size_t{65536}),
-                            0x03u);
+  std::vector<uint8_t> data(GetParam(), 0x03u);
   setupWebSocket = [&] {
     ws->binary.connect([&](auto inData, bool fin) {
       ++gotCallback;
       ws->Terminate();
-      REQUIRE(fin);
+      ASSERT_TRUE(fin);
       std::vector<uint8_t> recvData{inData.begin(), inData.end()};
-      REQUIRE(data == recvData);
+      ASSERT_EQ(data, recvData);
     });
   };
   auto message = BuildMessage(0x02, true, false, data);
@@ -290,29 +294,24 @@ TEST_CASE_METHOD(WebSocketClientDataTest,
 
   loop->Run();
 
-  REQUIRE(gotCallback == 1);
+  ASSERT_EQ(gotCallback, 1);
 }
 
 //
 // The client must close the connection if a masked frame is received.
 //
 
-TEST_CASE_METHOD(WebSocketClientDataTest,
-                 "WebSocketClientDataTest ReceiveMasked",
-                 "[websocket][client][data][protocol]") {
+TEST_P(WebSocketClientDataTest, ReceiveMasked) {
   int gotCallback = 0;
-  std::vector<uint8_t> data(GENERATE(size_t{0}, size_t{1}, size_t{125},
-                                     size_t{126}, size_t{65535}, size_t{65536}),
-                            ' ');
+  std::vector<uint8_t> data(GetParam(), ' ');
   setupWebSocket = [&] {
     ws->text.connect([&](std::string_view, bool) {
       ws->Terminate();
-      FAIL("Should not have gotten masked message");
+      FAIL() << "Should not have gotten masked message";
     });
     ws->closed.connect([&](uint16_t code, std::string_view reason) {
       ++gotCallback;
-      UNSCOPED_INFO("reason: " << reason);
-      REQUIRE(code == 1002);
+      ASSERT_EQ(code, 1002) << "reason: " << reason;
     });
   };
   auto message = BuildMessage(0x01, true, true, data);
@@ -320,7 +319,7 @@ TEST_CASE_METHOD(WebSocketClientDataTest,
 
   loop->Run();
 
-  REQUIRE(gotCallback == 1);
+  ASSERT_EQ(gotCallback, 1);
 }
 
-}  // namespace wpi::net
+}  // namespace wpi

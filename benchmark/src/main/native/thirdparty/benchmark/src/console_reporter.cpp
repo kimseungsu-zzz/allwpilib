@@ -97,7 +97,6 @@ void ConsoleReporter::ReportRuns(const std::vector<Run>& reports) {
   }
 }
 
-PRINTF_FORMAT_STRING_FUNC(3, 4)
 static void IgnoreColorPrint(std::ostream& out, LogColor /*unused*/,
                              const char* fmt, ...) {
   va_list args;

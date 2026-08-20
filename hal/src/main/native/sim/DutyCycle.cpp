@@ -2,58 +2,59 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/hal/DutyCycle.h"
+#include "hal/DutyCycle.h"
 
-#include <string>
+#include "HALInitializer.h"
+#include "PortsInternal.h"
+#include "hal/Errors.h"
+#include "hal/handles/HandlesInternal.h"
+#include "hal/handles/LimitedHandleResource.h"
+#include "mockdata/DutyCycleDataInternal.h"
 
-#include "HALInitializer.hpp"
-#include "PortsInternal.hpp"
-#include "mockdata/DutyCycleDataInternal.hpp"
-#include "wpi/hal/Errors.h"
-#include "wpi/hal/handles/HandlesInternal.hpp"
-#include "wpi/hal/handles/IndexedHandleResource.hpp"
-
-using namespace wpi::hal;
+using namespace hal;
 
 namespace {
 struct DutyCycle {
   uint8_t index;
-  std::string previousAllocation;
 };
 struct Empty {};
 }  // namespace
 
-static IndexedHandleResource<HAL_DutyCycleHandle, DutyCycle, kNumDutyCycles,
-                             HAL_HandleEnum::DUTY_CYCLE>* dutyCycleHandles;
+static LimitedHandleResource<HAL_DutyCycleHandle, DutyCycle, kNumDutyCycles,
+                             HAL_HandleEnum::DutyCycle>* dutyCycleHandles;
 
-namespace wpi::hal::init {
+namespace hal::init {
 void InitializeDutyCycle() {
-  static IndexedHandleResource<HAL_DutyCycleHandle, DutyCycle, kNumDutyCycles,
-                               HAL_HandleEnum::DUTY_CYCLE>
+  static LimitedHandleResource<HAL_DutyCycleHandle, DutyCycle, kNumDutyCycles,
+                               HAL_HandleEnum::DutyCycle>
       dcH;
   dutyCycleHandles = &dcH;
 }
-}  // namespace wpi::hal::init
+}  // namespace hal::init
 
 extern "C" {
-HAL_DutyCycleHandle HAL_InitializeDutyCycle(int32_t channel,
-                                            const char* allocationLocation,
+HAL_DutyCycleHandle HAL_InitializeDutyCycle(HAL_Handle digitalSourceHandle,
+                                            HAL_AnalogTriggerType triggerType,
                                             int32_t* status) {
-  wpi::hal::init::CheckInit();
+  hal::init::CheckInit();
 
-  auto resource = dutyCycleHandles->Allocate(channel, "Duty Cycle");
-
-  if (!resource) {
-    *status = resource.error();
-    return HAL_INVALID_HANDLE;  // failed to allocate. Pass error back.
+  HAL_DutyCycleHandle handle = dutyCycleHandles->Allocate();
+  if (handle == HAL_kInvalidHandle) {
+    *status = NO_AVAILABLE_RESOURCES;
+    return HAL_kInvalidHandle;
   }
 
-  auto [handle, dutyCycle] = *resource;
+  auto dutyCycle = dutyCycleHandles->Get(handle);
+  if (dutyCycle == nullptr) {  // would only occur on thread issue
+    *status = HAL_HANDLE_ERROR;
+    return HAL_kInvalidHandle;
+  }
+
   int16_t index = getHandleIndex(handle);
+  SimDutyCycleData[index].digitalChannel = getHandleIndex(digitalSourceHandle);
   SimDutyCycleData[index].initialized = true;
   SimDutyCycleData[index].simDevice = 0;
   dutyCycle->index = index;
-  dutyCycle->previousAllocation = allocationLocation ? allocationLocation : "";
   return handle;
 }
 void HAL_FreeDutyCycle(HAL_DutyCycleHandle dutyCycleHandle) {
@@ -65,7 +66,7 @@ void HAL_FreeDutyCycle(HAL_DutyCycleHandle dutyCycleHandle) {
   SimDutyCycleData[dutyCycle->index].initialized = false;
 }
 
-void HAL_SetDutyCycleSimDevice(HAL_DutyCycleHandle handle,
+void HAL_SetDutyCycleSimDevice(HAL_EncoderHandle handle,
                                HAL_SimDeviceHandle device) {
   auto dutyCycle = dutyCycleHandles->Get(handle);
   if (dutyCycle == nullptr) {
@@ -74,8 +75,8 @@ void HAL_SetDutyCycleSimDevice(HAL_DutyCycleHandle handle,
   SimDutyCycleData[dutyCycle->index].simDevice = device;
 }
 
-double HAL_GetDutyCycleFrequency(HAL_DutyCycleHandle dutyCycleHandle,
-                                 int32_t* status) {
+int32_t HAL_GetDutyCycleFrequency(HAL_DutyCycleHandle dutyCycleHandle,
+                                  int32_t* status) {
   auto dutyCycle = dutyCycleHandles->Get(dutyCycleHandle);
   if (dutyCycle == nullptr) {
     *status = HAL_HANDLE_ERROR;
@@ -106,7 +107,23 @@ int32_t HAL_GetDutyCycleHighTime(HAL_DutyCycleHandle dutyCycleHandle,
     return 0;
   }
 
-  double period = 1e9 / SimDutyCycleData[dutyCycle->index].frequency;  // ns
-  return period * SimDutyCycleData[dutyCycle->index].output;
+  double periodSeconds = 1.0 / SimDutyCycleData[dutyCycle->index].frequency;
+  double periodNanoSeconds = periodSeconds * 1e9;
+  return periodNanoSeconds * SimDutyCycleData[dutyCycle->index].output;
+}
+
+int32_t HAL_GetDutyCycleOutputScaleFactor(HAL_DutyCycleHandle dutyCycleHandle,
+                                          int32_t* status) {
+  return 4e7 - 1;
+}
+
+int32_t HAL_GetDutyCycleFPGAIndex(HAL_DutyCycleHandle dutyCycleHandle,
+                                  int32_t* status) {
+  auto dutyCycle = dutyCycleHandles->Get(dutyCycleHandle);
+  if (dutyCycle == nullptr) {
+    *status = HAL_HANDLE_ERROR;
+    return -1;
+  }
+  return dutyCycle->index;
 }
 }  // extern "C"

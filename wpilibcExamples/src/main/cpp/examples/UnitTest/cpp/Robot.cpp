@@ -2,31 +2,31 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "Robot.hpp"
+#include "Robot.h"
 
 /**
  * This function is called periodically during operator control.
  */
 void Robot::TeleopPeriodic() {
   // Activate the intake while the trigger is held
-  if (joystick.GetTrigger()) {
-    intake.Activate(IntakeConstants::kIntakeVelocity);
+  if (m_joystick.GetTrigger()) {
+    m_intake.Activate(IntakeConstants::kIntakeSpeed);
   } else {
-    intake.Activate(0);
+    m_intake.Activate(0);
   }
 
   // Toggle deploying the intake when the top button is pressed
-  if (joystick.GetTop()) {
-    if (intake.IsDeployed()) {
-      intake.Retract();
+  if (m_joystick.GetTop()) {
+    if (m_intake.IsDeployed()) {
+      m_intake.Retract();
     } else {
-      intake.Deploy();
+      m_intake.Deploy();
     }
   }
 }
 
-#ifndef RUNNING_WPILIB_TESTS
+#ifndef RUNNING_FRC_TESTS
 int main() {
-  return wpi::StartRobot<Robot>();
+  return frc::StartRobot<Robot>();
 }
 #endif

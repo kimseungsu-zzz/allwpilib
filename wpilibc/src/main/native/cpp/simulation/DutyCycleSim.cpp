@@ -2,22 +2,31 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/simulation/DutyCycleSim.hpp"
+#include "frc/simulation/DutyCycleSim.h"
 
 #include <memory>
 #include <stdexcept>
 
-#include "wpi/hal/simulation/DutyCycleData.h"
-#include "wpi/hardware/rotation/DutyCycle.hpp"
+#include <hal/simulation/DutyCycleData.h>
 
-using namespace wpi;
-using namespace wpi::sim;
+#include "frc/DutyCycle.h"
+
+using namespace frc;
+using namespace frc::sim;
 
 DutyCycleSim::DutyCycleSim(const DutyCycle& dutyCycle)
-    : m_index{dutyCycle.GetSourceChannel()} {}
+    : m_index{dutyCycle.GetFPGAIndex()} {}
 
 DutyCycleSim DutyCycleSim::CreateForChannel(int channel) {
-  return DutyCycleSim{channel};
+  int index = HALSIM_FindDutyCycleForChannel(channel);
+  if (index < 0) {
+    throw std::out_of_range("no duty cycle found for channel");
+  }
+  return DutyCycleSim{index};
+}
+
+DutyCycleSim DutyCycleSim::CreateForIndex(int index) {
+  return DutyCycleSim{index};
 }
 
 std::unique_ptr<CallbackStore> DutyCycleSim::RegisterInitializedCallback(
@@ -46,12 +55,12 @@ std::unique_ptr<CallbackStore> DutyCycleSim::RegisterFrequencyCallback(
   return store;
 }
 
-wpi::units::hertz_t DutyCycleSim::GetFrequency() const {
-  return wpi::units::hertz_t{HALSIM_GetDutyCycleFrequency(m_index)};
+int DutyCycleSim::GetFrequency() const {
+  return HALSIM_GetDutyCycleFrequency(m_index);
 }
 
-void DutyCycleSim::SetFrequency(wpi::units::hertz_t frequency) {
-  HALSIM_SetDutyCycleFrequency(m_index, frequency.value());
+void DutyCycleSim::SetFrequency(int frequency) {
+  HALSIM_SetDutyCycleFrequency(m_index, frequency);
 }
 
 std::unique_ptr<CallbackStore> DutyCycleSim::RegisterOutputCallback(

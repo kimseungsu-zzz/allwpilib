@@ -2,15 +2,16 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/nt/NTSendable.hpp"
+#include "networktables/NTSendable.h"
 
-#include "wpi/nt/NTSendableBuilder.hpp"
-#include "wpi/util/sendable/SendableBuilder.hpp"
+#include <wpi/sendable/SendableBuilder.h>
 
-using namespace wpi::nt;
+#include "networktables/NTSendableBuilder.h"
 
-void NTSendable::InitSendable(wpi::util::SendableBuilder& builder) {
-  if (builder.GetBackendKind() == wpi::util::SendableBuilder::kNetworkTables) {
+using namespace nt;
+
+void NTSendable::InitSendable(wpi::SendableBuilder& builder) {
+  if (builder.GetBackendKind() == wpi::SendableBuilder::kNetworkTables) {
     InitSendable(static_cast<NTSendableBuilder&>(builder));
   }
 }

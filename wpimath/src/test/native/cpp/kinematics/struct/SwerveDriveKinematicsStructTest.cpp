@@ -2,25 +2,25 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include <catch2/catch_test_macros.hpp>
+#include <gtest/gtest.h>
 
-#include "../../StructTestBase.hpp"
-#include "wpi/math/kinematics/SwerveDriveKinematics.hpp"
+#include "../../StructTestBase.h"
+#include "frc/kinematics/SwerveDriveKinematics.h"
+#include "frc/kinematics/struct/SwerveDriveKinematicsStruct.h"
 
-using namespace wpi::math;
+using namespace frc;
 
 struct SwerveDriveKinematicsStructTestData {
   using Type = SwerveDriveKinematics<4>;
 
-  inline static const Type kTestData{wpi::math::Translation2d{1.0_m, 0.9_m},
-                                     wpi::math::Translation2d{1.1_m, -0.8_m},
-                                     wpi::math::Translation2d{-1.2_m, 0.7_m},
-                                     wpi::math::Translation2d{-1.3_m, -0.6_m}};
+  inline static const Type kTestData{
+      frc::Translation2d{1.0_m, 0.9_m}, frc::Translation2d{1.1_m, -0.8_m},
+      frc::Translation2d{-1.2_m, 0.7_m}, frc::Translation2d{-1.3_m, -0.6_m}};
 
   static void CheckEq(const Type& testData, const Type& data) {
-    CHECK(testData.GetModules() == data.GetModules());
+    EXPECT_EQ(testData.GetModules(), data.GetModules());
   }
 };
 
-INSTANTIATE_CATCH_TYPED_TEST_SUITE_P(SwerveDriveKinematics, StructTest,
-                                     SwerveDriveKinematicsStructTestData);
+INSTANTIATE_TYPED_TEST_SUITE_P(SwerveDriveKinematics, StructTest,
+                               SwerveDriveKinematicsStructTestData);

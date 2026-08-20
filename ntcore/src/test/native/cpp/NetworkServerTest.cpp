@@ -8,14 +8,13 @@
 #include <string>
 #include <thread>
 
-#include <catch2/catch_message.hpp>
-#include <catch2/catch_test_macros.hpp>
+#include <gtest/gtest.h>
 
-#include "wpi/nt/IntegerTopic.hpp"
-#include "wpi/nt/NetworkTableInstance.hpp"
+#include "networktables/IntegerTopic.h"
+#include "networktables/NetworkTableInstance.h"
 
 // Valid persistent JSON containing a single persistent integer topic.
-static constexpr const char* PERSISTENT_JSON = R"([
+static constexpr const char* kPersistentJson = R"([
   {
     "name": "/test/persistent_value",
     "type": "int",
@@ -24,12 +23,7 @@ static constexpr const char* PERSISTENT_JSON = R"([
   }
 ])";
 
-static constexpr unsigned int RESTORE_BACKUP_PORT = 10040;
-static constexpr unsigned int NORMAL_LOAD_PORT = 10041;
-static constexpr unsigned int ORIGINAL_OVER_BACKUP_PORT = 10042;
-static constexpr unsigned int NO_FILE_PORT = 10043;
-
-class NetworkServerPersistentTest {
+class NetworkServerPersistentTest : public ::testing::Test {
  public:
   NetworkServerPersistentTest() {
     // Create a unique temp directory for each test
@@ -42,7 +36,7 @@ class NetworkServerPersistentTest {
     m_persistFile = (m_tempDir / "test_persistent.json").string();
   }
 
-  ~NetworkServerPersistentTest() {
+  ~NetworkServerPersistentTest() override {
     std::error_code ec;
     std::filesystem::remove_all(m_tempDir, ec);
   }
@@ -51,15 +45,14 @@ class NetworkServerPersistentTest {
   // Write content to a file.
   static void WriteFile(const std::string& path, const std::string& content) {
     std::ofstream os{path};
-    UNSCOPED_INFO("Failed to create file: " << path);
-    REQUIRE(os.is_open());
+    ASSERT_TRUE(os.is_open()) << "Failed to create file: " << path;
     os << content;
   }
 
   // Wait for the server to finish initializing.  Returns true if a topic with
   // the given name was seen before the timeout expired.
   bool WaitForTopic(
-      wpi::nt::NetworkTableInstance& inst, std::string_view name,
+      nt::NetworkTableInstance& inst, std::string_view name,
       std::chrono::milliseconds timeout = std::chrono::milliseconds{3000}) {
     auto deadline = std::chrono::steady_clock::now() + timeout;
     while (std::chrono::steady_clock::now() < deadline) {
@@ -80,69 +73,62 @@ class NetworkServerPersistentTest {
 // original persistent file is missing.  This simulates SavePersistent being
 // interrupted after renaming the original file to .bck but before the
 // temporary file has been renamed to the original filename.
-TEST_CASE_METHOD(NetworkServerPersistentTest,
-                 "NetworkServerPersistentTest "
-                 "LoadPersistentRestoresFromBackupWhenOriginalMissing",
-                 "[ntcore][network-server]") {
+TEST_F(NetworkServerPersistentTest,
+       LoadPersistentRestoresFromBackupWhenOriginalMissing) {
   // Set up "interrupted" state: only .bck file exists, no original.
   std::string backupFile = m_persistFile + ".bck";
-  WriteFile(backupFile, PERSISTENT_JSON);
-  REQUIRE(std::filesystem::exists(backupFile));
-  REQUIRE_FALSE(std::filesystem::exists(m_persistFile));
+  WriteFile(backupFile, kPersistentJson);
+  ASSERT_TRUE(std::filesystem::exists(backupFile));
+  ASSERT_FALSE(std::filesystem::exists(m_persistFile));
 
   // Start a server that references the (missing) persistent file.
   // Subscribe BEFORE starting the server so the server's local client has a
   // matching subscriber when persistent topics are announced.
-  auto inst = wpi::nt::NetworkTableInstance::Create();
-  wpi::nt::IntegerSubscriber sub =
+  auto inst = nt::NetworkTableInstance::Create();
+  nt::IntegerSubscriber sub =
       inst.GetIntegerTopic("/test/persistent_value").Subscribe(0);
-  inst.StartServer(m_persistFile, "127.0.0.1", "", RESTORE_BACKUP_PORT);
+  inst.StartServer(m_persistFile, "127.0.0.1");
 
   // Wait for the persistent topic to appear.
-  UNSCOPED_INFO("LoadPersistent did not restore from the .bck backup file");
-  CHECK(WaitForTopic(inst, "/test/persistent_value"));
+  EXPECT_TRUE(WaitForTopic(inst, "/test/persistent_value"))
+      << "LoadPersistent did not restore from the .bck backup file";
 
   // Also verify the value is correct.
-  CHECK(sub.Get() == 42);
+  EXPECT_EQ(sub.Get(), 42);
 
   // The .bck should have been renamed to the original filename.
-  CHECK(std::filesystem::exists(m_persistFile));
+  EXPECT_TRUE(std::filesystem::exists(m_persistFile));
 
   inst.StopServer();
-  wpi::nt::NetworkTableInstance::Destroy(inst);
+  nt::NetworkTableInstance::Destroy(inst);
 }
 
 // Verify that LoadPersistent works normally when the original persistent file
 // is present (no interruption scenario).
-TEST_CASE_METHOD(NetworkServerPersistentTest,
-                 "NetworkServerPersistentTest LoadPersistentNormalLoad",
-                 "[ntcore][network-server]") {
+TEST_F(NetworkServerPersistentTest, LoadPersistentNormalLoad) {
   // Write the persistent file directly (no backup).
-  WriteFile(m_persistFile, PERSISTENT_JSON);
-  REQUIRE(std::filesystem::exists(m_persistFile));
+  WriteFile(m_persistFile, kPersistentJson);
+  ASSERT_TRUE(std::filesystem::exists(m_persistFile));
 
-  auto inst = wpi::nt::NetworkTableInstance::Create();
-  wpi::nt::IntegerSubscriber sub =
+  auto inst = nt::NetworkTableInstance::Create();
+  nt::IntegerSubscriber sub =
       inst.GetIntegerTopic("/test/persistent_value").Subscribe(0);
-  inst.StartServer(m_persistFile, "127.0.0.1", "", NORMAL_LOAD_PORT);
+  inst.StartServer(m_persistFile, "127.0.0.1");
 
-  UNSCOPED_INFO("LoadPersistent did not load the persistent file");
-  CHECK(WaitForTopic(inst, "/test/persistent_value"));
+  EXPECT_TRUE(WaitForTopic(inst, "/test/persistent_value"))
+      << "LoadPersistent did not load the persistent file";
 
-  CHECK(sub.Get() == 42);
+  EXPECT_EQ(sub.Get(), 42);
 
   inst.StopServer();
-  wpi::nt::NetworkTableInstance::Destroy(inst);
+  nt::NetworkTableInstance::Destroy(inst);
 }
 
 // Verify that when both the original file and .bck exist, the original file
 // takes precedence (the backup is not used).
-TEST_CASE_METHOD(
-    NetworkServerPersistentTest,
-    "NetworkServerPersistentTest LoadPersistentPrefersOriginalOverBackup",
-    "[ntcore][network-server]") {
+TEST_F(NetworkServerPersistentTest, LoadPersistentPrefersOriginalOverBackup) {
   // Original file with value 100.
-  static constexpr const char* ORIGINAL_JSON = R"([
+  static constexpr const char* kOriginalJson = R"([
   {
     "name": "/test/persistent_value",
     "type": "int",
@@ -152,44 +138,42 @@ TEST_CASE_METHOD(
 ])";
 
   // Backup file with a different value (42).
-  WriteFile(m_persistFile, ORIGINAL_JSON);
-  WriteFile(m_persistFile + ".bck", PERSISTENT_JSON);
-  REQUIRE(std::filesystem::exists(m_persistFile));
-  REQUIRE(std::filesystem::exists(m_persistFile + ".bck"));
+  WriteFile(m_persistFile, kOriginalJson);
+  WriteFile(m_persistFile + ".bck", kPersistentJson);
+  ASSERT_TRUE(std::filesystem::exists(m_persistFile));
+  ASSERT_TRUE(std::filesystem::exists(m_persistFile + ".bck"));
 
-  auto inst = wpi::nt::NetworkTableInstance::Create();
-  wpi::nt::IntegerSubscriber sub =
+  auto inst = nt::NetworkTableInstance::Create();
+  nt::IntegerSubscriber sub =
       inst.GetIntegerTopic("/test/persistent_value").Subscribe(0);
-  inst.StartServer(m_persistFile, "127.0.0.1", "", ORIGINAL_OVER_BACKUP_PORT);
+  inst.StartServer(m_persistFile, "127.0.0.1");
 
-  UNSCOPED_INFO("LoadPersistent did not load any persistent file");
-  CHECK(WaitForTopic(inst, "/test/persistent_value"));
+  EXPECT_TRUE(WaitForTopic(inst, "/test/persistent_value"))
+      << "LoadPersistent did not load any persistent file";
 
   // The value should come from the original (100), not the backup (42).
-  CHECK(sub.Get() == 100);
+  EXPECT_EQ(sub.Get(), 100);
 
   inst.StopServer();
-  wpi::nt::NetworkTableInstance::Destroy(inst);
+  nt::NetworkTableInstance::Destroy(inst);
 }
 
 // Verify that LoadPersistent handles a missing persistent file and no backup
 // gracefully (no crash, no topics loaded).
-TEST_CASE_METHOD(NetworkServerPersistentTest,
-                 "NetworkServerPersistentTest LoadPersistentNoFile",
-                 "[ntcore][network-server]") {
-  REQUIRE_FALSE(std::filesystem::exists(m_persistFile));
-  REQUIRE_FALSE(std::filesystem::exists(m_persistFile + ".bck"));
+TEST_F(NetworkServerPersistentTest, LoadPersistentNoFile) {
+  ASSERT_FALSE(std::filesystem::exists(m_persistFile));
+  ASSERT_FALSE(std::filesystem::exists(m_persistFile + ".bck"));
 
-  auto inst = wpi::nt::NetworkTableInstance::Create();
-  inst.StartServer(m_persistFile, "127.0.0.1", "", NO_FILE_PORT);
+  auto inst = nt::NetworkTableInstance::Create();
+  inst.StartServer(m_persistFile, "127.0.0.1");
 
   // Give the server time to initialize.
   std::this_thread::sleep_for(std::chrono::milliseconds{500});
 
   // No persistent topics should exist.
   auto infos = inst.GetTopicInfo("/test/persistent_value");
-  CHECK(infos.empty());
+  EXPECT_TRUE(infos.empty());
 
   inst.StopServer();
-  wpi::nt::NetworkTableInstance::Destroy(inst);
+  nt::NetworkTableInstance::Destroy(inst);
 }

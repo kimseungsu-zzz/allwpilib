@@ -12,23 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <algorithm>
+#include <cstdint>
 #include <iostream>
 #include <string>
+#include <tuple>
 #include <vector>
 
 #include "benchmark/benchmark.h"
 #include "check.h"
 #include "complexity.h"
+#include "string_util.h"
+#include "timers.h"
 
 // File format reference: http://edoceo.com/utilitas/csv-file-format.
 
 namespace benchmark {
 
 namespace {
-const std::vector<const char*> elements = {
+std::vector<std::string> elements = {
     "name",           "iterations",       "real_time",        "cpu_time",
     "time_unit",      "bytes_per_second", "items_per_second", "label",
     "error_occurred", "error_message"};
+}  // namespace
 
 std::string CsvEscape(const std::string& s) {
   std::string tmp;
@@ -45,7 +51,6 @@ std::string CsvEscape(const std::string& s) {
   }
   return '"' + tmp + '"';
 }
-}  // namespace
 
 BENCHMARK_EXPORT
 bool CSVReporter::ReportContext(const Context& context) {

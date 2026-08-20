@@ -3,29 +3,36 @@
 // the WPILib BSD license file in the root directory of this project.
 
 #include <memory>
-#include <string>
-#include <vector>
 
-#include <catch2/catch_test_macros.hpp>
+#include <gtest/gtest.h>
 
-#include "TestPrinters.hpp"
-#include "wpi/nt/DoubleTopic.hpp"
-#include "wpi/nt/NetworkTableInstance.hpp"
-#include "wpi/nt/ntcore_cpp.hpp"
+#include "TestPrinters.h"
+#include "gmock/gmock.h"
+#include "networktables/DoubleTopic.h"
+#include "networktables/NetworkTableInstance.h"
+#include "ntcore_cpp.h"
 
-class TableListenerTest {
+using ::testing::_;
+
+using MockTableEventListener = testing::MockFunction<void(
+    nt::NetworkTable* table, std::string_view key, const nt::Event& event)>;
+using MockSubTableListener =
+    testing::MockFunction<void(nt::NetworkTable* parent, std::string_view name,
+                               std::shared_ptr<nt::NetworkTable> table)>;
+
+class TableListenerTest : public ::testing::Test {
  public:
-  TableListenerTest() : m_inst(wpi::nt::NetworkTableInstance::Create()) {}
+  TableListenerTest() : m_inst(nt::NetworkTableInstance::Create()) {}
 
-  ~TableListenerTest() { wpi::nt::NetworkTableInstance::Destroy(m_inst); }
+  ~TableListenerTest() override { nt::NetworkTableInstance::Destroy(m_inst); }
 
   void PublishTopics();
 
  protected:
-  wpi::nt::NetworkTableInstance m_inst;
-  wpi::nt::DoublePublisher m_foovalue;
-  wpi::nt::DoublePublisher m_barvalue;
-  wpi::nt::DoublePublisher m_bazvalue;
+  nt::NetworkTableInstance m_inst;
+  nt::DoublePublisher m_foovalue;
+  nt::DoublePublisher m_barvalue;
+  nt::DoublePublisher m_bazvalue;
 };
 
 void TableListenerTest::PublishTopics() {
@@ -34,44 +41,21 @@ void TableListenerTest::PublishTopics() {
   m_bazvalue = m_inst.GetDoubleTopic("/baz/bazvalue").Publish();
 }
 
-TEST_CASE_METHOD(TableListenerTest, "TableListenerTest AddListener",
-                 "[ntcore][table-listener]") {
+TEST_F(TableListenerTest, AddListener) {
   auto table = m_inst.GetTable("/foo");
-  struct ListenerCall {
-    wpi::nt::NetworkTable* table;
-    std::string key;
-  };
-  std::vector<ListenerCall> listenerCalls;
+  MockTableEventListener listener;
   table->AddListener(NT_EVENT_TOPIC | NT_EVENT_IMMEDIATE,
-                     [&](wpi::nt::NetworkTable* callbackTable,
-                         std::string_view key, const wpi::nt::Event&) {
-                       listenerCalls.emplace_back(callbackTable,
-                                                  std::string{key});
-                     });
+                     listener.AsStdFunction());
+  EXPECT_CALL(listener, Call(table.get(), std::string_view{"foovalue"}, _));
   PublishTopics();
-  CHECK(m_inst.WaitForListenerQueue(1.0));
-  REQUIRE(listenerCalls.size() == 1u);
-  CHECK(listenerCalls[0].table == table.get());
-  CHECK(listenerCalls[0].key == "foovalue");
+  EXPECT_TRUE(m_inst.WaitForListenerQueue(1.0));
 }
 
-TEST_CASE_METHOD(TableListenerTest, "TableListenerTest AddSubTableListener",
-                 "[ntcore][table-listener]") {
+TEST_F(TableListenerTest, AddSubTableListener) {
   auto table = m_inst.GetTable("/foo");
-  struct ListenerCall {
-    wpi::nt::NetworkTable* parent;
-    std::string name;
-    std::shared_ptr<wpi::nt::NetworkTable> table;
-  };
-  std::vector<ListenerCall> listenerCalls;
-  table->AddSubTableListener(
-      [&](wpi::nt::NetworkTable* parent, std::string_view name,
-          std::shared_ptr<wpi::nt::NetworkTable> callbackTable) {
-        listenerCalls.emplace_back(parent, std::string{name}, callbackTable);
-      });
+  MockSubTableListener listener;
+  table->AddSubTableListener(listener.AsStdFunction());
+  EXPECT_CALL(listener, Call(table.get(), std::string_view{"bar"}, _));
   PublishTopics();
-  CHECK(m_inst.WaitForListenerQueue(1.0));
-  REQUIRE(listenerCalls.size() == 1u);
-  CHECK(listenerCalls[0].parent == table.get());
-  CHECK(listenerCalls[0].name == "bar");
+  EXPECT_TRUE(m_inst.WaitForListenerQueue(1.0));
 }

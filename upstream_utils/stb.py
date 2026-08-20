@@ -22,7 +22,8 @@ def copy_upstream_src(wpilib_root: Path):
     (stb / "cpp").mkdir(parents=True)
 
     with open(stb / "cpp/stb_image.cpp", "w") as f:
-        f.write("""#define STBI_WINDOWS_UTF8
+        f.write(
+            """#define STBI_WINDOWS_UTF8
 #define STB_IMAGE_IMPLEMENTATION
 
 #ifdef __GNUC__
@@ -31,7 +32,8 @@ def copy_upstream_src(wpilib_root: Path):
 #endif
 
 #include "stb_image.h"
-""")
+"""
+        )
 
 
 def main():

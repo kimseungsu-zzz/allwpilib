@@ -2,15 +2,16 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/net/uv/Process.hpp"
+#include "wpinet/uv/Process.h"
 
 #include <memory>
 
-#include "wpi/net/uv/Loop.hpp"
-#include "wpi/net/uv/Pipe.hpp"
-#include "wpi/util/SmallString.hpp"
+#include <wpi/SmallString.h>
 
-namespace wpi::net::uv {
+#include "wpinet/uv/Loop.h"
+#include "wpinet/uv/Pipe.h"
+
+namespace wpi::uv {
 
 std::shared_ptr<Process> Process::SpawnArray(Loop& loop, std::string_view file,
                                              std::span<const Option> options) {
@@ -26,49 +27,49 @@ std::shared_ptr<Process> Process::SpawnArray(Loop& loop, std::string_view file,
     h.exited(status, signal);
   };
 
-  wpi::util::SmallString<128> fileBuf{file};
+  SmallString<128> fileBuf{file};
   coptions.file = fileBuf.c_str();
   coptions.cwd = nullptr;
   coptions.flags = 0;
   coptions.uid = 0;
   coptions.gid = 0;
 
-  wpi::util::SmallVector<char*, 4> argsBuf;
-  wpi::util::SmallVector<char*, 4> envBuf;
+  SmallVector<char*, 4> argsBuf;
+  SmallVector<char*, 4> envBuf;
   struct StdioContainer : public uv_stdio_container_t {
     StdioContainer() {
       flags = UV_IGNORE;
       data.fd = 0;
     }
   };
-  wpi::util::SmallVector<StdioContainer, 4> stdioBuf;
+  SmallVector<StdioContainer, 4> stdioBuf;
 
   for (auto&& o : options) {
     switch (o.m_type) {
-      case Option::Type::ARG:
+      case Option::kArg:
         argsBuf.push_back(const_cast<char*>(o.m_data.str));
         break;
-      case Option::Type::ENV:
+      case Option::kEnv:
         envBuf.push_back(const_cast<char*>(o.m_data.str));
         break;
-      case Option::Type::WORKING_DIRECTORY:
+      case Option::kCwd:
         coptions.cwd = o.m_data.str[0] == '\0' ? nullptr : o.m_data.str;
         break;
-      case Option::Type::USER_ID:
+      case Option::kUid:
         coptions.uid = o.m_data.uid;
         coptions.flags |= UV_PROCESS_SETUID;
         break;
-      case Option::Type::GROUP_ID:
+      case Option::kGid:
         coptions.gid = o.m_data.gid;
         coptions.flags |= UV_PROCESS_SETGID;
         break;
-      case Option::Type::SET_FLAGS:
+      case Option::kSetFlags:
         coptions.flags |= o.m_data.flags;
         break;
-      case Option::Type::CLEAR_FLAGS:
+      case Option::kClearFlags:
         coptions.flags &= ~o.m_data.flags;
         break;
-      case Option::Type::STDIO_IGNORE: {
+      case Option::kStdioIgnore: {
         size_t index = o.m_data.stdio.index;
         if (index >= stdioBuf.size()) {
           stdioBuf.resize(index + 1);
@@ -77,7 +78,7 @@ std::shared_ptr<Process> Process::SpawnArray(Loop& loop, std::string_view file,
         stdioBuf[index].data.fd = 0;
         break;
       }
-      case Option::Type::STDIO_INHERIT_FD: {
+      case Option::kStdioInheritFd: {
         size_t index = o.m_data.stdio.index;
         if (index >= stdioBuf.size()) {
           stdioBuf.resize(index + 1);
@@ -86,7 +87,7 @@ std::shared_ptr<Process> Process::SpawnArray(Loop& loop, std::string_view file,
         stdioBuf[index].data.fd = o.m_data.stdio.fd;
         break;
       }
-      case Option::Type::STDIO_INHERIT_PIPE: {
+      case Option::kStdioInheritPipe: {
         size_t index = o.m_data.stdio.index;
         if (index >= stdioBuf.size()) {
           stdioBuf.resize(index + 1);
@@ -95,7 +96,7 @@ std::shared_ptr<Process> Process::SpawnArray(Loop& loop, std::string_view file,
         stdioBuf[index].data.stream = o.m_data.stdio.pipe->GetRawStream();
         break;
       }
-      case Option::Type::STDIO_CREATE_PIPE: {
+      case Option::kStdioCreatePipe: {
         size_t index = o.m_data.stdio.index;
         if (index >= stdioBuf.size()) {
           stdioBuf.resize(index + 1);
@@ -136,4 +137,4 @@ std::shared_ptr<Process> Process::SpawnArray(Loop& loop, std::string_view file,
   return h;
 }
 
-}  // namespace wpi::net::uv
+}  // namespace wpi::uv

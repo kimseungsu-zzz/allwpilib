@@ -2,36 +2,36 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "subsystems/Drive.hpp"
+#include "subsystems/Drive.h"
 
-#include "wpi/commands2/Commands.hpp"
+#include <frc2/command/Commands.h>
 
 Drive::Drive() {
-  leftMotor.AddFollower(wpi::PWMSparkMax{constants::drive::kLeftMotor2Port});
-  rightMotor.AddFollower(wpi::PWMSparkMax{constants::drive::kRightMotor2Port});
+  m_leftMotor.AddFollower(frc::PWMSparkMax{constants::drive::kLeftMotor2Port});
+  m_rightMotor.AddFollower(
+      frc::PWMSparkMax{constants::drive::kRightMotor2Port});
 
-  rightMotor.SetInverted(true);
+  m_rightMotor.SetInverted(true);
 
-  leftEncoder.SetDistancePerPulse(
+  m_leftEncoder.SetDistancePerPulse(
       constants::drive::kEncoderDistancePerPulse.value());
-  rightEncoder.SetDistancePerPulse(
+  m_rightEncoder.SetDistancePerPulse(
       constants::drive::kEncoderDistancePerPulse.value());
 
-  drive.SetSafetyEnabled(false);
+  m_drive.SetSafetyEnabled(false);
 }
 
-wpi::cmd::CommandPtr Drive::ArcadeDriveCommand(std::function<double()> fwd,
-                                               std::function<double()> rot) {
-  return wpi::cmd::Run([this, fwd, rot] { drive.ArcadeDrive(fwd(), rot()); },
-                       {this})
+frc2::CommandPtr Drive::ArcadeDriveCommand(std::function<double()> fwd,
+                                           std::function<double()> rot) {
+  return frc2::cmd::Run([this, fwd, rot] { m_drive.ArcadeDrive(fwd(), rot()); },
+                        {this})
       .WithName("Arcade Drive");
 }
 
-wpi::cmd::CommandPtr Drive::SysIdQuasistatic(
-    wpi::cmd::sysid::Direction direction) {
-  return sysIdRoutine.Quasistatic(direction);
+frc2::CommandPtr Drive::SysIdQuasistatic(frc2::sysid::Direction direction) {
+  return m_sysIdRoutine.Quasistatic(direction);
 }
 
-wpi::cmd::CommandPtr Drive::SysIdDynamic(wpi::cmd::sysid::Direction direction) {
-  return sysIdRoutine.Dynamic(direction);
+frc2::CommandPtr Drive::SysIdDynamic(frc2::sysid::Direction direction) {
+  return m_sysIdRoutine.Dynamic(direction);
 }

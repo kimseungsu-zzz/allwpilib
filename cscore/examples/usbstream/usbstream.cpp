@@ -4,31 +4,29 @@
 
 #include <cstdio>
 
-#include "wpi/cs/MjpegServer.hpp"
-#include "wpi/cs/RawEvent.hpp"
-#include "wpi/cs/UsbCamera.hpp"
-#include "wpi/cs/cscore_cpp.hpp"
-#include "wpi/util/print.hpp"
+#include <wpi/print.h>
+
+#include "cscore.h"
 
 int main() {
-  wpi::util::print("hostname: {}\n", wpi::cs::GetHostname());
+  wpi::print("hostname: {}\n", cs::GetHostname());
   std::puts("IPv4 network addresses:");
-  for (const auto& addr : wpi::cs::GetNetworkInterfaces()) {
-    wpi::util::print("  {}\n", addr);
+  for (const auto& addr : cs::GetNetworkInterfaces()) {
+    wpi::print("  {}\n", addr);
   }
-  wpi::cs::UsbCamera camera{"usbcam", 0};
-  camera.SetVideoMode(wpi::util::PixelFormat::MJPEG, 320, 240, 30);
-  wpi::cs::MjpegServer mjpegServer{"httpserver", 8081};
+  cs::UsbCamera camera{"usbcam", 0};
+  camera.SetVideoMode(cs::VideoMode::kMJPEG, 320, 240, 30);
+  cs::MjpegServer mjpegServer{"httpserver", 8081};
   mjpegServer.SetSource(camera);
 
   CS_Status status = 0;
-  wpi::cs::AddListener(
-      [&](const wpi::cs::RawEvent& event) {
-        wpi::util::print("FPS={} MBPS={}\n", camera.GetActualFPS(),
-                         (camera.GetActualDataRate() / 1000000.0));
+  cs::AddListener(
+      [&](const cs::RawEvent& event) {
+        wpi::print("FPS={} MBPS={}\n", camera.GetActualFPS(),
+                   (camera.GetActualDataRate() / 1000000.0));
       },
-      wpi::cs::RawEvent::kTelemetryUpdated, false, &status);
-  wpi::cs::SetTelemetryPeriod(1.0);
+      cs::RawEvent::kTelemetryUpdated, false, &status);
+  cs::SetTelemetryPeriod(1.0);
 
   std::getchar();
 }

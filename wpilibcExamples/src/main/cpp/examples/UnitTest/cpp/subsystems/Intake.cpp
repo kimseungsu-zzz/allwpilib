@@ -2,25 +2,25 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "subsystems/Intake.hpp"
+#include "subsystems/Intake.h"
 
 void Intake::Deploy() {
-  piston.Set(wpi::DoubleSolenoid::Value::FORWARD);
+  m_piston.Set(frc::DoubleSolenoid::Value::kForward);
 }
 
 void Intake::Retract() {
-  piston.Set(wpi::DoubleSolenoid::Value::REVERSE);
-  motor.SetThrottle(0);  // turn off the motor
+  m_piston.Set(frc::DoubleSolenoid::Value::kReverse);
+  m_motor.Set(0);  // turn off the motor
 }
 
-void Intake::Activate(double velocity) {
+void Intake::Activate(double speed) {
   if (IsDeployed()) {
-    motor.SetThrottle(velocity);
+    m_motor.Set(speed);
   } else {  // if piston isn't open, do nothing
-    motor.SetThrottle(0);
+    m_motor.Set(0);
   }
 }
 
 bool Intake::IsDeployed() const {
-  return piston.Get() == wpi::DoubleSolenoid::Value::FORWARD;
+  return m_piston.Get() == frc::DoubleSolenoid::Value::kForward;
 }

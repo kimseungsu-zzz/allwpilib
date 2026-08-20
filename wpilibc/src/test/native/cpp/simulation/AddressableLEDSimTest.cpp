@@ -2,57 +2,35 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/simulation/AddressableLEDSim.hpp"
+#include "frc/simulation/AddressableLEDSim.h"  // NOLINT(build/include_order)
 
 #include <array>
 
-#include <catch2/catch_test_macros.hpp>
-#include <catch2/matchers/catch_matchers_floating_point.hpp>
+#include <gtest/gtest.h>
+#include <hal/HAL.h>
 
-#include "callback_helpers/TestCallbackHelpers.hpp"
-#include "wpi/hal/HAL.h"
-#include "wpi/hardware/led/AddressableLED.hpp"
+#include "callback_helpers/TestCallbackHelpers.h"
+#include "frc/AddressableLED.h"
 
-namespace wpi::sim {
+namespace frc::sim {
 
-TEST_CASE("AddressableLEDSimTest InitializationCallback",
-          "[wpilibc][simulation]") {
-  HAL_Initialize();
+TEST(AddressableLEDSimTest, InitializationCallback) {
+  HAL_Initialize(500, 0);
 
   BooleanCallback callback;
-  AddressableLEDSim sim{0};
+  AddressableLEDSim sim;
   auto cb = sim.RegisterInitializedCallback(callback.GetCallback(), false);
 
-  CHECK_FALSE(callback.WasTriggered());
+  EXPECT_FALSE(callback.WasTriggered());
   AddressableLED led{0};
 
-  CHECK(sim.GetInitialized());
-  CHECK(callback.WasTriggered());
-  CHECK(callback.GetLastValue());
+  EXPECT_TRUE(sim.GetInitialized());
+  EXPECT_TRUE(callback.WasTriggered());
+  EXPECT_TRUE(callback.GetLastValue());
 }
 
-TEST_CASE("AddressableLEDSimTest SetStart", "[wpilibc][simulation]") {
-  HAL_Initialize();
-
-  AddressableLED led{0};
-  AddressableLEDSim sim{led};
-  IntCallback callback;
-
-  auto cb = sim.RegisterStartCallback(callback.GetCallback(), false);
-
-  CHECK(0 == sim.GetStart());  // Defaults to 0
-
-  std::array<AddressableLED::LEDData, 50> ledData;
-  led.SetStart(1);
-  led.SetData(ledData);
-
-  CHECK(1 == sim.GetStart());
-  CHECK(callback.WasTriggered());
-  CHECK(1 == callback.GetLastValue());
-}
-
-TEST_CASE("AddressableLEDSimTest SetLength", "[wpilibc][simulation]") {
-  HAL_Initialize();
+TEST(AddressableLEDSimTest, SetLength) {
+  HAL_Initialize(500, 0);
 
   AddressableLED led{0};
   AddressableLEDSim sim{led};
@@ -60,37 +38,62 @@ TEST_CASE("AddressableLEDSimTest SetLength", "[wpilibc][simulation]") {
 
   auto cb = sim.RegisterLengthCallback(callback.GetCallback(), false);
 
-  CHECK(0 == sim.GetLength());  // Defaults to 0 leds
+  EXPECT_EQ(1, sim.GetLength());  // Defaults to 1 led
 
   std::array<AddressableLED::LEDData, 50> ledData;
   led.SetLength(ledData.max_size());
   led.SetData(ledData);
 
-  CHECK(50 == sim.GetLength());
-  CHECK(callback.WasTriggered());
-  CHECK(50 == callback.GetLastValue());
+  EXPECT_EQ(50, sim.GetLength());
+  EXPECT_TRUE(callback.WasTriggered());
+  EXPECT_EQ(50, callback.GetLastValue());
 }
 
-TEST_CASE("AddressableLEDSimTest SetData", "[wpilibc][simulation]") {
+TEST(AddressableLEDSimTest, SetRunning) {
+  HAL_Initialize(500, 0);
+
+  AddressableLEDSim sim = AddressableLEDSim::CreateForIndex(0);
+  BooleanCallback callback;
+  auto cb = sim.RegisterRunningCallback(callback.GetCallback(), false);
   AddressableLED led{0};
-  AddressableLEDSim sim{0};
+
+  EXPECT_FALSE(sim.GetRunning());
+
+  led.Start();
+  EXPECT_TRUE(sim.GetRunning());
+  EXPECT_TRUE(callback.WasTriggered());
+  EXPECT_TRUE(callback.GetLastValue());
+
+  callback.Reset();
+  led.Stop();
+  EXPECT_FALSE(sim.GetRunning());
+  EXPECT_TRUE(callback.WasTriggered());
+  EXPECT_FALSE(callback.GetLastValue());
+}
+
+TEST(AddressableLEDSimTest, SetData) {
+  AddressableLED led{0};
+  AddressableLEDSim sim = AddressableLEDSim::CreateForChannel(0);
 
   bool callbackHit = false;
   std::array<AddressableLED::LEDData, 3> setData;
   auto cb = sim.RegisterDataCallback(
       [&](std::string_view, const unsigned char* buffer, unsigned int count) {
-        REQUIRE(count == 9u);
-        CHECK(255u == buffer[0]);
-        CHECK(0 == buffer[1]);
-        CHECK(0 == buffer[2]);
+        ASSERT_EQ(count, 12u);
+        EXPECT_EQ(0, buffer[0]);
+        EXPECT_EQ(0, buffer[1]);
+        EXPECT_EQ(255u, buffer[2]);
+        EXPECT_EQ(0, buffer[3]);
 
-        CHECK(0 == buffer[3]);
-        CHECK(255u == buffer[4]);
-        CHECK(0 == buffer[5]);
+        EXPECT_EQ(0, buffer[4]);
+        EXPECT_EQ(255u, buffer[5]);
+        EXPECT_EQ(0, buffer[6]);
+        EXPECT_EQ(0, buffer[7]);
 
-        CHECK(0 == buffer[6]);
-        CHECK(0 == buffer[7]);
-        CHECK(255u == buffer[8]);
+        EXPECT_EQ(255u, buffer[8]);
+        EXPECT_EQ(0, buffer[9]);
+        EXPECT_EQ(0, buffer[10]);
+        EXPECT_EQ(0, buffer[11]);
 
         callbackHit = true;
       },
@@ -104,22 +107,25 @@ TEST_CASE("AddressableLEDSimTest SetData", "[wpilibc][simulation]") {
   ledData[2].SetRGB(0, 0, 255);
   led.SetData(ledData);
 
-  CHECK(callbackHit);
+  EXPECT_TRUE(callbackHit);
 
   std::array<HAL_AddressableLEDData, 3> simData;
   sim.GetData(simData.data());
 
-  CHECK(0xFF == simData[0].r);
-  CHECK(0x00 == simData[0].g);
-  CHECK(0x00 == simData[0].b);
+  EXPECT_EQ(0xFF, simData[0].r);
+  EXPECT_EQ(0x00, simData[0].g);
+  EXPECT_EQ(0x00, simData[0].b);
+  EXPECT_EQ(0x00, simData[0].padding);
 
-  CHECK(0x00 == simData[1].r);
-  CHECK(0xFF == simData[1].g);
-  CHECK(0x00 == simData[1].b);
+  EXPECT_EQ(0x00, simData[1].r);
+  EXPECT_EQ(0xFF, simData[1].g);
+  EXPECT_EQ(0x00, simData[1].b);
+  EXPECT_EQ(0x00, simData[1].padding);
 
-  CHECK(0x00 == simData[2].r);
-  CHECK(0x00 == simData[2].g);
-  CHECK(0xFF == simData[2].b);
+  EXPECT_EQ(0x00, simData[2].r);
+  EXPECT_EQ(0x00, simData[2].g);
+  EXPECT_EQ(0xFF, simData[2].b);
+  EXPECT_EQ(0x00, simData[2].padding);
 }
 
-}  // namespace wpi::sim
+}  // namespace frc::sim

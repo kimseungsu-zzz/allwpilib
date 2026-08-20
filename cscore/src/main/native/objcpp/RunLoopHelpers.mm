@@ -2,13 +2,12 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/cs/cscore_runloop.hpp"
+#include "cscore_runloop.h"
 
 #include <CoreFoundation/CFRunLoop.h>
 #import <Foundation/Foundation.h>
 
-namespace wpi::cs {
-
+namespace cs {
 void RunMainRunLoop() {
   if (CFRunLoopGetMain() != CFRunLoopGetCurrent()) {
     NSLog(@"This method can only be called from the main thread");
@@ -17,16 +16,15 @@ void RunMainRunLoop() {
   CFRunLoopRun();
 }
 
-int RunMainRunLoopTimeout(double timeout) {
+int RunMainRunLoopTimeout(double timeoutSeconds) {
   if (CFRunLoopGetMain() != CFRunLoopGetCurrent()) {
     NSLog(@"This method can only be called from the main thread");
     return -1;
   }
-  return CFRunLoopRunInMode(kCFRunLoopDefaultMode, timeout, false);
+  return CFRunLoopRunInMode(kCFRunLoopDefaultMode, timeoutSeconds, false);
 }
 
 void StopMainRunLoop() {
   CFRunLoopStop(CFRunLoopGetMain());
 }
-
 }

@@ -2,16 +2,16 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/net/uv/Tcp.hpp"
+#include "wpinet/uv/Tcp.h"
 
 #include <cstring>
 #include <functional>
 #include <memory>
 #include <utility>
 
-#include "wpi/net/uv/util.hpp"
+#include "wpinet/uv/util.h"
 
-namespace wpi::net::uv {
+namespace wpi::uv {
 
 std::shared_ptr<Tcp> Tcp::Create(Loop& loop, unsigned int flags) {
   if (loop.IsClosing()) {
@@ -190,4 +190,4 @@ void Tcp::CloseReset() {
   }
 }
 
-}  // namespace wpi::net::uv
+}  // namespace wpi::uv

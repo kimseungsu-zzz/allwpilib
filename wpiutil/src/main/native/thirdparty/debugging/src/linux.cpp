@@ -7,7 +7,7 @@
 #	include <fstream>
 #	include <string>
 
-namespace wpi::util {
+namespace wpi {
 
 bool is_debugger_present() noexcept
 {
@@ -20,6 +20,6 @@ bool is_debugger_present() noexcept
 	return buffer[index + 11] != '0';
 }
 
-} // namespace wpi::util
+} // namespace wpi
 
 #endif

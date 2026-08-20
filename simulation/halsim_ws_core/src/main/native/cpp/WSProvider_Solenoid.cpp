@@ -2,23 +2,22 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/halsim/ws_core/WSProvider_Solenoid.hpp"
+#include "WSProvider_Solenoid.h"
 
-#include <format>
 #include <memory>
 #include <string>
 #include <utility>
 
-#include "wpi/hal/Ports.h"
-#include "wpi/hal/simulation/CTREPCMData.h"
+#include <fmt/format.h>
+#include <hal/Ports.h>
+#include <hal/simulation/CTREPCMData.h>
 
 #define REGISTER_SOLENOID(halsim, jsonid, ctype, haltype)                  \
   HALSIM_RegisterCTREPCMSolenoid##halsim##Callback(                        \
       m_pcmIndex, m_solenoidIndex,                                         \
       [](const char* name, void* param, const struct HAL_Value* value) {   \
         static_cast<HALSimWSProviderSolenoid*>(param)->ProcessHalCallback( \
-            wpi::util::json::object(                                       \
-                jsonid, static_cast<ctype>(value->data.v_##haltype)));     \
+            {{jsonid, static_cast<ctype>(value->data.v_##haltype)}});      \
       },                                                                   \
       this, true)
 
@@ -28,7 +27,7 @@ void HALSimWSProviderSolenoid::Initialize(WSRegisterFunc webRegisterFunc) {
        ++CTREPCMIndex) {
     for (int32_t solenoidIndex = 0;
          solenoidIndex < HAL_GetNumCTRESolenoidChannels(); ++solenoidIndex) {
-      auto key = std::format("Solenoid/{},{}", CTREPCMIndex, solenoidIndex);
+      auto key = fmt::format("Solenoid/{},{}", CTREPCMIndex, solenoidIndex);
       auto ptr = std::make_unique<HALSimWSProviderSolenoid>(
           CTREPCMIndex, solenoidIndex, key, "Solenoid");
       webRegisterFunc(key, std::move(ptr));
@@ -43,7 +42,7 @@ HALSimWSProviderSolenoid::HALSimWSProviderSolenoid(int32_t CTREPCMChannel,
     : HALSimWSHalProvider(key, type),
       m_pcmIndex(CTREPCMChannel),
       m_solenoidIndex(solenoidChannel) {
-  m_deviceId = std::format("{},{}", m_pcmIndex, solenoidChannel);
+  m_deviceId = fmt::format("{},{}", m_pcmIndex, solenoidChannel);
 }
 
 HALSimWSProviderSolenoid::~HALSimWSProviderSolenoid() {

@@ -2,29 +2,33 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "../PortsInternal.hpp"
-#include "EncoderDataInternal.hpp"
+#include <limits>
 
-using namespace wpi::hal;
+#include "../PortsInternal.h"
+#include "EncoderDataInternal.h"
 
-namespace wpi::hal::init {
+using namespace hal;
+
+namespace hal::init {
 void InitializeEncoderData() {
   static EncoderData sed[kNumEncoders];
-  ::wpi::hal::SimEncoderData = sed;
+  ::hal::SimEncoderData = sed;
 }
-}  // namespace wpi::hal::init
+}  // namespace hal::init
 
-EncoderData* wpi::hal::SimEncoderData;
+EncoderData* hal::SimEncoderData;
 void EncoderData::ResetData() {
   digitalChannelA = 0;
   digitalChannelB = 0;
   initialized.Reset(false);
   simDevice = 0;
   count.Reset(0);
-  rate.Reset(0);
+  period.Reset(std::numeric_limits<double>::max());
   reset.Reset(false);
+  maxPeriod.Reset(0);
   direction.Reset(false);
   reverseDirection.Reset(false);
+  samplesToAverage.Reset(0);
   distancePerPulse.Reset(1);
 }
 
@@ -63,10 +67,12 @@ HAL_SimDeviceHandle HALSIM_GetEncoderSimDevice(int32_t index) {
                                SimEncoderData, LOWERNAME)
 
 DEFINE_CAPI(HAL_Bool, Initialized, initialized)
-DEFINE_CAPI(double, Rate, rate)
+DEFINE_CAPI(double, Period, period)
 DEFINE_CAPI(HAL_Bool, Reset, reset)
+DEFINE_CAPI(double, MaxPeriod, maxPeriod)
 DEFINE_CAPI(HAL_Bool, Direction, direction)
 DEFINE_CAPI(HAL_Bool, ReverseDirection, reverseDirection)
+DEFINE_CAPI(int32_t, SamplesToAverage, samplesToAverage)
 DEFINE_CAPI(double, DistancePerPulse, distancePerPulse)
 
 int32_t HALSIM_RegisterEncoderCountCallback(int32_t index,
@@ -101,6 +107,22 @@ double HALSIM_GetEncoderDistance(int32_t index) {
   return simData.count * simData.distancePerPulse;
 }
 
+void HALSIM_SetEncoderRate(int32_t index, double rate) {
+  auto& simData = SimEncoderData[index];
+  if (rate == 0) {
+    simData.period = std::numeric_limits<double>::infinity();
+    return;
+  }
+
+  simData.period = simData.distancePerPulse / rate;
+}
+
+double HALSIM_GetEncoderRate(int32_t index) {
+  auto& simData = SimEncoderData[index];
+
+  return simData.distancePerPulse / simData.period;
+}
+
 #define REGISTER(NAME) \
   SimEncoderData[index].NAME.RegisterCallback(callback, param, initialNotify)
 
@@ -109,10 +131,12 @@ void HALSIM_RegisterEncoderAllCallbacks(int32_t index,
                                         void* param, HAL_Bool initialNotify) {
   REGISTER(initialized);
   REGISTER(count);
-  REGISTER(rate);
+  REGISTER(period);
   REGISTER(reset);
+  REGISTER(maxPeriod);
   REGISTER(direction);
   REGISTER(reverseDirection);
+  REGISTER(samplesToAverage);
   REGISTER(distancePerPulse);
 }
 }  // extern "C"

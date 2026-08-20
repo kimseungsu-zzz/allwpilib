@@ -31,22 +31,15 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
  */
 
-// clang-format off
-#include "wpi/util/Signal.h"
-// clang-format on
+#include "wpi/Signal.h"  // NOLINT(build/include_order)
 
 #include <array>
 #include <atomic>
-#include <barrier>
 #include <thread>
 
-#include <catch2/catch_template_test_macros.hpp>
-#include <catch2/catch_test_macros.hpp>
-#include <catch2/matchers/catch_matchers_floating_point.hpp>
-#include <catch2/matchers/catch_matchers_range_equals.hpp>
-#include <catch2/matchers/catch_matchers_vector.hpp>
+#include <gtest/gtest.h>
 
-using namespace wpi::util::sig;
+using namespace wpi::sig;
 
 namespace {
 
@@ -73,9 +66,9 @@ void connect_emit(Signal_mt<int>& sig) {
 
 }  // namespace
 
-namespace wpi::util {
+namespace wpi {
 
-TEST_CASE("SignalTest ThreadedMix", "[wpiutil][sigslot]") {
+TEST(SignalTest, ThreadedMix) {
   sum = 0;
 
   Signal_mt<int> sig;
@@ -90,7 +83,7 @@ TEST_CASE("SignalTest ThreadedMix", "[wpiutil][sigslot]") {
   }
 }
 
-TEST_CASE("SignalTest ThreadedEmission", "[wpiutil][sigslot]") {
+TEST(SignalTest, ThreadedEmission) {
   sum = 0;
 
   Signal_mt<int> sig;
@@ -105,28 +98,7 @@ TEST_CASE("SignalTest ThreadedEmission", "[wpiutil][sigslot]") {
     t.join();
   }
 
-  REQUIRE(sum == 100000);
+  ASSERT_EQ(sum, 100000);
 }
 
-TEST_CASE("SignalTest ConcurrentConnectAndEmission", "[wpiutil][sigslot]") {
-  Signal_mt<> sig;
-  std::barrier syncPoint{2};
-  std::thread emitter{[&] {
-    for (int i = 0; i < 10000; ++i) {
-      syncPoint.arrive_and_wait();
-      sig();
-      syncPoint.arrive_and_wait();
-    }
-  }};
-
-  for (int i = 0; i < 10000; ++i) {
-    sig.disconnect_all();
-    syncPoint.arrive_and_wait();
-    sig.connect([] {});
-    syncPoint.arrive_and_wait();
-  }
-
-  emitter.join();
-}
-
-}  // namespace wpi::util
+}  // namespace wpi

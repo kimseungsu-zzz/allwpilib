@@ -6,32 +6,42 @@
 
 #include <cassert>
 
-#include "HALUtil.hpp"
-#include "org_wpilib_hardware_hal_CANAPIJNI.h"
-#include "wpi/hal/CAN.h"
-#include "wpi/hal/CANAPI.h"
-#include "wpi/hal/Errors.h"
-#include "wpi/util/jni_util.hpp"
+#include <wpi/jni_util.h>
 
-using namespace wpi::hal;
-using namespace wpi::util::java;
+#include "HALUtil.h"
+#include "edu_wpi_first_hal_CANAPIJNI.h"
+#include "hal/CAN.h"
+#include "hal/CANAPI.h"
+#include "hal/Errors.h"
+
+using namespace hal;
+using namespace wpi::java;
 
 extern "C" {
 
 /*
- * Class:     org_wpilib_hardware_hal_CANAPIJNI
+ * Class:     edu_wpi_first_hal_CANAPIJNI
+ * Method:    getCANPacketBaseTime
+ * Signature: ()J
+ */
+JNIEXPORT jlong JNICALL
+Java_edu_wpi_first_hal_CANAPIJNI_getCANPacketBaseTime
+  (JNIEnv*, jclass)
+{
+  return HAL_GetCANPacketBaseTime();
+}
+/*
+ * Class:     edu_wpi_first_hal_CANAPIJNI
  * Method:    initializeCAN
- * Signature: (IIII)I
+ * Signature: (III)I
  */
 JNIEXPORT jint JNICALL
-Java_org_wpilib_hardware_hal_CANAPIJNI_initializeCAN
-  (JNIEnv* env, jclass, jint busId, jint manufacturer, jint deviceId,
-   jint deviceType)
+Java_edu_wpi_first_hal_CANAPIJNI_initializeCAN
+  (JNIEnv* env, jclass, jint manufacturer, jint deviceId, jint deviceType)
 {
   int32_t status = 0;
   auto handle =
-      HAL_InitializeCAN(static_cast<int32_t>(busId),
-                        static_cast<HAL_CANManufacturer>(manufacturer),
+      HAL_InitializeCAN(static_cast<HAL_CANManufacturer>(manufacturer),
                         static_cast<int32_t>(deviceId),
                         static_cast<HAL_CANDeviceType>(deviceType), &status);
 
@@ -40,212 +50,128 @@ Java_org_wpilib_hardware_hal_CANAPIJNI_initializeCAN
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_CANAPIJNI
+ * Class:     edu_wpi_first_hal_CANAPIJNI
  * Method:    cleanCAN
  * Signature: (I)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_hardware_hal_CANAPIJNI_cleanCAN
+Java_edu_wpi_first_hal_CANAPIJNI_cleanCAN
   (JNIEnv* env, jclass, jint handle)
 {
-  if (handle != HAL_INVALID_HANDLE) {
+  if (handle != HAL_kInvalidHandle) {
     HAL_CleanCAN(static_cast<HAL_CANHandle>(handle));
   }
 }
 
-static bool PackCANMessage(JNIEnv* env, jbyteArray data, jint dataLength,
-                           jint flags, HAL_CANMessage* message) {
-  if (data == nullptr) {
-    ThrowNullPointerException(env, "data array cannot be null");
-    return false;
-  }
-
-  auto arrLen = env->GetArrayLength(data);
-  if (arrLen < dataLength) {
-    ThrowIllegalArgumentException(env, "array length less than data length");
-    return false;
-  }
-
-  if ((flags & HAL_CAN_FD_DATALENGTH) && dataLength > 64) {
-    ThrowIllegalArgumentException(env, "FD frame has max length of 64 bytes");
-    return false;
-  } else if (!(flags & HAL_CAN_FD_DATALENGTH) && dataLength > 8) {
-    ThrowIllegalArgumentException(env,
-                                  "Non FD frame has max length of 8 bytes");
-    return false;
-  }
-
-  std::memset(message, 0, sizeof(*message));
-  message->dataSize = dataLength;
-  message->flags = flags;
-  JSpan<const jbyte> arr{env, data, static_cast<size_t>(dataLength)};
-  std::memcpy(message->data, arr.data(), dataLength);
-  return true;
-}
-
 /*
- * Class:     org_wpilib_hardware_hal_CANAPIJNI
+ * Class:     edu_wpi_first_hal_CANAPIJNI
  * Method:    writeCANPacket
- * Signature: (II[BII)V
+ * Signature: (I[BI)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_hardware_hal_CANAPIJNI_writeCANPacket
-  (JNIEnv* env, jclass, jint handle, jint apiId, jbyteArray data,
-   jint dataLength, jint flags)
+Java_edu_wpi_first_hal_CANAPIJNI_writeCANPacket
+  (JNIEnv* env, jclass, jint handle, jbyteArray data, jint apiId)
 {
-  HAL_CANMessage message;
-  if (!PackCANMessage(env, data, dataLength, flags, &message)) {
-    return;
-  }
-
+  auto halHandle = static_cast<HAL_CANHandle>(handle);
+  JSpan<const jbyte> arr{env, data};
   int32_t status = 0;
-  HAL_WriteCANPacket(static_cast<HAL_CANHandle>(handle), apiId, &message,
-                     &status);
+  HAL_WriteCANPacket(halHandle, reinterpret_cast<const uint8_t*>(arr.data()),
+                     arr.size(), apiId, &status);
   CheckStatus(env, status);
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_CANAPIJNI
+ * Class:     edu_wpi_first_hal_CANAPIJNI
  * Method:    writeCANPacketRepeating
- * Signature: (II[BIII)V
+ * Signature: (I[BII)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_hardware_hal_CANAPIJNI_writeCANPacketRepeating
-  (JNIEnv* env, jclass, jint handle, jint apiId, jbyteArray data,
-   jint dataLength, jint flags, jint repeatMs)
+Java_edu_wpi_first_hal_CANAPIJNI_writeCANPacketRepeating
+  (JNIEnv* env, jclass, jint handle, jbyteArray data, jint apiId,
+   jint timeoutMs)
 {
-  HAL_CANMessage message;
-  if (!PackCANMessage(env, data, dataLength, flags, &message)) {
-    return;
-  }
-
+  auto halHandle = static_cast<HAL_CANHandle>(handle);
+  JSpan<const jbyte> arr{env, data};
   int32_t status = 0;
-  HAL_WriteCANPacketRepeating(static_cast<HAL_CANHandle>(handle), apiId,
-                              &message, repeatMs, &status);
+  HAL_WriteCANPacketRepeating(halHandle,
+                              reinterpret_cast<const uint8_t*>(arr.data()),
+                              arr.size(), apiId, timeoutMs, &status);
   CheckStatus(env, status);
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_CANAPIJNI
+ * Class:     edu_wpi_first_hal_CANAPIJNI
  * Method:    writeCANRTRFrame
- * Signature: (II[BII)V
+ * Signature: (III)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_hardware_hal_CANAPIJNI_writeCANRTRFrame
-  (JNIEnv* env, jclass, jint handle, jint apiId, jbyteArray data,
-   jint dataLength, jint flags)
+Java_edu_wpi_first_hal_CANAPIJNI_writeCANRTRFrame
+  (JNIEnv* env, jclass, jint handle, jint length, jint apiId)
 {
-  HAL_CANMessage message;
-
-  if (data == nullptr) {
-    // We will allow RTR frames to have a null data array
-    if ((flags & HAL_CAN_FD_DATALENGTH) && dataLength > 64) {
-      ThrowIllegalArgumentException(env, "FD frame has max length of 64 bytes");
-      return;
-    } else if (!(flags & HAL_CAN_FD_DATALENGTH) && dataLength > 8) {
-      ThrowIllegalArgumentException(env,
-                                    "Non FD frame has max length of 8 bytes");
-      return;
-    }
-
-    std::memset(&message, 0, sizeof(message));
-    message.flags = flags;
-    message.dataSize = dataLength;
-  } else if (!PackCANMessage(env, data, dataLength, flags, &message)) {
-    return;
-  }
-
+  auto halHandle = static_cast<HAL_CANHandle>(handle);
   int32_t status = 0;
-  HAL_WriteCANRTRFrame(static_cast<HAL_CANHandle>(handle), apiId, &message,
-                       &status);
+  HAL_WriteCANRTRFrame(halHandle, static_cast<int32_t>(length), apiId, &status);
   CheckStatus(env, status);
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_CANAPIJNI
+ * Class:     edu_wpi_first_hal_CANAPIJNI
  * Method:    writeCANPacketNoThrow
- * Signature: (II[BII)I
+ * Signature: (I[BI)I
  */
 JNIEXPORT jint JNICALL
-Java_org_wpilib_hardware_hal_CANAPIJNI_writeCANPacketNoThrow
-  (JNIEnv* env, jclass, jint handle, jint apiId, jbyteArray data,
-   jint dataLength, jint flags)
+Java_edu_wpi_first_hal_CANAPIJNI_writeCANPacketNoThrow
+  (JNIEnv* env, jclass, jint handle, jbyteArray data, jint apiId)
 {
-  HAL_CANMessage message;
-  if (!PackCANMessage(env, data, dataLength, flags, &message)) {
-    return HAL_PARAMETER_OUT_OF_RANGE;
-  }
-
+  auto halHandle = static_cast<HAL_CANHandle>(handle);
+  JSpan<const jbyte> arr{env, data};
   int32_t status = 0;
-  HAL_WriteCANPacket(static_cast<HAL_CANHandle>(handle), apiId, &message,
-                     &status);
+  HAL_WriteCANPacket(halHandle, reinterpret_cast<const uint8_t*>(arr.data()),
+                     arr.size(), apiId, &status);
   return status;
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_CANAPIJNI
+ * Class:     edu_wpi_first_hal_CANAPIJNI
  * Method:    writeCANPacketRepeatingNoThrow
- * Signature: (II[BIII)I
+ * Signature: (I[BII)I
  */
 JNIEXPORT jint JNICALL
-Java_org_wpilib_hardware_hal_CANAPIJNI_writeCANPacketRepeatingNoThrow
-  (JNIEnv* env, jclass, jint handle, jint apiId, jbyteArray data,
-   jint dataLength, jint flags, jint repeatMs)
+Java_edu_wpi_first_hal_CANAPIJNI_writeCANPacketRepeatingNoThrow
+  (JNIEnv* env, jclass, jint handle, jbyteArray data, jint apiId,
+   jint timeoutMs)
 {
-  HAL_CANMessage message;
-  if (!PackCANMessage(env, data, dataLength, flags, &message)) {
-    return HAL_PARAMETER_OUT_OF_RANGE;
-  }
-
+  auto halHandle = static_cast<HAL_CANHandle>(handle);
+  JSpan<const jbyte> arr{env, data};
   int32_t status = 0;
-  HAL_WriteCANPacketRepeating(static_cast<HAL_CANHandle>(handle), apiId,
-                              &message, repeatMs, &status);
+  HAL_WriteCANPacketRepeating(halHandle,
+                              reinterpret_cast<const uint8_t*>(arr.data()),
+                              arr.size(), apiId, timeoutMs, &status);
   return status;
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_CANAPIJNI
+ * Class:     edu_wpi_first_hal_CANAPIJNI
  * Method:    writeCANRTRFrameNoThrow
- * Signature: (II[BII)I
+ * Signature: (III)I
  */
 JNIEXPORT jint JNICALL
-Java_org_wpilib_hardware_hal_CANAPIJNI_writeCANRTRFrameNoThrow
-  (JNIEnv* env, jclass, jint handle, jint apiId, jbyteArray data,
-   jint dataLength, jint flags)
+Java_edu_wpi_first_hal_CANAPIJNI_writeCANRTRFrameNoThrow
+  (JNIEnv* env, jclass, jint handle, jint length, jint apiId)
 {
-  HAL_CANMessage message;
-
-  if (data == nullptr) {
-    // We will allow RTR frames to have a null data array
-    if ((flags & HAL_CAN_FD_DATALENGTH) && dataLength > 64) {
-      ThrowIllegalArgumentException(env, "FD frame has max length of 64 bytes");
-      return HAL_PARAMETER_OUT_OF_RANGE;
-    } else if (!(flags & HAL_CAN_FD_DATALENGTH) && dataLength > 8) {
-      ThrowIllegalArgumentException(env,
-                                    "Non FD frame has max length of 8 bytes");
-      return HAL_PARAMETER_OUT_OF_RANGE;
-    }
-
-    std::memset(&message, 0, sizeof(message));
-    message.flags = flags;
-    message.dataSize = dataLength;
-  } else if (!PackCANMessage(env, data, dataLength, flags, &message)) {
-    return HAL_PARAMETER_OUT_OF_RANGE;
-  }
-
+  auto halHandle = static_cast<HAL_CANHandle>(handle);
   int32_t status = 0;
-  HAL_WriteCANRTRFrame(static_cast<HAL_CANHandle>(handle), apiId, &message,
-                       &status);
+  HAL_WriteCANRTRFrame(halHandle, static_cast<int32_t>(length), apiId, &status);
   return status;
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_CANAPIJNI
+ * Class:     edu_wpi_first_hal_CANAPIJNI
  * Method:    stopCANPacketRepeating
  * Signature: (II)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_hardware_hal_CANAPIJNI_stopCANPacketRepeating
+Java_edu_wpi_first_hal_CANAPIJNI_stopCANPacketRepeating
   (JNIEnv* env, jclass, jint handle, jint apiId)
 {
   auto halHandle = static_cast<HAL_CANHandle>(handle);
@@ -255,89 +181,93 @@ Java_org_wpilib_hardware_hal_CANAPIJNI_stopCANPacketRepeating
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_CANAPIJNI
+ * Class:     edu_wpi_first_hal_CANAPIJNI
  * Method:    readCANPacketNew
  * Signature: (IILjava/lang/Object;)Z
  */
 JNIEXPORT jboolean JNICALL
-Java_org_wpilib_hardware_hal_CANAPIJNI_readCANPacketNew
+Java_edu_wpi_first_hal_CANAPIJNI_readCANPacketNew
   (JNIEnv* env, jclass, jint handle, jint apiId, jobject data)
 {
   auto halHandle = static_cast<HAL_CANHandle>(handle);
-  HAL_CANReceiveMessage message;
-  std::memset(&message, 0, sizeof(message));
+  uint8_t dataTemp[8];
+  int32_t dataLength = 0;
+  uint64_t timestamp = 0;
   int32_t status = 0;
-  HAL_ReadCANPacketNew(halHandle, apiId, &message, &status);
+  HAL_ReadCANPacketNew(halHandle, apiId, dataTemp, &dataLength, &timestamp,
+                       &status);
   if (status == HAL_ERR_CANSessionMux_MessageNotFound) {
     return false;
   }
   if (!CheckStatus(env, status)) {
     return false;
   }
-
-  jbyteArray toSetArray =
-      SetCANReceiveMessageObject(env, data, message.message.dataSize,
-                                 message.message.flags, message.timeStamp);
-  auto javaLen = env->GetArrayLength(toSetArray);
-  if (javaLen < message.message.dataSize) {
-    ThrowIllegalArgumentException(env,
-                                  "Message buffer not long enough for message");
-    return false;
+  if (dataLength > 8) {
+    dataLength = 8;
   }
-  env->SetByteArrayRegion(toSetArray, 0, message.message.dataSize,
-                          reinterpret_cast<jbyte*>(message.message.data));
+
+  jbyteArray toSetArray = SetCANDataObject(env, data, dataLength, timestamp);
+  auto javaLen = env->GetArrayLength(toSetArray);
+  if (javaLen < dataLength) {
+    dataLength = javaLen;
+  }
+  env->SetByteArrayRegion(toSetArray, 0, dataLength,
+                          reinterpret_cast<jbyte*>(dataTemp));
   return true;
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_CANAPIJNI
+ * Class:     edu_wpi_first_hal_CANAPIJNI
  * Method:    readCANPacketLatest
  * Signature: (IILjava/lang/Object;)Z
  */
 JNIEXPORT jboolean JNICALL
-Java_org_wpilib_hardware_hal_CANAPIJNI_readCANPacketLatest
+Java_edu_wpi_first_hal_CANAPIJNI_readCANPacketLatest
   (JNIEnv* env, jclass, jint handle, jint apiId, jobject data)
 {
   auto halHandle = static_cast<HAL_CANHandle>(handle);
-  HAL_CANReceiveMessage message;
-  std::memset(&message, 0, sizeof(message));
+  uint8_t dataTemp[8];
+  int32_t dataLength = 0;
+  uint64_t timestamp = 0;
   int32_t status = 0;
-  HAL_ReadCANPacketLatest(halHandle, apiId, &message, &status);
+  HAL_ReadCANPacketLatest(halHandle, apiId, dataTemp, &dataLength, &timestamp,
+                          &status);
   if (status == HAL_ERR_CANSessionMux_MessageNotFound) {
     return false;
   }
   if (!CheckStatus(env, status)) {
     return false;
   }
-
-  jbyteArray toSetArray =
-      SetCANReceiveMessageObject(env, data, message.message.dataSize,
-                                 message.message.flags, message.timeStamp);
-  auto javaLen = env->GetArrayLength(toSetArray);
-  if (javaLen < message.message.dataSize) {
-    ThrowIllegalArgumentException(env,
-                                  "Message buffer not long enough for message");
-    return false;
+  if (dataLength > 8) {
+    dataLength = 8;
   }
-  env->SetByteArrayRegion(toSetArray, 0, message.message.dataSize,
-                          reinterpret_cast<jbyte*>(message.message.data));
+
+  jbyteArray toSetArray = SetCANDataObject(env, data, dataLength, timestamp);
+  auto javaLen = env->GetArrayLength(toSetArray);
+  if (javaLen < dataLength) {
+    dataLength = javaLen;
+  }
+  env->SetByteArrayRegion(toSetArray, 0, dataLength,
+                          reinterpret_cast<jbyte*>(dataTemp));
   return true;
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_CANAPIJNI
+ * Class:     edu_wpi_first_hal_CANAPIJNI
  * Method:    readCANPacketTimeout
- * Signature: (IILjava/lang/Object;I)Z
+ * Signature: (IIILjava/lang/Object;)Z
  */
 JNIEXPORT jboolean JNICALL
-Java_org_wpilib_hardware_hal_CANAPIJNI_readCANPacketTimeout
-  (JNIEnv* env, jclass, jint handle, jint apiId, jobject data, jint timeoutMs)
+Java_edu_wpi_first_hal_CANAPIJNI_readCANPacketTimeout
+  (JNIEnv* env, jclass, jint handle, jint apiId, jint timeoutMs, jobject data)
 {
   auto halHandle = static_cast<HAL_CANHandle>(handle);
-  HAL_CANReceiveMessage message;
-  std::memset(&message, 0, sizeof(message));
+  uint8_t dataTemp[8];
+  int32_t dataLength = 0;
+  uint64_t timestamp = 0;
   int32_t status = 0;
-  HAL_ReadCANPacketTimeout(halHandle, apiId, &message, timeoutMs, &status);
+  HAL_ReadCANPacketTimeout(halHandle, apiId, dataTemp, &dataLength, &timestamp,
+                           timeoutMs, &status);
   if (status == HAL_CAN_TIMEOUT ||
       status == HAL_ERR_CANSessionMux_MessageNotFound) {
     return false;
@@ -345,18 +275,17 @@ Java_org_wpilib_hardware_hal_CANAPIJNI_readCANPacketTimeout
   if (!CheckStatus(env, status)) {
     return false;
   }
-
-  jbyteArray toSetArray =
-      SetCANReceiveMessageObject(env, data, message.message.dataSize,
-                                 message.message.flags, message.timeStamp);
-  auto javaLen = env->GetArrayLength(toSetArray);
-  if (javaLen < message.message.dataSize) {
-    ThrowIllegalArgumentException(env,
-                                  "Message buffer not long enough for message");
-    return false;
+  if (dataLength > 8) {
+    dataLength = 8;
   }
-  env->SetByteArrayRegion(toSetArray, 0, message.message.dataSize,
-                          reinterpret_cast<jbyte*>(message.message.data));
+
+  jbyteArray toSetArray = SetCANDataObject(env, data, dataLength, timestamp);
+  auto javaLen = env->GetArrayLength(toSetArray);
+  if (javaLen < dataLength) {
+    dataLength = javaLen;
+  }
+  env->SetByteArrayRegion(toSetArray, 0, dataLength,
+                          reinterpret_cast<jbyte*>(dataTemp));
   return true;
 }
 }  // extern "C"

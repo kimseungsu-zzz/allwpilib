@@ -2,12 +2,13 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include <catch2/catch_test_macros.hpp>
+#include <gtest/gtest.h>
 
-#include "../../StructTestBase.hpp"
-#include "wpi/math/system/LinearSystem.hpp"
+#include "../../StructTestBase.h"
+#include "frc/system/LinearSystem.h"
+#include "frc/system/struct/LinearSystemStruct.h"
 
-using namespace wpi::math;
+using namespace frc;
 
 struct LinearSystemStructTestData {
   using Type = LinearSystem<2, 3, 4>;
@@ -22,12 +23,12 @@ struct LinearSystemStructTestData {
                     {4.10, 4.11, 4.12}}};
 
   static void CheckEq(const Type& testData, const Type& data) {
-    CHECK(testData.A() == data.A());
-    CHECK(testData.B() == data.B());
-    CHECK(testData.C() == data.C());
-    CHECK(testData.D() == data.D());
+    EXPECT_EQ(testData.A(), data.A());
+    EXPECT_EQ(testData.B(), data.B());
+    EXPECT_EQ(testData.C(), data.C());
+    EXPECT_EQ(testData.D(), data.D());
   }
 };
 
-INSTANTIATE_CATCH_TYPED_TEST_SUITE_P(LinearSystem, StructTest,
-                                     LinearSystemStructTestData);
+INSTANTIATE_TYPED_TEST_SUITE_P(LinearSystem, StructTest,
+                               LinearSystemStructTestData);

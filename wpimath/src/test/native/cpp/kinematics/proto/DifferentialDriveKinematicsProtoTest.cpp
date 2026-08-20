@@ -2,12 +2,13 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include <catch2/catch_test_macros.hpp>
+#include <google/protobuf/arena.h>
+#include <gtest/gtest.h>
+#include <wpi/SmallVector.h>
 
-#include "wpi/math/kinematics/DifferentialDriveKinematics.hpp"
-#include "wpi/util/SmallVector.hpp"
+#include "frc/kinematics/DifferentialDriveKinematics.h"
 
-using namespace wpi::math;
+using namespace frc;
 
 namespace {
 
@@ -15,13 +16,14 @@ const DifferentialDriveKinematics kExpectedData =
     DifferentialDriveKinematics{1.74_m};
 }  // namespace
 
-TEST_CASE("DifferentialDriveKinematicsProtoTest Roundtrip", "[wpimath]") {
-  wpi::util::ProtobufMessage<decltype(kExpectedData)> message;
-  wpi::util::SmallVector<uint8_t, 64> buf;
+TEST(DifferentialDriveKinematicsProtoTest, Roundtrip) {
+  wpi::ProtobufMessage<decltype(kExpectedData)> message;
+  wpi::SmallVector<uint8_t, 64> buf;
 
-  REQUIRE(message.Pack(buf, kExpectedData));
+  ASSERT_TRUE(message.Pack(buf, kExpectedData));
   auto unpacked_data = message.Unpack(buf);
-  REQUIRE(unpacked_data.has_value());
+  ASSERT_TRUE(unpacked_data.has_value());
 
-  CHECK(kExpectedData.trackwidth.value() == unpacked_data->trackwidth.value());
+  EXPECT_EQ(kExpectedData.trackWidth.value(),
+            unpacked_data->trackWidth.value());
 }

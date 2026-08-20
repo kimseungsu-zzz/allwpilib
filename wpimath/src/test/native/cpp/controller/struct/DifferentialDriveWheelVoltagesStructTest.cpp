@@ -2,26 +2,26 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include <catch2/catch_test_macros.hpp>
+#include <gtest/gtest.h>
 
-#include "wpi/math/controller/DifferentialDriveWheelVoltages.hpp"
+#include "frc/controller/DifferentialDriveWheelVoltages.h"
 
-using namespace wpi::math;
+using namespace frc;
 
 namespace {
 
-using StructType = wpi::util::Struct<wpi::math::DifferentialDriveWheelVoltages>;
+using StructType = wpi::Struct<frc::DifferentialDriveWheelVoltages>;
 const DifferentialDriveWheelVoltages kExpectedData{
     DifferentialDriveWheelVoltages{0.174_V, 0.191_V}};
 }  // namespace
 
-TEST_CASE("DifferentialDriveWheelVoltagesStructTest Roundtrip", "[wpimath]") {
+TEST(DifferentialDriveWheelVoltagesStructTest, Roundtrip) {
   uint8_t buffer[StructType::GetSize()];
   std::memset(buffer, 0, StructType::GetSize());
   StructType::Pack(buffer, kExpectedData);
 
   DifferentialDriveWheelVoltages unpacked_data = StructType::Unpack(buffer);
 
-  CHECK(kExpectedData.left.value() == unpacked_data.left.value());
-  CHECK(kExpectedData.right.value() == unpacked_data.right.value());
+  EXPECT_EQ(kExpectedData.left.value(), unpacked_data.left.value());
+  EXPECT_EQ(kExpectedData.right.value(), unpacked_data.right.value());
 }

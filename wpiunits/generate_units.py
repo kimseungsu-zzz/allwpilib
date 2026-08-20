@@ -9,18 +9,19 @@
 #
 # Generated files will be located in wpiunits/src/generated/main/
 
+import argparse
 import inspect
 import re
-import sys
 from pathlib import Path
-
-# When invoked directly, Python puts the script directory on sys.path.
-# Add the repo root so absolute package imports still work.
-sys.path.insert(0, str(Path(__file__).absolute().parent.parent))
 
 from jinja2 import Environment, FileSystemLoader
 
-from shared.generation import add_jinja_args, make_arg_parser, write_file
+
+def output(output_dir, outfn: str, contents: str):
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_file = output_dir / outfn
+    output_file.write_text(contents, encoding="utf-8", newline="\n")
+
 
 # The units for which multiply and divide mathematical operations are defined
 MATH_OPERATION_UNITS = [
@@ -78,9 +79,11 @@ UNIT_CONFIGURATIONS = {
         "base_unit": "RadiansPerSecond",
         "multiply": {"Time": "Angle", "Frequency": "AngularAcceleration"},
         "divide": {"Time": "AngularAcceleration"},
-        "extra": inspect.cleandoc("""
-          public Frequency asFrequency() { return Hertz.of(baseUnitMagnitude()); }
-        """),
+        "extra": inspect.cleandoc(
+            """
+          default Frequency asFrequency() { return Hertz.of(baseUnitMagnitude()); }
+        """
+        ),
     },
     "Current": {
         "base_unit": "Amps",
@@ -158,10 +161,12 @@ UNIT_CONFIGURATIONS = {
             "AngularVelocity": "AngularAcceleration",
         },
         "divide": {},
-        "extra": inspect.cleandoc("""
+        "extra": inspect.cleandoc(
+            """
           /** Converts this frequency to the time period between cycles. */
-          public Time asPeriod() { return Seconds.of(1 / baseUnitMagnitude()); }
-        """),
+          default Time asPeriod() { return Seconds.of(1 / baseUnitMagnitude()); }
+        """
+        ),
     },
     "LinearAcceleration": {
         "base_unit": "MetersPerSecondPerSecond",
@@ -199,16 +204,18 @@ UNIT_CONFIGURATIONS = {
         "generics": {"Dividend": {"extends": "Unit"}, "Divisor": {"extends": "Unit"}},
         "multiply": {},
         "divide": {},
-        "extra": inspect.cleandoc("""
-          public Measure<Dividend> timesDivisor(Measure<? extends Divisor> multiplier) {
+        "extra": inspect.cleandoc(
+            """
+          default Measure<Dividend> timesDivisor(Measure<? extends Divisor> multiplier) {
             return (Measure<Dividend>) baseUnit().numerator().ofBaseUnits(baseUnitMagnitude() * multiplier.baseUnitMagnitude());
           }
 
-          public Measure<? extends PerUnit<Divisor, Dividend>> reciprocal() {
+          default Measure<? extends PerUnit<Divisor, Dividend>> reciprocal() {
             // May return a velocity if Divisor == TimeUnit, so we can't guarantee a "Per" instance
             return baseUnit().reciprocal().ofBaseUnits(1 / baseUnitMagnitude());
           }
-        """),
+        """
+        ),
     },
     "Power": {
         "base_unit": "Watts",
@@ -243,9 +250,11 @@ UNIT_CONFIGURATIONS = {
             # `Velocity<TimeUnit>` (i.e. a time per unit time ratio)
             "Time": "Dimensionless"
         },
-        "extra": inspect.cleandoc("""
-          public Frequency asFrequency() { return Hertz.of(1 / baseUnitMagnitude()); }
-        """),
+        "extra": inspect.cleandoc(
+            """
+          default Frequency asFrequency() { return Hertz.of(1 / baseUnitMagnitude()); }
+        """
+        ),
     },
     "Torque": {
         "base_unit": "NewtonMeters",
@@ -257,12 +266,14 @@ UNIT_CONFIGURATIONS = {
         "generics": {"D": {"extends": "Unit"}},
         "multiply": {
             "Time": {
-                "implementation": inspect.cleandoc("""
+                "implementation": inspect.cleandoc(
+                    """
                   @Override
-                  public Measure<D> times(Time multiplier) {
+                  default Measure<D> times(Time multiplier) {
                     return (Measure<D>) unit().numerator().ofBaseUnits(baseUnitMagnitude() * multiplier.baseUnitMagnitude());
                   }
-                """)
+                """
+                )
             }
         },
         "divide": {},
@@ -319,7 +330,7 @@ def mtou(measure_name):
         measure_name in UNIT_CONFIGURATIONS
         and "generics" in UNIT_CONFIGURATIONS[measure_name]
     ):
-        return f"{measure_name}Unit{generics_usage(measure_name)}"
+        return "{}Unit{}".format(measure_name, generics_usage(measure_name))
     else:
         regex = re.compile(r"^(.*?)(<.*>)?$")
         return re.sub(regex, "\\1Unit\\2", measure_name)
@@ -329,7 +340,9 @@ def indent(multiline_string, indentation):
     """
     Indents a multiline string by `indentation` number of spaces
     """
-    return "\n".join(" " * indentation + line for line in multiline_string.split("\n"))
+    return "\n".join(
+        list(map(lambda line: " " * indentation + line, multiline_string.split("\n")))
+    )
 
 
 def generate_units(output_directory: Path, template_directory: Path):
@@ -339,8 +352,10 @@ def generate_units(output_directory: Path, template_directory: Path):
         keep_trailing_newline=True,
     )
 
-    interfaceTemplate = env.get_template("Measure-implementation.java.jinja")
-    rootPath = output_directory / "main/java/org/wpilib/units"
+    interfaceTemplate = env.get_template("Measure-interface.java.jinja")
+    immutableTemplate = env.get_template("Measure-immutable.java.jinja")
+    mutableTemplate = env.get_template("Measure-mutable.java.jinja")
+    rootPath = output_directory / "main/java/edu/wpi/first/units"
 
     helpers = {
         "type_decl": type_decl,
@@ -358,16 +373,41 @@ def generate_units(output_directory: Path, template_directory: Path):
             config=UNIT_CONFIGURATIONS,
             helpers=helpers,
         )
+        immutableContents = immutableTemplate.render(
+            name=unit_name,
+            units=MATH_OPERATION_UNITS,
+            config=UNIT_CONFIGURATIONS,
+            helpers=helpers,
+        )
+        mutableContents = mutableTemplate.render(
+            name=unit_name,
+            units=MATH_OPERATION_UNITS,
+            config=UNIT_CONFIGURATIONS,
+            helpers=helpers,
+        )
 
-        write_file(rootPath / "measure", f"{unit_name}.java", interfaceContents)
+        output(rootPath / "measure", f"{unit_name}.java", interfaceContents)
+        output(rootPath / "measure", f"Immutable{unit_name}.java", immutableContents)
+        output(rootPath / "measure", f"Mut{unit_name}.java", mutableContents)
 
 
 def main():
     script_path = Path(__file__).resolve()
     dirname = script_path.parent
 
-    parser = make_arg_parser(dirname, dirname.parent)
-    add_jinja_args(parser, dirname, None)
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--output_directory",
+        help="Optional. If set, will output the generated files to this directory, otherwise it will use a path relative to the script",
+        default=dirname / "src/generated",
+        type=Path,
+    )
+    parser.add_argument(
+        "--template_root",
+        help="Optional. If set, will use this directory as the root for the jinja templates",
+        default=dirname / "src/generate",
+        type=Path,
+    )
     args = parser.parse_args()
 
     generate_units(args.output_directory, args.template_root)

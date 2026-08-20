@@ -2,26 +2,26 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "../PortsInternal.hpp"
-#include "REVPHDataInternal.hpp"
+#include "../PortsInternal.h"
+#include "REVPHDataInternal.h"
 
-using namespace wpi::hal;
+using namespace hal;
 
-namespace wpi::hal::init {
+namespace hal::init {
 void InitializeREVPHData() {
   static REVPHData spd[kNumREVPHModules];
-  ::wpi::hal::SimREVPHData = spd;
+  ::hal::SimREVPHData = spd;
 }
-}  // namespace wpi::hal::init
+}  // namespace hal::init
 
-REVPHData* wpi::hal::SimREVPHData;
+REVPHData* hal::SimREVPHData;
 void REVPHData::ResetData() {
   for (int i = 0; i < kNumREVPHChannels; i++) {
     solenoidOutput[i].Reset(false);
   }
   initialized.Reset(false);
   compressorOn.Reset(false);
-  compressorConfigType.Reset(HAL_REVPH_COMPRESSOR_CONFIG_DISABLED);
+  compressorConfigType.Reset(HAL_REVPHCompressorConfigType_kDisabled);
   pressureSwitch.Reset(false);
   compressorCurrent.Reset(0.0);
 }

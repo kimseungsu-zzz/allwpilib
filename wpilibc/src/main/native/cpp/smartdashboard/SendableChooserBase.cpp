@@ -2,18 +2,18 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/smartdashboard/SendableChooserBase.hpp"
+#include "frc/smartdashboard/SendableChooserBase.h"
 
 #include <utility>
 
-#include "wpi/util/sendable/SendableRegistry.hpp"
+#include <wpi/sendable/SendableRegistry.h>
 
-using namespace wpi;
+using namespace frc;
 
 std::atomic_int SendableChooserBase::s_instances{0};
 
 SendableChooserBase::SendableChooserBase() : m_instance{s_instances++} {
-  wpi::util::SendableRegistry::Add(this, "SendableChooser", m_instance);
+  wpi::SendableRegistry::Add(this, "SendableChooser", m_instance);
 }
 
 SendableChooserBase::SendableChooserBase(SendableChooserBase&& oth)

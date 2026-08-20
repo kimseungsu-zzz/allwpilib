@@ -2,13 +2,13 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/math/controller/BangBangController.hpp"
+#include "frc/controller/BangBangController.h"
 
-#include "wpi/util/sendable/SendableBuilder.hpp"
+#include <wpi/sendable/SendableBuilder.h>
 
-using namespace wpi::math;
+using namespace frc;
 
-void BangBangController::InitSendable(wpi::util::SendableBuilder& builder) {
+void BangBangController::InitSendable(wpi::SendableBuilder& builder) {
   builder.SetSmartDashboardType("BangBangController");
   builder.AddDoubleProperty(
       "tolerance", [this] { return GetTolerance(); },

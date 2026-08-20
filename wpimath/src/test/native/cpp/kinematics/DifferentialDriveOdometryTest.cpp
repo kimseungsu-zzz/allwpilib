@@ -2,27 +2,24 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/math/kinematics/DifferentialDriveOdometry.hpp"
-
 #include <numbers>
 
-#include <catch2/catch_test_macros.hpp>
+#include <gtest/gtest.h>
 
-#include "wpi/math/TestAssertions.hpp"
-#include "wpi/units/angle.hpp"
-#include "wpi/units/length.hpp"
+#include "frc/kinematics/DifferentialDriveKinematics.h"
+#include "frc/kinematics/DifferentialDriveOdometry.h"
 
 static constexpr double kEpsilon = 1E-9;
 
-using namespace wpi::math;
+using namespace frc;
 
-TEST_CASE("DifferentialDriveOdometryTest EncoderDistances", "[wpimath]") {
+TEST(DifferentialDriveOdometryTest, EncoderDistances) {
   DifferentialDriveOdometry odometry{45_deg, 0_m, 0_m};
 
   const auto& pose =
-      odometry.Update(135_deg, 0_m, wpi::units::meter_t{5 * std::numbers::pi});
+      odometry.Update(135_deg, 0_m, units::meter_t{5 * std::numbers::pi});
 
-  CHECK_NEAR(pose.X().value(), 5.0, kEpsilon);
-  CHECK_NEAR(pose.Y().value(), 5.0, kEpsilon);
-  CHECK_NEAR(pose.Rotation().Degrees().value(), 90.0, kEpsilon);
+  EXPECT_NEAR(pose.X().value(), 5.0, kEpsilon);
+  EXPECT_NEAR(pose.Y().value(), 5.0, kEpsilon);
+  EXPECT_NEAR(pose.Rotation().Degrees().value(), 90.0, kEpsilon);
 }

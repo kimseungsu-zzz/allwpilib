@@ -2,21 +2,21 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "ConfigurableSourceImpl.hpp"
+#include "ConfigurableSourceImpl.h"
 
 #include <memory>
 #include <string>
 
-#include "Handle.hpp"
-#include "Instance.hpp"
-#include "Notifier.hpp"
-#include "wpi/util/string.hpp"
-#include "wpi/util/timestamp.hpp"
+#include <wpi/timestamp.h>
 
-using namespace wpi::cs;
+#include "Handle.h"
+#include "Instance.h"
+#include "Notifier.h"
+
+using namespace cs;
 
 ConfigurableSourceImpl::ConfigurableSourceImpl(std::string_view name,
-                                               wpi::util::Logger& logger,
+                                               wpi::Logger& logger,
                                                Notifier& notifier,
                                                Telemetry& telemetry,
                                                const VideoMode& mode)
@@ -53,7 +53,7 @@ void ConfigurableSourceImpl::NumSinksEnabledChanged() {
 }
 
 void ConfigurableSourceImpl::NotifyError(std::string_view msg) {
-  PutError(msg, wpi::util::Now());
+  PutError(msg, wpi::Now());
 }
 
 int ConfigurableSourceImpl::CreateProperty(std::string_view name,
@@ -107,7 +107,7 @@ void ConfigurableSourceImpl::SetEnumPropertyChoices(
                                   prop->value, {});
 }
 
-namespace wpi::cs {
+namespace cs {
 static constexpr unsigned SourceMask = CS_SOURCE_CV | CS_SOURCE_RAW;
 
 void NotifySourceError(CS_Source source, std::string_view msg,
@@ -152,7 +152,7 @@ CS_Property CreateSourceProperty(CS_Source source, std::string_view name,
   int property = static_cast<ConfigurableSourceImpl&>(*data->source)
                      .CreateProperty(name, kind, minimum, maximum, step,
                                      defaultValue, value);
-  return Handle{source, property, Handle::PROPERTY};
+  return Handle{source, property, Handle::kProperty};
 }
 
 CS_Property CreateSourcePropertyCallback(
@@ -167,7 +167,7 @@ CS_Property CreateSourcePropertyCallback(
   int property = static_cast<ConfigurableSourceImpl&>(*data->source)
                      .CreateProperty(name, kind, minimum, maximum, step,
                                      defaultValue, value, onChange);
-  return Handle{source, property, Handle::PROPERTY};
+  return Handle{source, property, Handle::kProperty};
 }
 
 void SetSourceEnumPropertyChoices(CS_Source source, CS_Property property,
@@ -186,7 +186,7 @@ void SetSourceEnumPropertyChoices(CS_Source source, CS_Property property,
     *status = CS_INVALID_HANDLE;
     return;
   }
-  auto data2 = Instance::GetInstance().GetSource(Handle{i, Handle::SOURCE});
+  auto data2 = Instance::GetInstance().GetSource(Handle{i, Handle::kSource});
   if (!data2 || data->source.get() != data2->source.get()) {
     *status = CS_INVALID_HANDLE;
     return;
@@ -196,25 +196,24 @@ void SetSourceEnumPropertyChoices(CS_Source source, CS_Property property,
       .SetEnumPropertyChoices(propertyIndex, choices, status);
 }
 
-}  // namespace wpi::cs
+}  // namespace cs
 
 extern "C" {
 void CS_NotifySourceError(CS_Source source, const struct WPI_String* msg,
                           CS_Status* status) {
-  return wpi::cs::NotifySourceError(source, wpi::util::to_string_view(msg),
-                                    status);
+  return cs::NotifySourceError(source, wpi::to_string_view(msg), status);
 }
 
 void CS_SetSourceConnected(CS_Source source, CS_Bool connected,
                            CS_Status* status) {
-  return wpi::cs::SetSourceConnected(source, connected, status);
+  return cs::SetSourceConnected(source, connected, status);
 }
 
 void CS_SetSourceDescription(CS_Source source,
                              const struct WPI_String* description,
                              CS_Status* status) {
-  return wpi::cs::SetSourceDescription(
-      source, wpi::util::to_string_view(description), status);
+  return cs::SetSourceDescription(source, wpi::to_string_view(description),
+                                  status);
 }
 
 CS_Property CS_CreateSourceProperty(CS_Source source,
@@ -222,16 +221,16 @@ CS_Property CS_CreateSourceProperty(CS_Source source,
                                     enum CS_PropertyKind kind, int minimum,
                                     int maximum, int step, int defaultValue,
                                     int value, CS_Status* status) {
-  return wpi::cs::CreateSourceProperty(source, wpi::util::to_string_view(name),
-                                       kind, minimum, maximum, step,
-                                       defaultValue, value, status);
+  return cs::CreateSourceProperty(source, wpi::to_string_view(name), kind,
+                                  minimum, maximum, step, defaultValue, value,
+                                  status);
 }
 
 CS_Property CS_CreateSourcePropertyCallback(
     CS_Source source, const char* name, enum CS_PropertyKind kind, int minimum,
     int maximum, int step, int defaultValue, int value, void* data,
     void (*onChange)(void* data, CS_Property property), CS_Status* status) {
-  return wpi::cs::CreateSourcePropertyCallback(
+  return cs::CreateSourcePropertyCallback(
       source, name, kind, minimum, maximum, step, defaultValue, value,
       [=](CS_Property property) { onChange(data, property); }, status);
 }
@@ -239,12 +238,12 @@ CS_Property CS_CreateSourcePropertyCallback(
 void CS_SetSourceEnumPropertyChoices(CS_Source source, CS_Property property,
                                      const struct WPI_String* choices,
                                      int count, CS_Status* status) {
-  wpi::util::SmallVector<std::string, 8> vec;
+  wpi::SmallVector<std::string, 8> vec;
   vec.reserve(count);
   for (int i = 0; i < count; ++i) {
-    vec.emplace_back(wpi::util::to_string_view(&choices[i]));
+    vec.emplace_back(wpi::to_string_view(&choices[i]));
   }
-  return wpi::cs::SetSourceEnumPropertyChoices(source, property, vec, status);
+  return cs::SetSourceEnumPropertyChoices(source, property, vec, status);
 }
 
 }  // extern "C"

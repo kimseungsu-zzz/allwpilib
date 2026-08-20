@@ -2,17 +2,18 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "WindowsMessagePump.hpp"
+#include "WindowsMessagePump.h"
 
-#include <windows.h>
-#include <dbt.h>
 #include <ks.h>
 #include <ksmedia.h>
 #include <mfapi.h>
 #include <mfidl.h>
+#include <windows.h>
 #include <windowsx.h>
 
 #include <memory>
+
+#include <Dbt.h>
 
 #pragma comment(lib, "Mfplat.lib")
 #pragma comment(lib, "Mf.lib")
@@ -20,7 +21,7 @@
 #pragma comment(lib, "Ole32.lib")
 #pragma comment(lib, "User32.lib")
 
-namespace wpi::cs {
+namespace cs {
 
 static LRESULT CALLBACK pWndProc(HWND hwnd, UINT uiMsg, WPARAM wParam,
                                  LPARAM lParam) {
@@ -147,4 +148,4 @@ void WindowsMessagePump::ThreadMain(HANDLE eventHandle) {
   CoUninitialize();
 }
 
-}  // namespace wpi::cs
+}  // namespace cs

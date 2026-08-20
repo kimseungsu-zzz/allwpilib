@@ -2,11 +2,11 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "Value_internal.hpp"
+#include "Value_internal.h"
 
-using namespace wpi::nt;
+using namespace nt;
 
-Value wpi::nt::ConvertNumericValue(const Value& value, NT_Type type) {
+Value nt::ConvertNumericValue(const Value& value, NT_Type type) {
   switch (type) {
     case NT_INTEGER: {
       Value newval =

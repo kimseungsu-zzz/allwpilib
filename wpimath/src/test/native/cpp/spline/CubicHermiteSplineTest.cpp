@@ -2,25 +2,22 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include <cmath>
+#include <chrono>
 #include <vector>
 
-#include <catch2/catch_test_macros.hpp>
+#include <gtest/gtest.h>
 
-#include "wpi/math/TestAssertions.hpp"
-#include "wpi/math/geometry/Pose2d.hpp"
-#include "wpi/math/geometry/Rotation2d.hpp"
-#include "wpi/math/geometry/Translation2d.hpp"
-#include "wpi/math/spline/Spline.hpp"
-#include "wpi/math/spline/SplineHelper.hpp"
-#include "wpi/math/spline/SplineParameterizer.hpp"
-#include "wpi/units/angle.hpp"
-#include "wpi/units/length.hpp"
+#include "frc/geometry/Pose2d.h"
+#include "frc/geometry/Rotation2d.h"
+#include "frc/spline/QuinticHermiteSpline.h"
+#include "frc/spline/SplineHelper.h"
+#include "frc/spline/SplineParameterizer.h"
+#include "units/length.h"
 
-using namespace wpi::math;
+using namespace frc;
 
-namespace wpi::math {
-class CubicHermiteSplineTest {
+namespace frc {
+class CubicHermiteSplineTest : public ::testing::Test {
  protected:
   static void Run(const Pose2d& a, const std::vector<Translation2d>& waypoints,
                   const Pose2d& b) {
@@ -45,18 +42,20 @@ class CubicHermiteSplineTest {
       auto& p1 = poses[i + 1];
 
       // Make sure the twist is under the tolerance defined by the Spline class.
-      auto twist = (p1.first - p0.first).Log();
-      CHECK(std::abs(twist.dx.value()) < SplineParameterizer::kMaxDx.value());
-      CHECK(std::abs(twist.dy.value()) < SplineParameterizer::kMaxDy.value());
-      CHECK(std::abs(twist.dtheta.value()) <
-            SplineParameterizer::kMaxDtheta.value());
+      auto twist = p0.first.Log(p1.first);
+      EXPECT_LT(std::abs(twist.dx.value()),
+                SplineParameterizer::kMaxDx.value());
+      EXPECT_LT(std::abs(twist.dy.value()),
+                SplineParameterizer::kMaxDy.value());
+      EXPECT_LT(std::abs(twist.dtheta.value()),
+                SplineParameterizer::kMaxDtheta.value());
     }
 
     // Check first point.
-    CHECK_NEAR(poses.front().first.X().value(), a.X().value(), 1E-9);
-    CHECK_NEAR(poses.front().first.Y().value(), a.Y().value(), 1E-9);
-    CHECK_NEAR(poses.front().first.Rotation().Radians().value(),
-               a.Rotation().Radians().value(), 1E-9);
+    EXPECT_NEAR(poses.front().first.X().value(), a.X().value(), 1E-9);
+    EXPECT_NEAR(poses.front().first.Y().value(), a.Y().value(), 1E-9);
+    EXPECT_NEAR(poses.front().first.Rotation().Radians().value(),
+                a.Rotation().Radians().value(), 1E-9);
 
     // Check interior waypoints
     bool interiorsGood = true;
@@ -71,24 +70,22 @@ class CubicHermiteSplineTest {
       interiorsGood &= found;
     }
 
-    CHECK(interiorsGood);
+    EXPECT_TRUE(interiorsGood);
 
     // Check last point.
-    CHECK_NEAR(poses.back().first.X().value(), b.X().value(), 1E-9);
-    CHECK_NEAR(poses.back().first.Y().value(), b.Y().value(), 1E-9);
-    CHECK_NEAR(poses.back().first.Rotation().Radians().value(),
-               b.Rotation().Radians().value(), 1E-9);
+    EXPECT_NEAR(poses.back().first.X().value(), b.X().value(), 1E-9);
+    EXPECT_NEAR(poses.back().first.Y().value(), b.Y().value(), 1E-9);
+    EXPECT_NEAR(poses.back().first.Rotation().Radians().value(),
+                b.Rotation().Radians().value(), 1E-9);
   }
 };
-}  // namespace wpi::math
+}  // namespace frc
 
-TEST_CASE_METHOD(CubicHermiteSplineTest, "CubicHermiteSplineTest StraightLine",
-                 "[wpimath]") {
+TEST_F(CubicHermiteSplineTest, StraightLine) {
   Run(Pose2d{}, std::vector<Translation2d>(), Pose2d{3_m, 0_m, 0_deg});
 }
 
-TEST_CASE_METHOD(CubicHermiteSplineTest, "CubicHermiteSplineTest SCurve",
-                 "[wpimath]") {
+TEST_F(CubicHermiteSplineTest, SCurve) {
   Pose2d start{0_m, 0_m, 90_deg};
   std::vector<Translation2d> waypoints{Translation2d{1_m, 1_m},
                                        Translation2d{2_m, -1_m}};
@@ -96,20 +93,18 @@ TEST_CASE_METHOD(CubicHermiteSplineTest, "CubicHermiteSplineTest SCurve",
   Run(start, waypoints, end);
 }
 
-TEST_CASE_METHOD(CubicHermiteSplineTest, "CubicHermiteSplineTest OneInterior",
-                 "[wpimath]") {
+TEST_F(CubicHermiteSplineTest, OneInterior) {
   Pose2d start{0_m, 0_m, 0_rad};
   std::vector<Translation2d> waypoints{Translation2d{2_m, 0_m}};
   Pose2d end{4_m, 0_m, 0_rad};
   Run(start, waypoints, end);
 }
 
-TEST_CASE_METHOD(CubicHermiteSplineTest,
-                 "CubicHermiteSplineTest ThrowsOnMalformed", "[wpimath]") {
-  CHECK_THROWS_AS(Run(Pose2d{0_m, 0_m, 0_deg}, std::vector<Translation2d>{},
-                      Pose2d{1_m, 0_m, 180_deg}),
-                  SplineParameterizer::MalformedSplineException);
-  CHECK_THROWS_AS(Run(Pose2d{10_m, 10_m, 90_deg}, std::vector<Translation2d>{},
-                      Pose2d{10_m, 11_m, -90_deg}),
-                  SplineParameterizer::MalformedSplineException);
+TEST_F(CubicHermiteSplineTest, ThrowsOnMalformed) {
+  EXPECT_THROW(Run(Pose2d{0_m, 0_m, 0_deg}, std::vector<Translation2d>{},
+                   Pose2d{1_m, 0_m, 180_deg}),
+               SplineParameterizer::MalformedSplineException);
+  EXPECT_THROW(Run(Pose2d{10_m, 10_m, 90_deg}, std::vector<Translation2d>{},
+                   Pose2d{10_m, 11_m, -90_deg}),
+               SplineParameterizer::MalformedSplineException);
 }

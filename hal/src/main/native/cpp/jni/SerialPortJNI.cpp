@@ -6,23 +6,24 @@
 
 #include <cassert>
 
-#include "HALUtil.hpp"
-#include "org_wpilib_hardware_hal_SerialPortJNI.h"
-#include "wpi/hal/SerialPort.h"
-#include "wpi/util/jni_util.hpp"
+#include <wpi/jni_util.h>
 
-using namespace wpi::hal;
-using namespace wpi::util::java;
+#include "HALUtil.h"
+#include "edu_wpi_first_hal_SerialPortJNI.h"
+#include "hal/SerialPort.h"
+
+using namespace hal;
+using namespace wpi::java;
 
 extern "C" {
 
 /*
- * Class:     org_wpilib_hardware_hal_SerialPortJNI
+ * Class:     edu_wpi_first_hal_SerialPortJNI
  * Method:    serialInitializePort
  * Signature: (B)I
  */
 JNIEXPORT jint JNICALL
-Java_org_wpilib_hardware_hal_SerialPortJNI_serialInitializePort
+Java_edu_wpi_first_hal_SerialPortJNI_serialInitializePort
   (JNIEnv* env, jclass, jbyte port)
 {
   int32_t status = 0;
@@ -33,12 +34,12 @@ Java_org_wpilib_hardware_hal_SerialPortJNI_serialInitializePort
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_SerialPortJNI
+ * Class:     edu_wpi_first_hal_SerialPortJNI
  * Method:    serialInitializePortDirect
  * Signature: (BLjava/lang/String;)I
  */
 JNIEXPORT jint JNICALL
-Java_org_wpilib_hardware_hal_SerialPortJNI_serialInitializePortDirect
+Java_edu_wpi_first_hal_SerialPortJNI_serialInitializePortDirect
   (JNIEnv* env, jclass, jbyte port, jstring portName)
 {
   JStringRef portNameRef{env, portName};
@@ -50,12 +51,12 @@ Java_org_wpilib_hardware_hal_SerialPortJNI_serialInitializePortDirect
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_SerialPortJNI
+ * Class:     edu_wpi_first_hal_SerialPortJNI
  * Method:    serialSetBaudRate
  * Signature: (II)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_hardware_hal_SerialPortJNI_serialSetBaudRate
+Java_edu_wpi_first_hal_SerialPortJNI_serialSetBaudRate
   (JNIEnv* env, jclass, jint handle, jint rate)
 {
   int32_t status = 0;
@@ -65,12 +66,12 @@ Java_org_wpilib_hardware_hal_SerialPortJNI_serialSetBaudRate
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_SerialPortJNI
+ * Class:     edu_wpi_first_hal_SerialPortJNI
  * Method:    serialSetDataBits
  * Signature: (IB)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_hardware_hal_SerialPortJNI_serialSetDataBits
+Java_edu_wpi_first_hal_SerialPortJNI_serialSetDataBits
   (JNIEnv* env, jclass, jint handle, jbyte bits)
 {
   int32_t status = 0;
@@ -80,12 +81,12 @@ Java_org_wpilib_hardware_hal_SerialPortJNI_serialSetDataBits
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_SerialPortJNI
+ * Class:     edu_wpi_first_hal_SerialPortJNI
  * Method:    serialSetParity
  * Signature: (IB)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_hardware_hal_SerialPortJNI_serialSetParity
+Java_edu_wpi_first_hal_SerialPortJNI_serialSetParity
   (JNIEnv* env, jclass, jint handle, jbyte parity)
 {
   int32_t status = 0;
@@ -95,12 +96,12 @@ Java_org_wpilib_hardware_hal_SerialPortJNI_serialSetParity
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_SerialPortJNI
+ * Class:     edu_wpi_first_hal_SerialPortJNI
  * Method:    serialSetStopBits
  * Signature: (IB)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_hardware_hal_SerialPortJNI_serialSetStopBits
+Java_edu_wpi_first_hal_SerialPortJNI_serialSetStopBits
   (JNIEnv* env, jclass, jint handle, jbyte bits)
 {
   int32_t status = 0;
@@ -110,12 +111,12 @@ Java_org_wpilib_hardware_hal_SerialPortJNI_serialSetStopBits
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_SerialPortJNI
+ * Class:     edu_wpi_first_hal_SerialPortJNI
  * Method:    serialSetWriteMode
  * Signature: (IB)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_hardware_hal_SerialPortJNI_serialSetWriteMode
+Java_edu_wpi_first_hal_SerialPortJNI_serialSetWriteMode
   (JNIEnv* env, jclass, jint handle, jbyte mode)
 {
   int32_t status = 0;
@@ -125,12 +126,12 @@ Java_org_wpilib_hardware_hal_SerialPortJNI_serialSetWriteMode
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_SerialPortJNI
+ * Class:     edu_wpi_first_hal_SerialPortJNI
  * Method:    serialSetFlowControl
  * Signature: (IB)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_hardware_hal_SerialPortJNI_serialSetFlowControl
+Java_edu_wpi_first_hal_SerialPortJNI_serialSetFlowControl
   (JNIEnv* env, jclass, jint handle, jbyte flow)
 {
   int32_t status = 0;
@@ -140,12 +141,12 @@ Java_org_wpilib_hardware_hal_SerialPortJNI_serialSetFlowControl
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_SerialPortJNI
+ * Class:     edu_wpi_first_hal_SerialPortJNI
  * Method:    serialSetTimeout
  * Signature: (ID)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_hardware_hal_SerialPortJNI_serialSetTimeout
+Java_edu_wpi_first_hal_SerialPortJNI_serialSetTimeout
   (JNIEnv* env, jclass, jint handle, jdouble timeout)
 {
   int32_t status = 0;
@@ -155,12 +156,12 @@ Java_org_wpilib_hardware_hal_SerialPortJNI_serialSetTimeout
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_SerialPortJNI
+ * Class:     edu_wpi_first_hal_SerialPortJNI
  * Method:    serialEnableTermination
  * Signature: (IC)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_hardware_hal_SerialPortJNI_serialEnableTermination
+Java_edu_wpi_first_hal_SerialPortJNI_serialEnableTermination
   (JNIEnv* env, jclass, jint handle, jchar terminator)
 {
   int32_t status = 0;
@@ -170,12 +171,12 @@ Java_org_wpilib_hardware_hal_SerialPortJNI_serialEnableTermination
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_SerialPortJNI
+ * Class:     edu_wpi_first_hal_SerialPortJNI
  * Method:    serialDisableTermination
  * Signature: (I)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_hardware_hal_SerialPortJNI_serialDisableTermination
+Java_edu_wpi_first_hal_SerialPortJNI_serialDisableTermination
   (JNIEnv* env, jclass, jint handle)
 {
   int32_t status = 0;
@@ -185,12 +186,12 @@ Java_org_wpilib_hardware_hal_SerialPortJNI_serialDisableTermination
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_SerialPortJNI
+ * Class:     edu_wpi_first_hal_SerialPortJNI
  * Method:    serialSetReadBufferSize
  * Signature: (II)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_hardware_hal_SerialPortJNI_serialSetReadBufferSize
+Java_edu_wpi_first_hal_SerialPortJNI_serialSetReadBufferSize
   (JNIEnv* env, jclass, jint handle, jint size)
 {
   int32_t status = 0;
@@ -200,12 +201,12 @@ Java_org_wpilib_hardware_hal_SerialPortJNI_serialSetReadBufferSize
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_SerialPortJNI
+ * Class:     edu_wpi_first_hal_SerialPortJNI
  * Method:    serialSetWriteBufferSize
  * Signature: (II)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_hardware_hal_SerialPortJNI_serialSetWriteBufferSize
+Java_edu_wpi_first_hal_SerialPortJNI_serialSetWriteBufferSize
   (JNIEnv* env, jclass, jint handle, jint size)
 {
   int32_t status = 0;
@@ -215,12 +216,12 @@ Java_org_wpilib_hardware_hal_SerialPortJNI_serialSetWriteBufferSize
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_SerialPortJNI
+ * Class:     edu_wpi_first_hal_SerialPortJNI
  * Method:    serialGetBytesReceived
  * Signature: (I)I
  */
 JNIEXPORT jint JNICALL
-Java_org_wpilib_hardware_hal_SerialPortJNI_serialGetBytesReceived
+Java_edu_wpi_first_hal_SerialPortJNI_serialGetBytesReceived
   (JNIEnv* env, jclass, jint handle)
 {
   int32_t status = 0;
@@ -231,15 +232,15 @@ Java_org_wpilib_hardware_hal_SerialPortJNI_serialGetBytesReceived
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_SerialPortJNI
+ * Class:     edu_wpi_first_hal_SerialPortJNI
  * Method:    serialRead
  * Signature: (I[BI)I
  */
 JNIEXPORT jint JNICALL
-Java_org_wpilib_hardware_hal_SerialPortJNI_serialRead
+Java_edu_wpi_first_hal_SerialPortJNI_serialRead
   (JNIEnv* env, jclass, jint handle, jbyteArray dataReceived, jint size)
 {
-  wpi::util::SmallVector<char, 128> recvBuf;
+  wpi::SmallVector<char, 128> recvBuf;
   recvBuf.resize(size);
   int32_t status = 0;
   jint retVal = HAL_ReadSerial(static_cast<HAL_SerialPortHandle>(handle),
@@ -251,12 +252,12 @@ Java_org_wpilib_hardware_hal_SerialPortJNI_serialRead
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_SerialPortJNI
+ * Class:     edu_wpi_first_hal_SerialPortJNI
  * Method:    serialWrite
  * Signature: (I[BI)I
  */
 JNIEXPORT jint JNICALL
-Java_org_wpilib_hardware_hal_SerialPortJNI_serialWrite
+Java_edu_wpi_first_hal_SerialPortJNI_serialWrite
   (JNIEnv* env, jclass, jint handle, jbyteArray dataToSend, jint size)
 {
   int32_t status = 0;
@@ -269,12 +270,12 @@ Java_org_wpilib_hardware_hal_SerialPortJNI_serialWrite
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_SerialPortJNI
+ * Class:     edu_wpi_first_hal_SerialPortJNI
  * Method:    serialFlush
  * Signature: (I)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_hardware_hal_SerialPortJNI_serialFlush
+Java_edu_wpi_first_hal_SerialPortJNI_serialFlush
   (JNIEnv* env, jclass, jint handle)
 {
   int32_t status = 0;
@@ -283,12 +284,12 @@ Java_org_wpilib_hardware_hal_SerialPortJNI_serialFlush
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_SerialPortJNI
+ * Class:     edu_wpi_first_hal_SerialPortJNI
  * Method:    serialClear
  * Signature: (I)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_hardware_hal_SerialPortJNI_serialClear
+Java_edu_wpi_first_hal_SerialPortJNI_serialClear
   (JNIEnv* env, jclass, jint handle)
 {
   int32_t status = 0;
@@ -297,15 +298,15 @@ Java_org_wpilib_hardware_hal_SerialPortJNI_serialClear
 }
 
 /*
- * Class:     org_wpilib_hardware_hal_SerialPortJNI
+ * Class:     edu_wpi_first_hal_SerialPortJNI
  * Method:    serialClose
  * Signature: (I)V
  */
 JNIEXPORT void JNICALL
-Java_org_wpilib_hardware_hal_SerialPortJNI_serialClose
+Java_edu_wpi_first_hal_SerialPortJNI_serialClose
   (JNIEnv* env, jclass, jint handle)
 {
-  if (handle != HAL_INVALID_HANDLE) {
+  if (handle != HAL_kInvalidHandle) {
     HAL_CloseSerial(static_cast<HAL_SerialPortHandle>(handle));
   }
 }

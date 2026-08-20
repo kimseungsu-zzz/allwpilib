@@ -2,16 +2,16 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/vision/VisionRunner.hpp"
+#include "vision/VisionRunner.h"
 
 #include <memory>
 #include <thread>
 
 #include <opencv2/core/mat.hpp>
 
-#include "wpi/cameraserver/CameraServerShared.hpp"
+#include "cameraserver/CameraServerShared.h"
 
-using namespace wpi::vision;
+using namespace frc;
 
 VisionRunnerBase::VisionRunnerBase(cs::VideoSource videoSource)
     : m_image(std::make_unique<cv::Mat>()),
@@ -24,7 +24,7 @@ VisionRunnerBase::VisionRunnerBase(cs::VideoSource videoSource)
 VisionRunnerBase::~VisionRunnerBase() = default;
 
 void VisionRunnerBase::RunOnce() {
-  auto csShared = wpi::GetCameraServerShared();
+  auto csShared = frc::GetCameraServerShared();
   auto res = csShared->GetRobotMainThreadId();
   if (res.second && (std::this_thread::get_id() == res.first)) {
     csShared->SetVisionRunnerError(
@@ -41,7 +41,7 @@ void VisionRunnerBase::RunOnce() {
 }
 
 void VisionRunnerBase::RunForever() {
-  auto csShared = wpi::GetCameraServerShared();
+  auto csShared = frc::GetCameraServerShared();
   auto res = csShared->GetRobotMainThreadId();
   if (res.second && (std::this_thread::get_id() == res.first)) {
     csShared->SetVisionRunnerError(

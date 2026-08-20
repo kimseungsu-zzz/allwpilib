@@ -2,22 +2,22 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/framework/TimedRobot.hpp"
-#include "wpi/hardware/rotation/DutyCycleEncoder.hpp"
-#include "wpi/math/util/MathUtil.hpp"
-#include "wpi/smartdashboard/SmartDashboard.hpp"
+#include <frc/DutyCycleEncoder.h>
+#include <frc/MathUtil.h>
+#include <frc/TimedRobot.h>
+#include <frc/smartdashboard/SmartDashboard.h>
 
 constexpr double fullRange = 1.3;
 constexpr double expectedZero = 0.0;
 
-class Robot : public wpi::TimedRobot {
+class Robot : public frc::TimedRobot {
   // 2nd parameter is the range of values. This sensor will output between
   // 0 and the passed in value.
   // 3rd parameter is the the physical value where you want "0" to be. How
   // to measure this is fairly easy. Set the value to 0, place the mechanism
   // where you want "0" to be, and observe the value on the dashboard, That
   // is the value to enter for the 3rd parameter.
-  wpi::DutyCycleEncoder dutyCycleEncoder{0, fullRange, expectedZero};
+  frc::DutyCycleEncoder m_dutyCycleEncoder{0, fullRange, expectedZero};
 
  public:
   Robot() {
@@ -32,18 +32,18 @@ class Robot : public wpi::TimedRobot {
     // those values. This number doesn't have to be perfect,
     // just having a fairly close value will make the output readings
     // much more stable.
-    dutyCycleEncoder.SetAssumedFrequency(967.8_Hz);
+    m_dutyCycleEncoder.SetAssumedFrequency(967.8_Hz);
   }
 
   void RobotPeriodic() override {
     // Connected can be checked, and uses the frequency of the encoder
-    auto connected = dutyCycleEncoder.IsConnected();
+    auto connected = m_dutyCycleEncoder.IsConnected();
 
     // Duty Cycle Frequency in Hz
-    auto frequency = dutyCycleEncoder.GetFrequency();
+    auto frequency = m_dutyCycleEncoder.GetFrequency();
 
     // Output of encoder
-    auto output = dutyCycleEncoder.Get();
+    auto output = m_dutyCycleEncoder.Get();
 
     // By default, the output will wrap around to the full range value
     // when the sensor goes below 0. However, for moving mechanisms this
@@ -56,18 +56,18 @@ class Robot : public wpi::TimedRobot {
     // This does not change where "0" is, so no calibration numbers need
     // to be changed.
     double percentOfRange = fullRange * 0.1;
-    double shiftedOutput = wpi::math::InputModulus(output, 0 - percentOfRange,
-                                                   fullRange - percentOfRange);
+    double shiftedOutput = frc::InputModulus(output, 0 - percentOfRange,
+                                             fullRange - percentOfRange);
 
-    wpi::SmartDashboard::PutBoolean("Connected", connected);
-    wpi::SmartDashboard::PutNumber("Frequency", frequency.value());
-    wpi::SmartDashboard::PutNumber("Output", output);
-    wpi::SmartDashboard::PutNumber("ShiftedOutput", shiftedOutput);
+    frc::SmartDashboard::PutBoolean("Connected", connected);
+    frc::SmartDashboard::PutNumber("Frequency", frequency);
+    frc::SmartDashboard::PutNumber("Output", output);
+    frc::SmartDashboard::PutNumber("ShiftedOutput", shiftedOutput);
   }
 };
 
-#ifndef RUNNING_WPILIB_TESTS
+#ifndef RUNNING_FRC_TESTS
 int main() {
-  return wpi::StartRobot<Robot>();
+  return frc::StartRobot<Robot>();
 }
 #endif

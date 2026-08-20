@@ -4,31 +4,30 @@
 
 #include <memory>
 
-#include "wpi/glass/networktables/NTAlerts.hpp"
-#include "wpi/glass/networktables/NTCommandScheduler.hpp"
-#include "wpi/glass/networktables/NTCommandSelector.hpp"
-#include "wpi/glass/networktables/NTDS.hpp"
-#include "wpi/glass/networktables/NTDifferentialDrive.hpp"
-#include "wpi/glass/networktables/NTDigitalInput.hpp"
-#include "wpi/glass/networktables/NTDigitalOutput.hpp"
-#include "wpi/glass/networktables/NTField2D.hpp"
-#include "wpi/glass/networktables/NTGyro.hpp"
-#include "wpi/glass/networktables/NTMecanumDrive.hpp"
-#include "wpi/glass/networktables/NTMechanism2D.hpp"
-#include "wpi/glass/networktables/NTMotorController.hpp"
-#include "wpi/glass/networktables/NTPIDController.hpp"
-#include "wpi/glass/networktables/NTProfiledPIDController.hpp"
-#include "wpi/glass/networktables/NTStringChooser.hpp"
-#include "wpi/glass/networktables/NTSubsystem.hpp"
-#include "wpi/glass/networktables/NetworkTablesProvider.hpp"
+#include "glass/networktables/NTAlerts.h"
+#include "glass/networktables/NTCommandScheduler.h"
+#include "glass/networktables/NTCommandSelector.h"
+#include "glass/networktables/NTDifferentialDrive.h"
+#include "glass/networktables/NTDigitalInput.h"
+#include "glass/networktables/NTDigitalOutput.h"
+#include "glass/networktables/NTFMS.h"
+#include "glass/networktables/NTField2D.h"
+#include "glass/networktables/NTGyro.h"
+#include "glass/networktables/NTMecanumDrive.h"
+#include "glass/networktables/NTMechanism2D.h"
+#include "glass/networktables/NTMotorController.h"
+#include "glass/networktables/NTPIDController.h"
+#include "glass/networktables/NTProfiledPIDController.h"
+#include "glass/networktables/NTStringChooser.h"
+#include "glass/networktables/NTSubsystem.h"
+#include "glass/networktables/NetworkTablesProvider.h"
 
-using namespace wpi::glass;
+using namespace glass;
 
-void wpi::glass::AddStandardNetworkTablesViews(
-    NetworkTablesProvider& provider) {
+void glass::AddStandardNetworkTablesViews(NetworkTablesProvider& provider) {
   provider.Register(
       NTAlertsModel::kType,
-      [](wpi::nt::NetworkTableInstance inst, const char* path) {
+      [](nt::NetworkTableInstance inst, const char* path) {
         return std::make_unique<NTAlertsModel>(inst, path);
       },
       [](Window* win, Model* model, const char*) {
@@ -38,7 +37,7 @@ void wpi::glass::AddStandardNetworkTablesViews(
       });
   provider.Register(
       NTCommandSchedulerModel::kType,
-      [](wpi::nt::NetworkTableInstance inst, const char* path) {
+      [](nt::NetworkTableInstance inst, const char* path) {
         return std::make_unique<NTCommandSchedulerModel>(inst, path);
       },
       [](Window* win, Model* model, const char*) {
@@ -49,7 +48,7 @@ void wpi::glass::AddStandardNetworkTablesViews(
       });
   provider.Register(
       NTCommandSelectorModel::kType,
-      [](wpi::nt::NetworkTableInstance inst, const char* path) {
+      [](nt::NetworkTableInstance inst, const char* path) {
         return std::make_unique<NTCommandSelectorModel>(inst, path);
       },
       [](Window* win, Model* model, const char*) {
@@ -60,7 +59,7 @@ void wpi::glass::AddStandardNetworkTablesViews(
       });
   provider.Register(
       NTDifferentialDriveModel::kType,
-      [](wpi::nt::NetworkTableInstance inst, const char* path) {
+      [](nt::NetworkTableInstance inst, const char* path) {
         return std::make_unique<NTDifferentialDriveModel>(inst, path);
       },
       [](Window* win, Model* model, const char*) {
@@ -70,18 +69,18 @@ void wpi::glass::AddStandardNetworkTablesViews(
         });
       });
   provider.Register(
-      NTDSModel::kType,
-      [](wpi::nt::NetworkTableInstance inst, const char* path) {
-        return std::make_unique<NTDSModel>(inst, path);
+      NTFMSModel::kType,
+      [](nt::NetworkTableInstance inst, const char* path) {
+        return std::make_unique<NTFMSModel>(inst, path);
       },
       [](Window* win, Model* model, const char*) {
         win->SetFlags(ImGuiWindowFlags_AlwaysAutoResize);
         return MakeFunctionView(
-            [=] { DisplayDS(static_cast<DSModel*>(model), true); });
+            [=] { DisplayFMS(static_cast<FMSModel*>(model), true); });
       });
   provider.Register(
       NTDigitalInputModel::kType,
-      [](wpi::nt::NetworkTableInstance inst, const char* path) {
+      [](nt::NetworkTableInstance inst, const char* path) {
         return std::make_unique<NTDigitalInputModel>(inst, path);
       },
       [](Window* win, Model* model, const char*) {
@@ -92,7 +91,7 @@ void wpi::glass::AddStandardNetworkTablesViews(
       });
   provider.Register(
       NTDigitalOutputModel::kType,
-      [](wpi::nt::NetworkTableInstance inst, const char* path) {
+      [](nt::NetworkTableInstance inst, const char* path) {
         return std::make_unique<NTDigitalOutputModel>(inst, path);
       },
       [](Window* win, Model* model, const char*) {
@@ -103,7 +102,7 @@ void wpi::glass::AddStandardNetworkTablesViews(
       });
   provider.Register(
       NTField2DModel::kType,
-      [](wpi::nt::NetworkTableInstance inst, const char* path) {
+      [](nt::NetworkTableInstance inst, const char* path) {
         return std::make_unique<NTField2DModel>(inst, path);
       },
       [=](Window* win, Model* model, const char* path) {
@@ -115,7 +114,7 @@ void wpi::glass::AddStandardNetworkTablesViews(
       });
   provider.Register(
       NTGyroModel::kType,
-      [](wpi::nt::NetworkTableInstance inst, const char* path) {
+      [](nt::NetworkTableInstance inst, const char* path) {
         return std::make_unique<NTGyroModel>(inst, path);
       },
       [](Window* win, Model* model, const char* path) {
@@ -125,7 +124,7 @@ void wpi::glass::AddStandardNetworkTablesViews(
       });
   provider.Register(
       NTMecanumDriveModel::kType,
-      [](wpi::nt::NetworkTableInstance inst, const char* path) {
+      [](nt::NetworkTableInstance inst, const char* path) {
         return std::make_unique<NTMecanumDriveModel>(inst, path);
       },
       [](Window* win, Model* model, const char*) {
@@ -135,7 +134,7 @@ void wpi::glass::AddStandardNetworkTablesViews(
       });
   provider.Register(
       NTMechanism2DModel::kType,
-      [](wpi::nt::NetworkTableInstance inst, const char* path) {
+      [](nt::NetworkTableInstance inst, const char* path) {
         return std::make_unique<NTMechanism2DModel>(inst, path);
       },
       [=](Window* win, Model* model, const char* path) {
@@ -147,7 +146,7 @@ void wpi::glass::AddStandardNetworkTablesViews(
       });
   provider.Register(
       NTPIDControllerModel::kType,
-      [](wpi::nt::NetworkTableInstance inst, const char* path) {
+      [](nt::NetworkTableInstance inst, const char* path) {
         return std::make_unique<NTPIDControllerModel>(inst, path);
       },
       [](Window* win, Model* model, const char* path) {
@@ -158,7 +157,7 @@ void wpi::glass::AddStandardNetworkTablesViews(
       });
   provider.Register(
       NTProfiledPIDControllerModel::kType,
-      [](wpi::nt::NetworkTableInstance inst, const char* path) {
+      [](nt::NetworkTableInstance inst, const char* path) {
         return std::make_unique<NTProfiledPIDControllerModel>(inst, path);
       },
       [](Window* win, Model* model, const char* path) {
@@ -170,7 +169,7 @@ void wpi::glass::AddStandardNetworkTablesViews(
       });
   provider.Register(
       NTMotorControllerModel::kType,
-      [](wpi::nt::NetworkTableInstance inst, const char* path) {
+      [](nt::NetworkTableInstance inst, const char* path) {
         return std::make_unique<NTMotorControllerModel>(inst, path);
       },
       [](Window* win, Model* model, const char* path) {
@@ -181,7 +180,7 @@ void wpi::glass::AddStandardNetworkTablesViews(
       });
   provider.Register(
       NTStringChooserModel::kType,
-      [](wpi::nt::NetworkTableInstance inst, const char* path) {
+      [](nt::NetworkTableInstance inst, const char* path) {
         return std::make_unique<NTStringChooserModel>(inst, path);
       },
       [](Window* win, Model* model, const char*) {
@@ -192,7 +191,7 @@ void wpi::glass::AddStandardNetworkTablesViews(
       });
   provider.Register(
       NTSubsystemModel::kType,
-      [](wpi::nt::NetworkTableInstance inst, const char* path) {
+      [](nt::NetworkTableInstance inst, const char* path) {
         return std::make_unique<NTSubsystemModel>(inst, path);
       },
       [](Window* win, Model* model, const char*) {

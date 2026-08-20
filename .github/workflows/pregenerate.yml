@@ -1,7 +1,6 @@
 name: Check Pregenerated Files
 
 on:
-  merge_group:
   pull_request:
   push:
     branches-ignore:
@@ -14,9 +13,9 @@ concurrency:
 jobs:
   update:
     name: "Update"
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: Run pregen
@@ -28,8 +27,8 @@ jobs:
       - name: Generate diff
         run: git diff HEAD > pregenerated-files-fixes.patch
         if: ${{ failure() }}
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@v4
         with:
-          archive: false
+          name: pregenerated-files-fixes
           path: pregenerated-files-fixes.patch
         if: ${{ failure() }}

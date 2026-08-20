@@ -2,25 +2,28 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-#include "wpi/glass/networktables/NTDigitalOutput.hpp"
+#include "glass/networktables/NTDigitalOutput.h"
 
-#include <format>
 #include <utility>
 
-using namespace wpi::glass;
+#include <fmt/format.h>
+
+using namespace glass;
 
 NTDigitalOutputModel::NTDigitalOutputModel(std::string_view path)
-    : NTDigitalOutputModel{wpi::nt::NetworkTableInstance::GetDefault(), path} {}
+    : NTDigitalOutputModel{nt::NetworkTableInstance::GetDefault(), path} {}
 
-NTDigitalOutputModel::NTDigitalOutputModel(wpi::nt::NetworkTableInstance inst,
+NTDigitalOutputModel::NTDigitalOutputModel(nt::NetworkTableInstance inst,
                                            std::string_view path)
     : m_inst{inst},
       m_value{
-          inst.GetBooleanTopic(std::format("{}/Value", path)).GetEntry(false)},
-      m_name{inst.GetStringTopic(std::format("{}/.name", path)).Subscribe("")},
-      m_controllable{inst.GetBooleanTopic(std::format("{}/.controllable", path))
+          inst.GetBooleanTopic(fmt::format("{}/Value", path)).GetEntry(false)},
+      m_name{inst.GetStringTopic(fmt::format("{}/.name", path)).Subscribe("")},
+      m_controllable{inst.GetBooleanTopic(fmt::format("{}/.controllable", path))
                          .Subscribe(false)},
-      m_valueData{std::format("NT_DOut:{}", path)} {}
+      m_valueData{fmt::format("NT_DOut:{}", path)} {
+  m_valueData.SetDigital(true);
+}
 
 void NTDigitalOutputModel::SetValue(bool val) {
   m_value.Set(val);

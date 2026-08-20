@@ -81,9 +81,7 @@ std::string FormatKV(std::string const& key, bool value) {
 
 std::string FormatKV(std::string const& key, int64_t value) {
   std::stringstream ss;
-  // We really want to just dump the integer as-is,
-  // without the system locale interfering.
-  ss << '"' << StrEscape(key) << "\": " << std::to_string(value);
+  ss << '"' << StrEscape(key) << "\": " << value;
   return ss.str();
 }
 
