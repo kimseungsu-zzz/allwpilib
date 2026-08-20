@@ -137,26 +137,17 @@ TEST(VMXAnalogGyroTest, AcceptsOnlyLogicalAccumulatorChannels) {
 }
 
 TEST(VMXAnalogGyroTest, ManagerRejectsDuplicateGyroAllocation) {
-  auto hardware = std::make_shared<FakeGyroHardware>();
-  AnalogInputManager inputManager{[hardware](
-                                      int32_t,
-                                      const AnalogInputConfig& config) {
-    return std::unique_ptr<AnalogInputBackend>{
-        std::make_unique<FakeGyroBackend>(hardware, config)};
-  }};
-  const auto analog = inputManager.Allocate(0, "shared analog");
-  ASSERT_EQ(analog.result, AnalogInputResult::kOk);
-  AnalogGyroManager manager{[](double) {}, &inputManager};
-
+  AnalogGyroHandleResource resource;
   HAL_GyroHandle first = HAL_kInvalidHandle;
-  ASSERT_EQ(manager.Initialize(analog.handle, "first gyro", first),
-            AnalogGyroResult::kOk);
+  int32_t status = HAL_SUCCESS;
+  ASSERT_TRUE(resource.Allocate(0, &first, &status));
+  EXPECT_EQ(status, HAL_SUCCESS);
   HAL_GyroHandle duplicate = HAL_kInvalidHandle;
-  EXPECT_EQ(manager.Initialize(analog.handle, "duplicate gyro", duplicate),
-            AnalogGyroResult::kAlreadyAllocated);
+  auto duplicateResource = resource.Allocate(0, &duplicate, &status);
+  EXPECT_FALSE(duplicateResource);
+  EXPECT_EQ(status, RESOURCE_IS_ALLOCATED);
   EXPECT_EQ(duplicate, HAL_kInvalidHandle);
-  manager.Free(first);
-  inputManager.Free(analog.handle);
+  resource.Free(first);
 }
 
 TEST(VMXAnalogGyroTest, SetupUsesFixedRateConfigurationAndInjectableWait) {
