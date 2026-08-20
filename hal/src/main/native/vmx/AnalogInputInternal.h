@@ -143,19 +143,21 @@ class AnalogInputPort final {
 
   std::pair<AnalogInputResult, int32_t> GetAverageBits() const noexcept {
     std::scoped_lock lock{m_mutex};
-    return IsUsable() ? std::pair{AnalogInputResult::kOk, m_config.averageBits}
+    return IsUsableLocked()
+               ? std::pair{AnalogInputResult::kOk, m_config.averageBits}
                       : std::pair{AnalogInputResult::kHardwareFailure, 0};
   }
 
   std::pair<AnalogInputResult, int32_t> GetOversampleBits() const noexcept {
     std::scoped_lock lock{m_mutex};
-    return IsUsable() ? std::pair{AnalogInputResult::kOk, m_config.oversampleBits}
+    return IsUsableLocked()
+               ? std::pair{AnalogInputResult::kOk, m_config.oversampleBits}
                       : std::pair{AnalogInputResult::kHardwareFailure, 0};
   }
 
   std::pair<AnalogInputResult, int32_t> GetLSBWeight() const noexcept {
     std::scoped_lock lock{m_mutex};
-    if (!IsUsable()) {
+    if (!IsUsableLocked()) {
       return {AnalogInputResult::kHardwareFailure, 0};
     }
     return {AnalogInputResult::kOk,
@@ -166,7 +168,7 @@ class AnalogInputPort final {
   std::pair<AnalogInputResult, double> ValueToVolts(
       int32_t rawValue) const noexcept {
     std::scoped_lock lock{m_mutex};
-    return IsUsable()
+    return IsUsableLocked()
                ? std::pair{AnalogInputResult::kOk,
                            static_cast<double>(rawValue) *
                                m_backend->GetFullScaleVoltage() / kVMXADCCounts}
@@ -181,7 +183,7 @@ class AnalogInputPort final {
 
   VoltsToValueResult VoltsToValue(double voltage) const noexcept {
     std::scoped_lock lock{m_mutex};
-    if (!IsUsable()) {
+    if (!IsUsableLocked()) {
       return {};
     }
     double fullScale = m_backend->GetFullScaleVoltage();
@@ -200,7 +202,7 @@ class AnalogInputPort final {
     if (!IsAnalogAccumulatorChannelValid(m_logicalChannel)) {
       return AnalogInputResult::kInvalidAccumulatorChannel;
     }
-    if (!IsUsable()) {
+    if (!IsUsableLocked()) {
       return AnalogInputResult::kHardwareFailure;
     }
     if (m_config.accumulatorEnabled) {
@@ -222,7 +224,7 @@ class AnalogInputPort final {
 
   AnalogInputResult ResetAccumulator() noexcept {
     std::scoped_lock lock{m_mutex};
-    if (!IsUsable()) {
+    if (!IsUsableLocked()) {
       return AnalogInputResult::kHardwareFailure;
     }
     if (!m_config.accumulatorEnabled) {
@@ -261,7 +263,7 @@ class AnalogInputPort final {
   std::pair<AnalogInputResult, AnalogAccumulatorOutput> GetAccumulatorOutput()
       noexcept {
     std::scoped_lock lock{m_mutex};
-    if (!IsUsable()) {
+    if (!IsUsableLocked()) {
       return {AnalogInputResult::kHardwareFailure, {}};
     }
     if (!m_config.accumulatorEnabled) {
@@ -281,6 +283,15 @@ class AnalogInputPort final {
     return m_previousAllocation;
   }
 
+  // AnalogTrigger keeps this shared reference internally so the trigger can
+  // never dereference a reclaimed AnalogInputPort. HAL_FreeAnalogInputPort()
+  // still closes the port immediately; a trigger that outlives its input then
+  // observes a hardware failure instead of a use-after-free.
+  bool IsUsable() const noexcept {
+    std::scoped_lock lock{m_mutex};
+    return IsUsableLocked();
+  }
+
   void Close() noexcept {
     std::scoped_lock lock{m_mutex};
     m_faulted = true;
@@ -288,7 +299,9 @@ class AnalogInputPort final {
   }
 
  private:
-  bool IsUsable() const noexcept { return !m_faulted && m_backend; }
+  bool IsUsableLocked() const noexcept {
+    return !m_faulted && m_backend != nullptr;
+  }
 
   std::unique_ptr<AnalogInputBackend> CreateBackend(
       const AnalogInputConfig& config) noexcept {
@@ -317,7 +330,7 @@ class AnalogInputPort final {
   }
 
   AnalogInputResult Reconfigure(const AnalogInputConfig& config) noexcept {
-    if (!IsUsable()) {
+    if (!IsUsableLocked()) {
       return AnalogInputResult::kHardwareFailure;
     }
     if (config.averageBits < 0 || config.averageBits > 255 ||
@@ -509,6 +522,10 @@ class AnalogInputManager final {
     return port ? port->VoltsToValue(voltage)
                 : AnalogInputPort::VoltsToValueResult{
                       AnalogInputResult::kInvalidHandle, 0, false};
+  }
+  std::shared_ptr<AnalogInputPort> AcquirePort(
+      HAL_AnalogInputHandle handle) noexcept {
+    return Get(handle);
   }
   std::pair<AnalogInputResult, bool> IsAccumulatorChannel(
       HAL_AnalogInputHandle handle) noexcept {

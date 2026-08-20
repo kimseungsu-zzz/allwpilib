@@ -199,3 +199,40 @@ Rising and falling timestamps are read from the VMX hardware APIs
 Those values must share the time domain that the future VMX
 `HAL_GetFPGATime()` implementation will expose; until that HAL core exists,
 this is an explicit integration dependency.
+
+## AnalogTrigger support
+
+The VMX AnalogTrigger adapter intentionally does not allocate a separate VMX
+AnalogTrigger resource. Each trigger retains an internal shared reference to
+the existing `AnalogInputPort`, so its reads continue through the same VMX
+`AccumulatorInput` resource used by `AnalogInput` and the accumulator. The
+public AnalogInput handle remains owned by the caller; freeing it closes the
+underlying port, while an already-created trigger safely observes a hardware
+failure instead of dereferencing a reclaimed object.
+
+Raw limits use the VMX 12-bit ADC domain `[0, 4095]`. Voltage limits use the
+runtime AnalogInput full-scale voltage and remain as doubles, without an
+intermediate raw quantization. Both domains enforce lower `<=` upper and the
+standard `ANALOG_TRIGGER_LIMIT_ORDER_ERROR` / `PARAMETER_OUT_OF_RANGE` HAL
+statuses.
+
+Trigger evaluation follows WPILib hysteresis semantics:
+
+- `value < lower` sets TriggerState false
+- `value > upper` sets TriggerState true
+- values inside the window preserve the previous TriggerState
+- InWindow includes both lower and upper bounds
+
+Instantaneous mode reads the existing raw or voltage AnalogInput value;
+`HAL_SetAnalogTriggerAveraged(true)` selects the existing averaged raw or
+averaged voltage path. Filtered mode is deliberately explicit: enabling it
+returns `INCOMPATIBLE_STATE`, while disabling it succeeds. Rising and falling
+pulse outputs return `ANALOG_TRIGGER_PULSE_OUTPUT_ERROR`, and DutyCycle-based
+AnalogTrigger initialization/limits return `INCOMPATIBLE_STATE` until a future
+DutyCycle Core exists.
+
+AnalogTrigger handles use stable logical WPILib indices (0 through 7), not
+physical VMX or FPGA numbers. `HAL_GetAnalogTriggerFPGAIndex()` returns that
+logical handle slot for Java, C++, and Python compatibility. No public HAL
+header or language binding changes are required, and `vmxdrivers/` remains
+unchanged.
