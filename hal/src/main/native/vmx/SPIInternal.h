@@ -35,7 +35,7 @@ enum class SPIResult {
 };
 
 struct SPIPortConfig {
-  int32_t clockRate = 1000000;
+  int32_t clockRate = 500000;
   HAL_SPIMode mode = HAL_SPI_kMode0;
   bool chipSelectActiveLow = true;
 
@@ -54,8 +54,9 @@ constexpr SPIResult ValidateSPIPort(HAL_SPIPort port) noexcept {
   if (port < HAL_SPI_kOnboardCS0 || port > HAL_SPI_kMXP) {
     return SPIResult::kPortOutOfRange;
   }
-  return port == HAL_SPI_kMXP ? SPIResult::kOk
-                              : SPIResult::kUnsupportedPort;
+  // VMX has one physical SPI connector.  All WPILib onboard CS0..CS3 and
+  // MXP identifiers are aliases for that bus and share one registry claim.
+  return SPIResult::kOk;
 }
 
 constexpr bool IsValidSPIConfig(const SPIPortConfig& config) noexcept {
@@ -83,6 +84,7 @@ using SPICommDIOMapProvider = std::function<VMXCommDIOChannelMap()>;
 struct SPIPortState {
   mutable std::mutex mutex;
   bool initialized = false;
+  int32_t referenceCount = 0;
   int32_t handle = 0;
   SPIPortConfig config;
   VMXCommDIOChannelMap channels;
@@ -101,12 +103,11 @@ class SPIManager final {
         m_mapProvider{std::move(mapProvider)} {}
 
   ~SPIManager() {
-    for (auto& state : m_ports) {
-      std::scoped_lock lock{state.mutex};
-      ReleaseChannels(state);
-      state.backend.reset();
-      ResetState(state);
-    }
+    auto& state = m_port;
+    std::scoped_lock lock{state.mutex};
+    ReleaseChannels(state);
+    state.backend.reset();
+    ResetState(state);
   }
 
   SPIResult Initialize(HAL_SPIPort port) noexcept {
@@ -114,9 +115,10 @@ class SPIManager final {
     if (validation != SPIResult::kOk) {
       return validation;
     }
-    auto& state = m_ports[static_cast<size_t>(port)];
+    auto& state = m_port;
     std::scoped_lock lock{state.mutex};
     if (state.initialized) {
+      ++state.referenceCount;
       return SPIResult::kOk;
     }
 
@@ -148,6 +150,7 @@ class SPIManager final {
     state.channels = channels;
     state.backend = std::move(backend);
     state.initialized = true;
+    state.referenceCount = 1;
     state.handle = state.backend->GetHandle();
     if (state.handle == 0) {
       // A backend may not expose the SDK handle (host mocks do not need one),
@@ -162,9 +165,13 @@ class SPIManager final {
     if (validation != SPIResult::kOk) {
       return validation;
     }
-    auto& state = m_ports[static_cast<size_t>(port)];
+    auto& state = m_port;
     std::scoped_lock lock{state.mutex};
     if (!state.initialized) {
+      return SPIResult::kOk;
+    }
+    if (state.referenceCount > 1) {
+      --state.referenceCount;
       return SPIResult::kOk;
     }
     state.backend.reset();
@@ -182,7 +189,7 @@ class SPIManager final {
     if (validation != SPIResult::kOk) {
       return validation;
     }
-    auto& state = m_ports[static_cast<size_t>(port)];
+    auto& state = m_port;
     std::scoped_lock lock{state.mutex};
     if (!state.initialized || !state.backend) {
       return SPIResult::kNotInitialized;
@@ -210,7 +217,7 @@ class SPIManager final {
     if (validation != SPIResult::kOk) {
       return validation;
     }
-    auto& state = m_ports[static_cast<size_t>(port)];
+    auto& state = m_port;
     std::scoped_lock lock{state.mutex};
     if (!state.initialized || !state.backend) {
       return SPIResult::kNotInitialized;
@@ -237,7 +244,7 @@ class SPIManager final {
     if (validation != SPIResult::kOk) {
       return validation;
     }
-    auto& state = m_ports[static_cast<size_t>(port)];
+    auto& state = m_port;
     std::scoped_lock lock{state.mutex};
     if (!state.initialized || !state.backend) {
       return SPIResult::kNotInitialized;
@@ -260,7 +267,7 @@ class SPIManager final {
     if (validation != SPIResult::kOk) {
       return validation;
     }
-    auto& state = m_ports[static_cast<size_t>(port)];
+    auto& state = m_port;
     std::scoped_lock lock{state.mutex};
     if (!state.initialized || !state.backend) {
       return SPIResult::kNotInitialized;
@@ -281,7 +288,7 @@ class SPIManager final {
     if (static_cast<int32_t>(mode) < 0 || static_cast<int32_t>(mode) > 3) {
       return SPIResult::kInvalidMode;
     }
-    auto& state = m_ports[static_cast<size_t>(port)];
+    auto& state = m_port;
     std::scoped_lock lock{state.mutex};
     if (!state.initialized || !state.backend) {
       return SPIResult::kNotInitialized;
@@ -295,7 +302,7 @@ class SPIManager final {
     if (ValidateSPIPort(port) != SPIResult::kOk) {
       return HAL_SPI_kMode0;
     }
-    auto& state = m_ports[static_cast<size_t>(port)];
+    auto& state = m_port;
     std::scoped_lock lock{state.mutex};
     return state.config.mode;
   }
@@ -305,7 +312,7 @@ class SPIManager final {
     if (validation != SPIResult::kOk) {
       return validation;
     }
-    auto& state = m_ports[static_cast<size_t>(port)];
+    auto& state = m_port;
     std::scoped_lock lock{state.mutex};
     if (!state.initialized || !state.backend) {
       return SPIResult::kNotInitialized;
@@ -319,7 +326,7 @@ class SPIManager final {
     if (ValidateSPIPort(port) != SPIResult::kOk) {
       return 0;
     }
-    auto& state = m_ports[static_cast<size_t>(port)];
+    auto& state = m_port;
     std::scoped_lock lock{state.mutex};
     return state.initialized ? state.handle : 0;
   }
@@ -328,7 +335,7 @@ class SPIManager final {
     if (ValidateSPIPort(port) != SPIResult::kOk) {
       return;
     }
-    auto& state = m_ports[static_cast<size_t>(port)];
+    auto& state = m_port;
     std::scoped_lock lock{state.mutex};
     if (state.initialized) {
       state.handle = handle;
@@ -402,6 +409,7 @@ class SPIManager final {
 
   static void ResetState(SPIPortState& state) noexcept {
     state.initialized = false;
+    state.referenceCount = 0;
     state.handle = 0;
     state.config = {};
     state.channels = {};
@@ -453,7 +461,8 @@ class SPIManager final {
   SPIBackendFactory m_factory;
   DigitalChannelRegistry& m_registry;
   SPICommDIOMapProvider m_mapProvider;
-  mutable std::array<SPIPortState, 5> m_ports;
+  // One physical VMX SPI bus shared by all five WPILib port aliases.
+  mutable SPIPortState m_port;
 };
 
 }  // namespace hal::vmx

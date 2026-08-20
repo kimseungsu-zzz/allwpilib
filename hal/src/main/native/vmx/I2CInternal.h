@@ -67,7 +67,10 @@ constexpr I2CResult ValidateI2CPort(HAL_I2CPort port) noexcept {
   if (port < HAL_I2C_kOnboard || port > HAL_I2C_kMXP) {
     return I2CResult::kPortOutOfRange;
   }
-  return port == HAL_I2C_kMXP ? I2CResult::kOk : I2CResult::kUnsupportedPort;
+  // VMX exposes one physical I2C connector.  WPILib's onboard and MXP
+  // identifiers are compatibility aliases for that same resource and must
+  // therefore share one lifecycle/registry reservation.
+  return I2CResult::kOk;
 }
 
 class I2CManager final {
@@ -82,15 +85,14 @@ class I2CManager final {
         m_mapProvider{std::move(mapProvider)} {}
 
   ~I2CManager() {
-    for (auto& state : m_ports) {
-      std::scoped_lock lock{state.mutex};
-      if (state.referenceCount > 0) {
-        m_registry.Release(state.sdaChannel, DigitalChannelOwner::kI2C);
-        m_registry.Release(state.sclChannel, DigitalChannelOwner::kI2C);
-      }
-      state.referenceCount = 0;
-      state.backend.reset();
+    auto& state = m_port;
+    std::scoped_lock lock{state.mutex};
+    if (state.referenceCount > 0) {
+      m_registry.Release(state.sdaChannel, DigitalChannelOwner::kI2C);
+      m_registry.Release(state.sclChannel, DigitalChannelOwner::kI2C);
     }
+    state.referenceCount = 0;
+    state.backend.reset();
   }
 
   I2CResult Initialize(HAL_I2CPort port) noexcept {
@@ -98,7 +100,7 @@ class I2CManager final {
     if (portResult != I2CResult::kOk) {
       return portResult;
     }
-    auto& state = m_ports[static_cast<size_t>(port)];
+    auto& state = m_port;
     std::scoped_lock lock{state.mutex};
     if (state.referenceCount == 0) {
       // The official VMX map places the MXP I2C SDA/SCL pair at CommDIO
@@ -174,7 +176,7 @@ class I2CManager final {
     if (portResult != I2CResult::kOk) {
       return portResult;
     }
-    auto& state = m_ports[static_cast<size_t>(port)];
+    auto& state = m_port;
     std::scoped_lock lock{state.mutex};
     if (state.referenceCount <= 0) {
       return I2CResult::kOk;
@@ -198,7 +200,7 @@ class I2CManager final {
     if (validation != I2CResult::kOk) {
       return validation;
     }
-    auto& state = m_ports[static_cast<size_t>(port)];
+    auto& state = m_port;
     std::scoped_lock lock{state.mutex};
     if (state.referenceCount <= 0 || !state.backend) {
       return I2CResult::kNotInitialized;
@@ -222,7 +224,7 @@ class I2CManager final {
     if (validation != I2CResult::kOk) {
       return validation;
     }
-    auto& state = m_ports[static_cast<size_t>(port)];
+    auto& state = m_port;
     std::scoped_lock lock{state.mutex};
     if (state.referenceCount <= 0 || !state.backend) {
       return I2CResult::kNotInitialized;
@@ -244,7 +246,7 @@ class I2CManager final {
     if (validation != I2CResult::kOk) {
       return validation;
     }
-    auto& state = m_ports[static_cast<size_t>(port)];
+    auto& state = m_port;
     std::scoped_lock lock{state.mutex};
     if (state.referenceCount <= 0 || !state.backend) {
       return I2CResult::kNotInitialized;
@@ -264,7 +266,7 @@ class I2CManager final {
     if (portResult != I2CResult::kOk) {
       return 0;
     }
-    auto& state = m_ports[static_cast<size_t>(port)];
+    auto& state = m_port;
     std::scoped_lock lock{state.mutex};
     return state.referenceCount;
   }
@@ -295,7 +297,8 @@ class I2CManager final {
   I2CBackendFactory m_factory;
   DigitalChannelRegistry& m_registry;
   CommDIOMapProvider m_mapProvider;
-  mutable std::array<I2CPortState, 2> m_ports;
+  // One physical VMX I2C bus shared by kOnboard and kMXP aliases.
+  mutable I2CPortState m_port;
 };
 
 }  // namespace hal::vmx

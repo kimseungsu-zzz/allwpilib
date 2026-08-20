@@ -8,6 +8,7 @@ Welcome to the WPILib project. This repository contains the HAL, WPILibJ, and WP
 
 - [WPILib Project](#wpilib-project)
   - [WPILib Mission](#wpilib-mission)
+  - [VMX backend status](#vmx-backend-status)
 - [Building WPILib](#building-wpilib)
   - [Requirements](#requirements)
   - [Setup](#setup)
@@ -26,6 +27,28 @@ Welcome to the WPILib project. This repository contains the HAL, WPILibJ, and WP
 ## WPILib Mission
 
 The WPILib Mission is to enable FIRST Robotics teams to focus on writing game-specific software rather than focusing on hardware details - "raise the floor, don't lower the ceiling". We work to enable teams with limited programming knowledge and/or mentor experience to be as successful as possible, while not hampering the abilities of teams with more advanced programming capabilities. We support Kit of Parts control system components directly in the library. We also strive to keep parity between major features of each language (Java, C++, Python, and NI's LabVIEW), so that teams aren't at a disadvantage for choosing a specific programming language. WPILib is an open source project, licensed under the BSD 3-clause license. You can find a copy of the license [here](LICENSE.md).
+
+## VMX backend status
+
+This repository also contains an experimental VMX-Pi/VMX2 HAL backend under
+`hal/src/main/native/vmx`. It keeps the existing Java, C++, and Python WPILib
+APIs and adapts them through the HAL; it does not add a second public robot
+framework. The detailed, synchronized status is maintained in the [VMX HAL
+README](hal/src/main/native/vmx/README.md) and [sensor compatibility
+matrix](hal/src/main/native/vmx/VMX_SENSOR_COMPATIBILITY.md).
+
+The current communication-port mapping is fixed by the VMX CommDIO connector:
+I2C `26/27`, TTL UART `28/29`, and SPI `30/31/32/33` (CLK/MOSI/MISO/CS).
+WPILib I2C onboard/MXP names and SPI onboard CS0-3/MXP names are aliases for
+the same physical resources and share the registry. Serial `kMXP` is backed by
+the SDK UART with baud rates `0..230400`; onboard RS-232 and USB serial
+enumeration remain explicit compatibility boundaries. The basic SPI HAL
+primitive is available but sensor-level status remains `NOT_TESTED`, while
+AutoSPI remains explicitly unsupported. Hardware validation is separate from
+the matrix's HAL/API status. The currently available VMXPi SDK shared
+library is ELF32 ARM EABI5, so VMX-Pi deployment targets armhf; the maintained
+Linux ARM64 VMX Debug/Release checks are source/header checks until a matching
+ELF64 VMX2 SDK is provided.
 
 # Quick Start
 

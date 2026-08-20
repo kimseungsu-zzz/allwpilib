@@ -35,6 +35,20 @@ TEST(VMXChannelMappingTest, PhysicalBanksAndOfficialPairsAreExplicit) {
   EXPECT_FALSE(IsVMXCounterPair(1, 2));
 }
 
+TEST(VMXChannelMappingTest, CommunicationAliasesUseDocumentedPhysicalPins) {
+  const auto map = kDefaultVMXCommDIOChannelMap;
+  EXPECT_EQ(map.i2cSDA, 26);
+  EXPECT_EQ(map.i2cSCL, 27);
+  EXPECT_EQ(map.uartTX, 28);
+  EXPECT_EQ(map.uartRX, 29);
+  EXPECT_EQ(map.spiCLK, 30);
+  EXPECT_EQ(map.spiMOSI, 31);
+  EXPECT_EQ(map.spiMISO, 32);
+  EXPECT_EQ(map.spiCS, 33);
+  EXPECT_NE(map.i2cSDA, map.uartTX);
+  EXPECT_NE(map.uartRX, map.spiCLK);
+}
+
 TEST(VMXChannelCapabilityTest, MockSdkCapabilitiesModelJumperAndCommDio) {
   VMXCapabilityProvider mock{[](int32_t physical, VMXCapability capability) {
     if (physical >= 12 && physical <= 21) {

@@ -25,6 +25,18 @@ Do not put public WPILib API changes, simulation fallbacks, Studica product
 APIs, or direct `/usr/local` SDK paths here. Runtime/context initialization and
 individual HAL facilities use this adapter boundary.
 
+## SDK ABI and target decision
+
+The SDK artifact currently available to this checkout is
+`libvmxpi_hal_cpp.so` from `vmxpi-hal-1.1.249-linuxraspbian`; `file` reports
+`ELF 32-bit LSB shared object, ARM, EABI5`. Its headers expose the VMXPi/VMXIO
+ABI used by this adapter, but the library is not link-compatible with an
+AArch64 target. Therefore the VMX-Pi deployment target is the 32-bit ARM/armhf
+SDK ABI. A VMX2 deployment may use a 64-bit ARM target only when a matching
+ELF64 VMX2 SDK library is supplied. The current Linux ARM64 Gradle VMX source
+compile is kept as an ABI/header check (Debug and Release); a full AArch64 link
+is intentionally not claimed with the installed ELF32 library.
+
 ## Language bindings
 
 This backend is the single hardware implementation shared by all supported
@@ -36,8 +48,8 @@ C++  (WPILibC) -------------+-> wpiHal -> VMX backend
 Python (RobotPy bindings) ---+
 ```
 
-Do not create VMX-specific Java, C++, or Python hardware APIs. Java's Linux
-aarch64 JNI artifact must link this `wpiHal`; C++ links it directly; and a
+Do not create VMX-specific Java, C++, or Python hardware APIs. Java's
+target-matched Linux JNI artifact must link this `wpiHal`; C++ links it directly; and a
 future mostrobotpy integration must package/select this same native HAL through
 `robotpy-native-wpihal`. Python bindings and deployment remain in the
 mostrobotpy repository rather than allwpilib.
@@ -57,7 +69,7 @@ The public WPILib channel number is a logical address, not always a VMX pin:
 | --- | --- | --- | --- |
 | DIO 0-11 / PWM 0-11 | 0-11 | FlexDIO | SDK-selected input/output; interrupt, encoder, counter and PWM routes are available when advertised. |
 | DIO 12-21 / PWM 12-21 | 12-21 | HighCurrent DIO | One bank-wide jumper selects INPUT or OUTPUT. `HAL_SetDIODirection()` never changes it. |
-| DIO 22-29 / PWM 22-27 | 26-33 | CommDIO | Fixed UART/I2C/SPI and digital capabilities; no runtime direction switch. |
+| DIO 22-29 / PWM 22-27 | 26-33 | CommDIO | Fixed I2C (26/27), TTL UART (28/29), and SPI (30/31/32/33) capabilities; no runtime direction switch. |
 | Analog 0-3 | 22-25 | AnalogIn | Dedicated analog input and AccumulatorInput resources. |
 
 `VMXChannelCapabilities` is the adapter-side capability layer. Static FRC
@@ -164,10 +176,10 @@ Current DIO feature status:
 ## I2C support
 
 The VMX SDK exposes one independent I2C bus: the sole channels advertising
-`I2C_SDA` and `I2C_SCL`. The VMX-pi communication port map identifies this as
-the WPILib MXP I2C port. The VMX HAL maps that bus to
-`HAL_I2C_kMXP`; `HAL_I2C_kOnboard` is explicitly unsupported rather than being
-reported as a second fake bus. One VMX I2C resource is shared by all objects
+`I2C_SDA` and `I2C_SCL` at physical 26/27. The VMX-pi communication port map
+identifies this as the one WPILib I2C connector. `HAL_I2C_kOnboard` and
+`HAL_I2C_kMXP` are compatibility aliases for that same resource; they cannot
+be used as two independent buses. One VMX I2C resource is shared by all objects
 using the supported port, with reference-counted initialization and final-close
 deallocation, so different device addresses can be used concurrently on the
 same bus.
@@ -190,13 +202,15 @@ sensors.
 
 ## SPI support
 
-The VMX SPI adapter exposes the one physical CommDIO SPI resource as
-`HAL_SPI_kMXP`. The SDK capability inventory supplies the channel map (with the
-documented fallback of physical CLK/MOSI/MISO/CS `28/29/30/31`), and the shared
-physical registry reserves all four channels for the lifetime of the resource.
-Consequently a generic logical DIO, I2C, or UART reservation on any overlapping
-physical channel makes SPI initialization fail atomically; SPI likewise blocks
-later claims of those channels. No second fake onboard SPI bus is reported.
+The VMX SPI adapter exposes one physical CommDIO SPI resource at
+physical CLK/MOSI/MISO/CS `30/31/32/33`. `HAL_SPI_kOnboardCS0` through
+`HAL_SPI_kOnboardCS3` and `HAL_SPI_kMXP` are compatibility aliases for that same
+bus, not five independent chip-select resources. The SDK capability inventory
+remains the runtime source of truth and the shared physical registry reserves
+all four channels for the lifetime of the resource. Consequently a generic
+logical DIO or another communication resource on an overlapping physical
+channel makes SPI initialization fail atomically; SPI likewise blocks later
+claims of those channels.
 
 Basic `HAL_TransactionSPI`, `HAL_WriteSPI`, and `HAL_ReadSPI` operations are
 serialized per bus and use the SDK's `SPI_Transaction`, `SPI_Write`, and
@@ -214,6 +228,28 @@ claim that AutoSPI works. This distinction is recorded in the sensor matrix:
 ADXL345_SPI and an explicitly-MXP ADXL362 remain `NOT_TESTED`, while
 ADXRS450, ADIS16448, and ADIS16470 remain blocked by AutoSPI and their
 additional DIO/port dependencies.
+
+## Serial / UART support
+
+The VMX TTL UART is the sole SDK serial resource on CommDIO physical TX/RX
+channels `28/29`, exposed as WPILib `HAL_SerialPort_MXP`. `kOnboard` is the
+unimplemented VMX RS-232 path, while `kUSB1`/`kUSB2` are Linux USB serial
+devices and are intentionally left for a separate enumeration milestone; the
+adapter never hardcodes `/dev/ttyUSB0`-style names. Every kMXP object gets a
+distinct HAL handle while sharing one mutex-protected SDK resource and one
+physical registry claim.
+
+The SDK-backed configuration is the baud rate (0 through 230400) and all SDK
+read/write/bytes-available operations are used directly. Read timeout and
+termination are implemented in the adapter around the SDK's blocking read;
+writes remain blocking and serialized. SDK-inexpressible data bits, parity,
+stop bits, and flow control return explicit incompatible-state errors rather
+than storing state that cannot affect hardware. Read/write buffer sizes are
+implemented as adapter chunk limits, receive clear drains the SDK queue, and
+flush is complete when the blocking SDK write returns. The SDK's default
+8-N-1/no-flow configuration and both WPILib write modes are supported by the
+blocking writer; alternate UART framing and a raw OS file descriptor remain
+explicit unsupported semantics.
 
 ## PWM support
 

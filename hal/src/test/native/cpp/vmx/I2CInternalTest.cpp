@@ -108,11 +108,17 @@ struct I2CFixture {
   I2CManager manager;
 };
 
-TEST(VMXI2CTest, SupportsOnlyTheMappedMXPBus) {
+TEST(VMXI2CTest, OnboardAndMXPAreAliasesForOnePhysicalBus) {
   I2CFixture fixture;
+  EXPECT_EQ(fixture.manager.Initialize(HAL_I2C_kOnboard), I2CResult::kOk);
   EXPECT_EQ(fixture.manager.Initialize(HAL_I2C_kMXP), I2CResult::kOk);
-  EXPECT_EQ(fixture.manager.Initialize(HAL_I2C_kOnboard),
-            I2CResult::kUnsupportedPort);
+  EXPECT_EQ(fixture.hardware->backendsCreated, 1);
+  EXPECT_EQ(fixture.manager.GetReferenceCount(HAL_I2C_kOnboard), 2);
+  EXPECT_EQ(fixture.manager.GetReferenceCount(HAL_I2C_kMXP), 2);
+  EXPECT_EQ(fixture.manager.Close(HAL_I2C_kOnboard), I2CResult::kOk);
+  EXPECT_EQ(fixture.manager.GetReferenceCount(HAL_I2C_kMXP), 1);
+  EXPECT_EQ(fixture.manager.Close(HAL_I2C_kMXP), I2CResult::kOk);
+  EXPECT_EQ(fixture.manager.GetReferenceCount(HAL_I2C_kMXP), 0);
   EXPECT_EQ(fixture.manager.Initialize(HAL_I2C_kInvalid),
             I2CResult::kPortOutOfRange);
   EXPECT_EQ(fixture.manager.Initialize(static_cast<HAL_I2CPort>(2)),

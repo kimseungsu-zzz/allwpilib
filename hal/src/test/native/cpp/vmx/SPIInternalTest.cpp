@@ -101,13 +101,16 @@ TEST(VMXSPIInternalTest, ValidatesPortsAndRepeatedLifecycle) {
   EXPECT_EQ(ValidateSPIPort(static_cast<HAL_SPIPort>(-2)),
             SPIResult::kPortOutOfRange);
   EXPECT_EQ(ValidateSPIPort(HAL_SPI_kInvalid), SPIResult::kPortOutOfRange);
-  EXPECT_EQ(fixture.manager.Initialize(HAL_SPI_kOnboardCS0),
-            SPIResult::kUnsupportedPort);
+  EXPECT_EQ(fixture.manager.Initialize(HAL_SPI_kOnboardCS0), SPIResult::kOk);
   EXPECT_EQ(fixture.manager.Initialize(HAL_SPI_kMXP), SPIResult::kOk);
   EXPECT_EQ(fixture.manager.Initialize(HAL_SPI_kMXP), SPIResult::kOk);
   EXPECT_EQ(fixture.state->factories, 1);
+  EXPECT_EQ(fixture.manager.GetHandle(HAL_SPI_kOnboardCS0), 42);
+  EXPECT_EQ(fixture.manager.GetHandle(HAL_SPI_kMXP), 42);
+  EXPECT_EQ(fixture.manager.Close(HAL_SPI_kOnboardCS0), SPIResult::kOk);
   EXPECT_EQ(fixture.manager.GetHandle(HAL_SPI_kMXP), 42);
   EXPECT_EQ(fixture.manager.Close(HAL_SPI_kMXP), SPIResult::kOk);
+  EXPECT_EQ(fixture.manager.GetHandle(HAL_SPI_kMXP), 42);
   EXPECT_EQ(fixture.manager.Close(HAL_SPI_kMXP), SPIResult::kOk);
   EXPECT_EQ(fixture.manager.GetHandle(HAL_SPI_kMXP), 0);
 }
@@ -173,7 +176,7 @@ TEST(VMXSPIInternalTest, AutoSPIIsExplicitlyUnsupported) {
   EXPECT_EQ(fixture.manager.AutoUnsupported(HAL_SPI_kMXP),
             SPIResult::kAutoUnsupported);
   EXPECT_EQ(fixture.manager.AutoUnsupported(HAL_SPI_kOnboardCS0),
-            SPIResult::kUnsupportedPort);
+            SPIResult::kAutoUnsupported);
 }
 
 TEST(VMXSPIInternalTest, CommDIOReservationsPreventPhysicalConflicts) {
