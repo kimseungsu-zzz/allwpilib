@@ -27,6 +27,8 @@ namespace studica_driver
 
             bool Set(bool value);
             bool Get(bool& value);
+            bool Pulse(uint32_t microseconds);
+            bool IsPulsing(bool& is_pulsing);
             bool Get();
             void Toggle();
 

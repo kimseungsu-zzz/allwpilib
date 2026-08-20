@@ -47,6 +47,7 @@ class PWMBackend {
   virtual ~PWMBackend() = default;
   virtual bool SetPulseTimeMicroseconds(int32_t requested,
                                         int32_t& applied) noexcept = 0;
+  virtual bool GetPulseTimeMicroseconds(int32_t& pulse) noexcept = 0;
   virtual bool Disable() noexcept = 0;
 };
 
@@ -178,15 +179,17 @@ class PWMPort final {
     return PWMResult::kOk;
   }
 
-  std::pair<PWMResult, int32_t> GetPulseTimeMicroseconds() const noexcept {
+  std::pair<PWMResult, int32_t> GetPulseTimeMicroseconds() noexcept {
     std::scoped_lock lock{m_mutex};
-    return m_backend ? std::pair{PWMResult::kOk, m_currentPulseMicroseconds}
-                     : std::pair{PWMResult::kHardwareFailure, 0};
+    if (!ReadPulseTimeMicrosecondsLocked()) {
+      return {PWMResult::kHardwareFailure, 0};
+    }
+    return {PWMResult::kOk, m_currentPulseMicroseconds};
   }
 
-  std::pair<PWMResult, double> GetSpeed() const noexcept {
+  std::pair<PWMResult, double> GetSpeed() noexcept {
     std::scoped_lock lock{m_mutex};
-    if (!m_backend) {
+    if (!ReadPulseTimeMicrosecondsLocked()) {
       return {PWMResult::kHardwareFailure, 0.0};
     }
     int32_t value = m_currentPulseMicroseconds;
@@ -218,9 +221,9 @@ class PWMPort final {
     return {PWMResult::kOk, 0.0};
   }
 
-  std::pair<PWMResult, double> GetPosition() const noexcept {
+  std::pair<PWMResult, double> GetPosition() noexcept {
     std::scoped_lock lock{m_mutex};
-    if (!m_backend) {
+    if (!ReadPulseTimeMicrosecondsLocked()) {
       return {PWMResult::kHardwareFailure, 0.0};
     }
     int32_t value = m_currentPulseMicroseconds;
@@ -254,6 +257,19 @@ class PWMPort final {
   }
 
  private:
+  bool ReadPulseTimeMicrosecondsLocked() noexcept {
+    if (!m_backend) {
+      return false;
+    }
+    int32_t pulse = 0;
+    if (!m_backend->GetPulseTimeMicroseconds(pulse)) {
+      return false;
+    }
+    m_currentPulseMicroseconds = pulse;
+    m_disabled = pulse == kPWMDisabledPulse;
+    return true;
+  }
+
   PWMResult SetPulseTimeMicrosecondsLocked(int32_t value) noexcept {
     if (!m_backend) {
       return PWMResult::kHardwareFailure;

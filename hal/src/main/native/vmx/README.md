@@ -74,7 +74,8 @@ Current DIO feature status:
 
 - DIO core: supported
 - Digital PWM over DIO: not yet implemented (explicit incompatible-state error)
-- Pulse generation: not yet implemented (explicit incompatible-state error)
+- Timed high pulse generation and hardware pulse-state readback: supported
+- Multi-channel pulse requests: supported for allocated VMX DIO outputs
 - Digital glitch filters: not yet implemented (explicit incompatible-state error)
 
 ## PWM support
@@ -89,8 +90,9 @@ PWM state and scaling use WPILib microsecond semantics. The default bounds are
 2000/1501/1500/1499/1000 us, custom bounds and eliminate-deadband state are
 preserved, and speed and position calculations follow the upstream positive,
 negative, and full-range formulas. Non-finite speed requests become zero speed
-(the center pulse). Getter state is the last successfully applied, quantized
-pulse rather than the last requested value.
+(the center pulse). Getter state is read back from the active VMX PWM generator
+duty-cycle register and converted to the applied, quantized pulse. Disabled
+resources report zero.
 
 The available VMX driver and public PWM example establish a 50 Hz generator
 with a configured maximum duty value of 5000. A 20,000 us period divided into

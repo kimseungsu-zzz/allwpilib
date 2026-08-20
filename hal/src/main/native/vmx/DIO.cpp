@@ -4,6 +4,8 @@
 
 #include "hal/DIO.h"
 
+#include <cmath>
+#include <limits>
 #include <memory>
 #include <string_view>
 
@@ -45,6 +47,23 @@ class DriverDIOBackend final : public DIOBackend {
       return m_driver && m_driver->Get(value);
     } catch (...) {
       value = false;
+      return false;
+    }
+  }
+
+  bool Pulse(uint32_t microseconds) noexcept override {
+    try {
+      return m_driver && m_driver->Pulse(microseconds);
+    } catch (...) {
+      return false;
+    }
+  }
+
+  bool IsPulsing(bool& isPulsing) noexcept override {
+    try {
+      return m_driver && m_driver->IsPulsing(isPulsing);
+    } catch (...) {
+      isPulsing = false;
       return false;
     }
   }
@@ -262,28 +281,85 @@ void HAL_SetDigitalPWMOutputChannel(HAL_DigitalPWMHandle pwmGenerator,
 
 void HAL_Pulse(HAL_DigitalHandle dioPortHandle, double pulseLengthSeconds,
                int32_t* status) {
-  static_cast<void>(pulseLengthSeconds);
-  if (hal::vmx::CheckHandleForUnsupported(dioPortHandle, status)) {
-    hal::vmx::SetUnsupported(status, "DIO pulse generation");
+  if (!std::isfinite(pulseLengthSeconds) || pulseLengthSeconds <= 0.0 ||
+      pulseLengthSeconds >
+          static_cast<double>(std::numeric_limits<uint32_t>::max()) / 1.0e6) {
+    *status = PARAMETER_OUT_OF_RANGE;
+    hal::SetLastError(status, "VMX DIO pulse length is out of range");
+    return;
+  }
+  auto microseconds =
+      static_cast<uint32_t>(std::llround(pulseLengthSeconds * 1.0e6));
+  if (microseconds == 0) {
+    *status = PARAMETER_OUT_OF_RANGE;
+    return;
+  }
+  auto result = hal::vmx::GetDIOManager().Pulse(dioPortHandle, microseconds);
+  if (result == hal::vmx::DIOResult::kOk) {
+    *status = HAL_SUCCESS;
+  } else if (result == hal::vmx::DIOResult::kInvalidHandle) {
+    *status = HAL_HANDLE_ERROR;
+  } else if (result == hal::vmx::DIOResult::kInputChannel) {
+    *status = PARAMETER_OUT_OF_RANGE;
+    hal::SetLastError(status, "Cannot pulse a VMX DIO input channel");
+  } else {
+    hal::vmx::SetHardwareError(status, "Failed to start VMX DIO pulse");
   }
 }
 
 void HAL_PulseMultiple(uint32_t channelMask, double pulseLengthSeconds,
                        int32_t* status) {
-  static_cast<void>(channelMask);
-  static_cast<void>(pulseLengthSeconds);
-  hal::vmx::SetUnsupported(status, "DIO pulse generation");
+  if ((channelMask >> hal::vmx::kNumDIOChannels) != 0 ||
+      !std::isfinite(pulseLengthSeconds) || pulseLengthSeconds <= 0.0 ||
+      pulseLengthSeconds >
+          static_cast<double>(std::numeric_limits<uint32_t>::max()) / 1.0e6) {
+    *status = PARAMETER_OUT_OF_RANGE;
+    return;
+  }
+  auto microseconds =
+      static_cast<uint32_t>(std::llround(pulseLengthSeconds * 1.0e6));
+  if (microseconds == 0) {
+    *status = PARAMETER_OUT_OF_RANGE;
+    return;
+  }
+  auto result =
+      hal::vmx::GetDIOManager().PulseMultiple(channelMask, microseconds);
+  if (result == hal::vmx::DIOResult::kOk) {
+    *status = HAL_SUCCESS;
+  } else if (result == hal::vmx::DIOResult::kInvalidHandle) {
+    *status = HAL_HANDLE_ERROR;
+  } else if (result == hal::vmx::DIOResult::kInputChannel) {
+    *status = PARAMETER_OUT_OF_RANGE;
+  } else {
+    hal::vmx::SetHardwareError(status,
+                               "Failed to start multiple VMX DIO pulses");
+  }
 }
 
 HAL_Bool HAL_IsPulsing(HAL_DigitalHandle dioPortHandle, int32_t* status) {
-  if (hal::vmx::CheckHandleForUnsupported(dioPortHandle, status)) {
-    hal::vmx::SetUnsupported(status, "DIO pulse generation");
+  auto [result, pulsing] =
+      hal::vmx::GetDIOManager().IsPulsing(dioPortHandle);
+  if (result == hal::vmx::DIOResult::kOk) {
+    *status = HAL_SUCCESS;
+    return pulsing;
+  }
+  if (result == hal::vmx::DIOResult::kInvalidHandle) {
+    *status = HAL_HANDLE_ERROR;
+  } else if (result == hal::vmx::DIOResult::kInputChannel) {
+    *status = PARAMETER_OUT_OF_RANGE;
+  } else {
+    hal::vmx::SetHardwareError(status, "Failed to read VMX DIO pulse state");
   }
   return false;
 }
 
 HAL_Bool HAL_IsAnyPulsing(int32_t* status) {
-  hal::vmx::SetUnsupported(status, "DIO pulse generation");
+  auto [result, pulsing] = hal::vmx::GetDIOManager().IsAnyPulsing();
+  if (result == hal::vmx::DIOResult::kOk) {
+    *status = HAL_SUCCESS;
+    return pulsing;
+  }
+  hal::vmx::SetHardwareError(status, "Failed to read VMX DIO pulse state");
   return false;
 }
 

@@ -198,6 +198,23 @@ bool DIO::Get(bool& value)
     return true;
 }
 
+bool DIO::Pulse(uint32_t microseconds)
+{
+    if (!initialized_ || mode_ != PinMode::OUTPUT || microseconds == 0)
+        return false;
+    VMXErrorCode vmxerr;
+    return vmx_->io.DIO_Pulse(dio_res_handle_, true, microseconds, &vmxerr);
+}
+
+bool DIO::IsPulsing(bool& is_pulsing)
+{
+    is_pulsing = false;
+    if (!initialized_ || mode_ != PinMode::OUTPUT)
+        return false;
+    VMXErrorCode vmxerr;
+    return vmx_->io.DIO_IsPulsing(dio_res_handle_, is_pulsing, &vmxerr);
+}
+
 bool DIO::Get()
 {
     bool value = false;

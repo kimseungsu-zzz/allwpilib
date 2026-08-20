@@ -27,6 +27,8 @@ struct FakePWMHardware {
   std::atomic_int failedCreatesRemaining{0};
   std::atomic_bool failWrite{false};
   std::atomic_bool failDisable{false};
+  std::atomic_bool failRead{false};
+  std::atomic_int pulseMicroseconds{0};
   std::atomic_bool quantizeToFourMicroseconds{false};
   std::shared_ptr<int> runtimeContext = std::make_shared<int>(42);
   std::vector<const int*> observedContexts;
@@ -49,12 +51,26 @@ class FakePWMBackend final : public PWMBackend {
     }
     applied = m_hardware->quantizeToFourMicroseconds ? ((requested + 2) / 4) * 4
                                                      : requested;
+    m_hardware->pulseMicroseconds = applied;
+    return true;
+  }
+
+  bool GetPulseTimeMicroseconds(int32_t& pulse) noexcept override {
+    if (m_hardware->failRead) {
+      pulse = 0;
+      return false;
+    }
+    pulse = m_hardware->pulseMicroseconds;
     return true;
   }
 
   bool Disable() noexcept override {
     ++m_hardware->disables;
-    return !m_hardware->failDisable;
+    if (m_hardware->failDisable) {
+      return false;
+    }
+    m_hardware->pulseMicroseconds = 0;
+    return true;
   }
 
  private:
@@ -91,6 +107,11 @@ class MinimalDIOBackend final : public DIOBackend {
   bool Set(bool) noexcept override { return true; }
   bool Get(bool& value) noexcept override {
     value = false;
+    return true;
+  }
+  bool Pulse(uint32_t) noexcept override { return true; }
+  bool IsPulsing(bool& pulsing) noexcept override {
+    pulsing = false;
     return true;
   }
 };
@@ -362,6 +383,24 @@ TEST(VMXPWMTest, EveryPWMBackendObservesOneSharedRuntimeContext) {
             fixture.hardware->runtimeContext.get());
   EXPECT_EQ(fixture.hardware->observedContexts[1],
             fixture.hardware->runtimeContext.get());
+}
+
+TEST(VMXPWMTest, GettersReadHardwareAndReportReadFailure) {
+  PWMFixture fixture;
+  auto allocation = fixture.manager.Allocate(17, "readback");
+  ASSERT_EQ(allocation.result, PWMResult::kOk);
+  ASSERT_EQ(fixture.manager.SetPulseTimeMicroseconds(allocation.handle, 1500),
+            PWMResult::kOk);
+  fixture.hardware->pulseMicroseconds = 1600;
+
+  EXPECT_EQ(fixture.manager.GetPulseTimeMicroseconds(allocation.handle).second,
+            1600);
+  EXPECT_GT(fixture.manager.GetSpeed(allocation.handle).second, 0.0);
+  EXPECT_DOUBLE_EQ(fixture.manager.GetPosition(allocation.handle).second, 0.6);
+
+  fixture.hardware->failRead = true;
+  EXPECT_EQ(fixture.manager.GetPulseTimeMicroseconds(allocation.handle).first,
+            PWMResult::kHardwareFailure);
 }
 
 }  // namespace

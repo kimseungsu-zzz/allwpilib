@@ -5,6 +5,7 @@
 #pragma once
 
 #include <functional>
+#include <array>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -33,6 +34,8 @@ class DIOBackend {
   virtual ~DIOBackend() = default;
   virtual bool Set(bool value) noexcept = 0;
   virtual bool Get(bool& value) noexcept = 0;
+  virtual bool Pulse(uint32_t microseconds) noexcept = 0;
+  virtual bool IsPulsing(bool& isPulsing) noexcept = 0;
 };
 
 using DIOBackendFactory =
@@ -73,6 +76,32 @@ class DIOPort final {
       return {DIOResult::kHardwareFailure, false};
     }
     return {DIOResult::kOk, value};
+  }
+
+  DIOResult Pulse(uint32_t microseconds) noexcept {
+    std::scoped_lock lock{m_mutex};
+    if (m_faulted || !m_backend) {
+      return DIOResult::kHardwareFailure;
+    }
+    if (m_input) {
+      return DIOResult::kInputChannel;
+    }
+    return m_backend->Pulse(microseconds) ? DIOResult::kOk
+                                          : DIOResult::kHardwareFailure;
+  }
+
+  std::pair<DIOResult, bool> IsPulsing() noexcept {
+    std::scoped_lock lock{m_mutex};
+    if (m_faulted || !m_backend) {
+      return {DIOResult::kHardwareFailure, false};
+    }
+    if (m_input) {
+      return {DIOResult::kInputChannel, false};
+    }
+    bool pulsing = false;
+    return m_backend->IsPulsing(pulsing)
+               ? std::pair{DIOResult::kOk, pulsing}
+               : std::pair{DIOResult::kHardwareFailure, false};
   }
 
   DIOResult SetDirection(bool input) noexcept {
@@ -197,6 +226,7 @@ class DIOManager final {
       m_registry.Release(channel, DigitalChannelOwner::kDIO);
       return {HAL_kInvalidHandle, DIOResult::kHardwareFailure, {}};
     }
+    m_ports[channel] = port;
     return {handle, DIOResult::kOk, {}};
   }
 
@@ -208,6 +238,7 @@ class DIOManager final {
     }
     int32_t channel = port->GetChannel();
     port->Close();
+    m_ports[channel].reset();
     m_handles.Free(handle, HAL_HandleEnum::DIO);
     m_registry.Release(channel, DigitalChannelOwner::kDIO);
   }
@@ -233,6 +264,69 @@ class DIOManager final {
                 : std::pair{DIOResult::kInvalidHandle, false};
   }
 
+  DIOResult Pulse(HAL_DigitalHandle handle, uint32_t microseconds) noexcept {
+    auto port = Get(handle);
+    return port ? port->Pulse(microseconds) : DIOResult::kInvalidHandle;
+  }
+
+  std::pair<DIOResult, bool> IsPulsing(
+      HAL_DigitalHandle handle) noexcept {
+    auto port = Get(handle);
+    return port ? port->IsPulsing()
+                : std::pair{DIOResult::kInvalidHandle, false};
+  }
+
+  DIOResult PulseMultiple(uint32_t channelMask,
+                          uint32_t microseconds) noexcept {
+    std::array<std::shared_ptr<DIOPort>, kNumDIOChannels> ports;
+    {
+      std::scoped_lock allocationLock{m_allocationMutex};
+      for (int32_t channel = 0; channel < kNumDIOChannels; ++channel) {
+        if ((channelMask & (uint32_t{1} << channel)) != 0) {
+          ports[channel] = m_ports[channel].lock();
+          if (!ports[channel]) {
+            return DIOResult::kInvalidHandle;
+          }
+        }
+      }
+    }
+    for (auto& port : ports) {
+      if (port) {
+        auto result = port->Pulse(microseconds);
+        if (result != DIOResult::kOk) {
+          return result;
+        }
+      }
+    }
+    return DIOResult::kOk;
+  }
+
+  std::pair<DIOResult, bool> IsAnyPulsing() noexcept {
+    std::array<std::shared_ptr<DIOPort>, kNumDIOChannels> ports;
+    {
+      std::scoped_lock allocationLock{m_allocationMutex};
+      for (int32_t channel = 0; channel < kNumDIOChannels; ++channel) {
+        ports[channel] = m_ports[channel].lock();
+      }
+    }
+    for (auto& port : ports) {
+      if (!port) {
+        continue;
+      }
+      auto [result, pulsing] = port->IsPulsing();
+      if (result == DIOResult::kInputChannel) {
+        continue;
+      }
+      if (result != DIOResult::kOk) {
+        return {result, false};
+      }
+      if (pulsing) {
+        return {DIOResult::kOk, true};
+      }
+    }
+    return {DIOResult::kOk, false};
+  }
+
  private:
   std::shared_ptr<DIOPort> Get(HAL_DigitalHandle handle) noexcept {
     return m_handles.Get(handle, HAL_HandleEnum::DIO);
@@ -244,6 +338,7 @@ class DIOManager final {
   // cannot activate a channel while the previous VMX resource is closing.
   std::mutex m_allocationMutex;
   DIOHandleResource m_handles;
+  std::array<std::weak_ptr<DIOPort>, kNumDIOChannels> m_ports;
 };
 
 }  // namespace hal::vmx

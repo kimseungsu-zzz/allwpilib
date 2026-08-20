@@ -41,6 +41,15 @@ class DriverPWMBackend final : public PWMBackend {
     }
   }
 
+  bool GetPulseTimeMicroseconds(int32_t& pulse) noexcept override {
+    try {
+      return m_driver && m_driver->GetPulseTimeMicroseconds(pulse);
+    } catch (...) {
+      pulse = 0;
+      return false;
+    }
+  }
+
   bool Disable() noexcept override {
     try {
       return m_driver && m_driver->Disable();

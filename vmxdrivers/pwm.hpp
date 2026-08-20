@@ -18,6 +18,7 @@ class PWM {
   bool IsInitialized() const { return initialized_; }
   bool SetPulseTimeMicroseconds(int32_t microseconds);
   bool Disable();
+  bool GetPulseTimeMicroseconds(int32_t& microseconds);
   bool GetLastPulseTimeMicroseconds(int32_t& microseconds) const;
 
   void SetBounds(double min, double center, double max);

@@ -24,6 +24,9 @@ struct FakeDIOHardware {
   std::atomic_int failedCreatesRemaining{0};
   std::atomic_bool failSet{false};
   std::atomic_bool failGet{false};
+  std::atomic_bool failPulse{false};
+  std::atomic_bool pulsing{false};
+  std::atomic_uint32_t lastPulseMicroseconds{0};
 };
 
 class FakeDIOBackend final : public DIOBackend {
@@ -49,6 +52,24 @@ class FakeDIOBackend final : public DIOBackend {
     }
     std::scoped_lock lock{m_hardware->mutex};
     value = m_hardware->values[m_channel];
+    return true;
+  }
+
+  bool Pulse(uint32_t microseconds) noexcept override {
+    if (m_hardware->failPulse) {
+      return false;
+    }
+    m_hardware->lastPulseMicroseconds = microseconds;
+    m_hardware->pulsing = true;
+    return true;
+  }
+
+  bool IsPulsing(bool& isPulsing) noexcept override {
+    if (m_hardware->failPulse) {
+      isPulsing = false;
+      return false;
+    }
+    isPulsing = m_hardware->pulsing;
     return true;
   }
 
@@ -231,6 +252,36 @@ TEST(VMXDIOTest, ConcurrentOperationsAndFreeKeepDriverLifetimeSafe) {
   }
 
   EXPECT_EQ(fixture.manager.GetValue(allocation.handle).first,
+            DIOResult::kInvalidHandle);
+}
+
+TEST(VMXDIOTest, PulseAndPulseReadbackUseOutputHardware) {
+  DIOFixture fixture;
+  auto output = fixture.manager.Allocate(13, false, "pulse output");
+  auto input = fixture.manager.Allocate(14, true, "pulse input");
+  ASSERT_EQ(output.result, DIOResult::kOk);
+  ASSERT_EQ(input.result, DIOResult::kOk);
+
+  EXPECT_EQ(fixture.manager.Pulse(output.handle, 2500), DIOResult::kOk);
+  EXPECT_EQ(fixture.hardware->lastPulseMicroseconds, 2500u);
+  EXPECT_TRUE(fixture.manager.IsPulsing(output.handle).second);
+  EXPECT_TRUE(fixture.manager.IsAnyPulsing().second);
+  EXPECT_EQ(fixture.manager.Pulse(input.handle, 10), DIOResult::kInputChannel);
+
+  fixture.hardware->pulsing = false;
+  EXPECT_FALSE(fixture.manager.IsAnyPulsing().second);
+}
+
+TEST(VMXDIOTest, PulseMultipleValidatesEveryAllocatedOutput) {
+  DIOFixture fixture;
+  auto first = fixture.manager.Allocate(15, false, "pulse one");
+  auto second = fixture.manager.Allocate(16, false, "pulse two");
+  ASSERT_EQ(first.result, DIOResult::kOk);
+  ASSERT_EQ(second.result, DIOResult::kOk);
+  EXPECT_EQ(fixture.manager.PulseMultiple((1u << 15) | (1u << 16), 800),
+            DIOResult::kOk);
+  EXPECT_EQ(fixture.hardware->lastPulseMicroseconds, 800u);
+  EXPECT_EQ(fixture.manager.PulseMultiple(1u << 17, 800),
             DIOResult::kInvalidHandle);
 }
 

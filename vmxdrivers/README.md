@@ -29,7 +29,8 @@ archive itself does not embed those libraries.
 from the pin value. This lets hardware adapters distinguish a valid low input
 from an SDK read failure without introducing any WPILib status types into this
 standalone component. DIO inputs use the VMX SDK pull-up mode; outputs use
-push-pull mode.
+push-pull mode. Output pulse generation and pulse-state queries use the VMX
+hardware `DIO_Pulse()` and `DIO_IsPulsing()` operations.
 
 The generic `PWM` driver exposes pulse widths rather than servo angle or speed:
 
@@ -37,6 +38,8 @@ The generic `PWM` driver exposes pulse widths rather than servo angle or speed:
 - `Disable()` deallocates the generator resource and a later set reactivates it.
 - `GetLastPulseTimeMicroseconds()` returns the last successfully applied,
   quantized pulse.
+- `GetPulseTimeMicroseconds()` reads the current hardware duty cycle and
+  converts it back to the applied pulse width.
 
 The driver retains the established 50 Hz, 5000-step VMX configuration. This is
 a 20,000 us period with 4 us duty resolution; requested microseconds are

@@ -108,6 +108,28 @@ bool PWM::GetLastPulseTimeMicroseconds(int32_t& microseconds) const {
   return true;
 }
 
+bool PWM::GetPulseTimeMicroseconds(int32_t& microseconds) {
+  if (!initialized_) {
+    if (has_last_pulse_ && last_pulse_microseconds_ == 0) {
+      microseconds = 0;
+      return true;
+    }
+    return false;
+  }
+
+  uint16_t duty = 0;
+  VMXErrorCode vmxerr;
+  if (!vmx_->io.PWMGenerator_GetDutyCycle(pwm_res_handle_, port_, &duty,
+                                           &vmxerr)) {
+    return false;
+  }
+  microseconds = static_cast<int32_t>(std::lround(
+      static_cast<double>(duty) * kPeriodMicroseconds / kMaxDutyCycleValue));
+  last_pulse_microseconds_ = microseconds;
+  has_last_pulse_ = true;
+  return true;
+}
+
 void PWM::SetBounds(double min, double center, double max) {
   min_us_ = static_cast<int>((min / 20) * 5000);
   center_us_ = static_cast<int>((center / 20) * 5000);
