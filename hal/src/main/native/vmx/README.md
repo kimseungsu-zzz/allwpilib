@@ -35,6 +35,13 @@ future mostrobotpy integration must package/select this same native HAL through
 `robotpy-native-wpihal`. Python bindings and deployment remain in the
 mostrobotpy repository rather than allwpilib.
 
+## Sensor compatibility matrix
+
+The current WPILib sensor compatibility boundary, including the distinction
+between supported HAL paths, incomplete primitives, and separate Studica
+vendor APIs, is maintained in
+[VMX_SENSOR_COMPATIBILITY.md](VMX_SENSOR_COMPATIBILITY.md).
+
 ## Runtime lifecycle
 
 `HAL_Initialize()` creates one process-local `VMXPi(true, 50)` context and
