@@ -75,7 +75,8 @@ class VMXAutoTriggerWaiter final : public SPIAutoTriggerWaiter {
  public:
   VMXAutoTriggerWaiter(int32_t channel, bool rising, bool falling)
       : m_state{std::make_shared<InterruptCallbackState>(
-            InterruptRisingMask(0), InterruptFallingMask(0))} {
+            InterruptRisingMask(channel), InterruptFallingMask(channel))},
+        m_channel{channel} {
     if (!m_state || (!rising && !falling)) {
       return;
     }
@@ -96,8 +97,8 @@ class VMXAutoTriggerWaiter final : public SPIAutoTriggerWaiter {
     }
     if (m_backend) {
       m_state->SetActive(true);
-      m_eligibleMask = (rising ? InterruptRisingMask(0) : 0) |
-                       (falling ? InterruptFallingMask(0) : 0);
+      m_eligibleMask = (rising ? InterruptRisingMask(m_channel) : 0) |
+                       (falling ? InterruptFallingMask(m_channel) : 0);
       m_valid.store(true, std::memory_order_release);
     }
   }
@@ -134,6 +135,7 @@ class VMXAutoTriggerWaiter final : public SPIAutoTriggerWaiter {
  private:
   std::shared_ptr<InterruptCallbackState> m_state;
   std::unique_ptr<InterruptBackend> m_backend;
+  int32_t m_channel = 0;
   uint64_t m_eligibleMask = 0;
   std::atomic_bool m_stopped = false;
   std::atomic_bool m_valid = false;
