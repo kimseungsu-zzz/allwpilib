@@ -113,6 +113,35 @@ The runtime guarantees lifecycle safety only; each future DIO/PWM/I2C/etc.
 adapter must provide any synchronization required by its VMX resource and SDK
 calls.
 
+## Driver Station support
+
+The VMX Driver Station adapter follows the historical KauaiLabs VMX-pi
+implementation and its wire constants rather than inventing a packet format.
+The reference sources are the [KauaiLabs DriverStation adapter](https://github.com/kauailabs/allwpilib/blob/master/hal/src/main/native/mau/DriverStation.cpp),
+[DriverComms protocol](https://github.com/kauailabs/allwpilib/blob/master/hal/src/main/native/mau/DriveStation/DriverComms.cpp),
+and [VMX UART/CommDIO example](https://gist.github.com/kauailabs/263e71e0dcc2d0e1dea22d8c98492ef3).
+The VMX-owned adapter is split into `VMXDriverStationTransport`, raw packet
+parsers, `VMXDriverStationState`, and the existing `hal/DriverStation.h` C ABI.
+
+The transport listens for KauaiLabs UDP v1 packets on robot port 1110 and TCP
+metadata on port 1740. A single receiver thread validates packet bounds before
+committing snapshots. Control word, alliance/FMS/DS attachment,
+joystick axes/buttons/POVs and descriptors, match time/info, game data,
+`HAL_RefreshDSData()` generation semantics, new-data events, and reconnect/
+timeout handling are implemented. No packet or fresh heartbeat forces a
+disabled, detached, zero-input failsafe; shutdown uses the same path.
+`HAL_ObserveUserProgram*()` and joystick rumble/output use the active DS UDP
+peer when present. Error and console calls always remain visible on the local
+VMX console; full KauaiLabs TCP forwarding is not claimed until a physical DS
+smoke test confirms the encoder and lifecycle.
+
+Current Driver Station status is `PARTIAL`: transport-independent parser/state
+tests and AArch64 source compilation pass, while physical VMX-Pi/VMX2 DS
+connection, enable/disable, joystick, rumble, match metadata, and reconnect
+smoke testing remain deployment checks. The host test seam injects validated
+UDP/TCP snapshots without opening sockets, so normal CI never requires a VMX
+network or SDK.
+
 ## Timing and Notifier support
 
 VMX HAL time uses the VMX SDK's monotonic hardware clock,

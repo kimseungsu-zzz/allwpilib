@@ -276,7 +276,7 @@ void HAL_InitializeSPI(HAL_SPIPort port, int32_t* status) {
   hal::init::CheckInit();
   hal::vmx::SetSPIResult(
       hal::vmx::GetSPIManager().Initialize(port), status,
-      "VMX SPI onboard CS0-3 and MXP ports alias physical channels 30/31/32/33",
+      "VMX SPI onboard CS0-3 and MXP ports alias physical channels 28/29/30/31",
       static_cast<int32_t>(port));
 }
 

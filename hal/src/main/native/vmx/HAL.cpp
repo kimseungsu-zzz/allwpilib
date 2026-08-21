@@ -9,6 +9,7 @@
 #include <mutex>
 
 #include "HALInitializer.h"
+#include "DriverStationInternal.h"
 #include "NotifierInternal.h"
 #include "SPIAutoInternal.h"
 #include "VMXRuntime.h"
@@ -50,6 +51,7 @@ HAL_Bool HAL_Initialize(int32_t timeout, int32_t mode) {
       return false;
     }
     hal::init::HAL_IsInitialized.store(true, std::memory_order_release);
+    hal::vmx::InitializeDriverStation();
     return true;
   } catch (...) {
     // No C++ exception may cross the public C HAL ABI used by JNI/RobotPy.
@@ -61,6 +63,7 @@ HAL_Bool HAL_Initialize(int32_t timeout, int32_t mode) {
 void HAL_Shutdown(void) {
   std::scoped_lock lock{gHalLifecycleMutex};
   hal::init::HAL_IsInitialized.store(false, std::memory_order_release);
+  hal::vmx::ShutdownDriverStation();
   hal::vmx::ShutdownSPIAuto();
   hal::vmx::ShutdownNotifiers();
   hal::vmx::ShutdownRuntime();

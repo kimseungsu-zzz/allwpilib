@@ -68,6 +68,16 @@ current SDK has no equivalent APIs; VMX overcurrent is never treated as
 brownout. System-time validity uses the Linux wall clock and remains separate
 from VMX monotonic FPGA time and RTC synchronization.
 
+The VMX Driver Station core follows the historical KauaiLabs VMX-pi UDP v1
+and TCP metadata protocol through a VMX-owned transport/state adapter. It
+provides validated control-word and joystick snapshots, mode/alliance/FMS
+state, match metadata, new-data events, refresh sequence semantics, observe
+program heartbeats, and rumble/output peer handling, with a disabled/detached
+failsafe when packets time out or are malformed. Host parser/state tests are
+transport-injectable; physical DS enable/disable, joystick, reconnect, and
+match smoke tests remain `PARTIAL`, and error/console calls are guaranteed
+locally rather than claiming unverified TCP forwarding.
+
 # Quick Start
 
 Below is a list of instructions that guide you through cloning, building, publishing and using local allwpilib binaries in a robot project. This quick start is not intended as a replacement for the information further listed in this document.

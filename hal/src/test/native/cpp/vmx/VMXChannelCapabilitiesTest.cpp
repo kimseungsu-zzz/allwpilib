@@ -8,6 +8,7 @@
 
 #include "../../../../main/native/vmx/VMXChannelCapabilities.h"
 #include "../../../../main/native/vmx/VMXConstants.h"
+#include "../../../../main/native/vmx/DigitalChannelRegistry.h"
 
 namespace hal::vmx {
 
@@ -59,6 +60,30 @@ TEST(VMXChannelMappingTest, CommunicationBusesHaveDisjointPhysicalResources) {
   std::sort(channels.begin(), channels.end());
   EXPECT_EQ(channels, (std::array<int32_t, 8>{{26, 27, 28, 29, 30, 31, 32,
                                                33}}));
+}
+
+TEST(VMXChannelMappingTest, UartSpiAndI2CCanCoexistOnDistinctCommDioPins) {
+  DigitalChannelRegistry registry;
+  const auto map = kDefaultVMXCommDIOChannelMap;
+  EXPECT_TRUE(
+      registry.Reserve(map.uartTX, DigitalChannelOwner::kUART, "UART TX")
+          .reserved);
+  EXPECT_TRUE(
+      registry.Reserve(map.uartRX, DigitalChannelOwner::kUART, "UART RX")
+          .reserved);
+  for (int32_t channel : {map.spiCLK, map.spiMOSI, map.spiMISO, map.spiCS}) {
+    EXPECT_TRUE(
+        registry.Reserve(channel, DigitalChannelOwner::kSPI, "SPI")
+            .reserved);
+  }
+  EXPECT_TRUE(
+      registry.Reserve(map.i2cSDA, DigitalChannelOwner::kI2C, "I2C SDA")
+          .reserved);
+  EXPECT_TRUE(
+      registry.Reserve(map.i2cSCL, DigitalChannelOwner::kI2C, "I2C SCL")
+          .reserved);
+  EXPECT_FALSE(
+      registry.Reserve(map.spiCS, DigitalChannelOwner::kDIO, "overlap").reserved);
 }
 
 TEST(VMXChannelCapabilityTest, MockSdkCapabilitiesModelJumperAndCommDio) {

@@ -70,6 +70,7 @@ are available but still awaiting sensor verification are `NOT_TESTED`.
 | Interrupt | `PARTIAL` | DIO interrupt sources and VMX timestamps are available; AnalogTrigger sources remain blocked. |
 | AnalogTrigger | `PARTIAL` | AnalogInput-backed raw/voltage trigger state and window semantics are available; filtered mode, pulse outputs, and DutyCycle sources are blocked. |
 | Timing / Notifier | `SUPPORTED` | VMX monotonic time and one global VMX timer-notification scheduler. |
+| DriverStation | `PARTIAL` | KauaiLabs VMX-pi UDP v1 control/joystick transport on 1110 plus TCP metadata on 1740, snapshot state, timeout failsafe, refresh generation, events, modes, match info, and output peer. Local error/console output is supported; full physical DS smoke and outbound TCP message validation remain. |
 | RobotController power/status | `PARTIAL` | VMX system voltage, Linux thermal sysfs, runtime readiness, and wall-clock validity | Vin voltage is hardware-backed and CPU temperature uses a discovered CPU-like thermal zone. Current, user rails, fault reset, brownout/undervoltage, FPGA button, RSL, and Driver Station disable count are explicit `INCOMPATIBLE_STATE` results because the SDK has no equivalent APIs; VMX overcurrent is not brownout. RTC synchronization remains a separate runtime service. |
 | I2C | `SUPPORTED` | One VMX physical bus at 32/33, shared and reference-counted by the kOnboard/kMXP aliases. |
 | DutyCycle | `SUPPORTED` | FlexDIO 0-11 VMX PWMCapture adapter with shared timer-group ownership and DIO handoff. |
@@ -106,7 +107,12 @@ separate vendor wrapper module.
    the ADXRS450_Gyro standard-SPI plus AutoSPI accumulator integration path.
    ADIS16448_IMU and ADIS16470_IMU remain blocked until precise AutoStall and
    their additional DIO routing requirements are resolved.
-4. Close the Counter single-source/semiperiod gap before validating
+4. Run a real VMX-Pi/VMX2 Driver Station smoke test: UDP control-word modes,
+   timeout/reconnect, all six joystick slots, TCP descriptors/match/game data,
+   new-data events, observe-program heartbeats, and rumble/output. Keep the
+   local-console-only error/console boundary explicit until outbound TCP
+   encoding is validated.
+5. Close the Counter single-source/semiperiod gap before validating
    Tachometer and Ultrasonic.
-5. Verify VMX IMU mappings separately before deciding whether any
+6. Verify VMX IMU mappings separately before deciding whether any
    BuiltInAccelerometer compatibility claim is justified.

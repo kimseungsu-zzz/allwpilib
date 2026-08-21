@@ -287,8 +287,8 @@ TEST(VMXI2CTest, MultipleDeviceAddressesShareOneBus) {
 TEST(VMXI2CTest, CommDioPhysicalReservationConflictsWithI2C) {
   auto hardware = std::make_shared<FakeI2CHardware>();
   DigitalChannelRegistry registry;
-  ASSERT_TRUE(registry.Reserve(26, DigitalChannelOwner::kDIO,
-                                "logical CommDIO 22")
+  ASSERT_TRUE(registry.Reserve(32, DigitalChannelOwner::kDIO,
+                                "logical CommDIO 28")
                   .reserved);
   I2CManager manager{
       [hardware] {

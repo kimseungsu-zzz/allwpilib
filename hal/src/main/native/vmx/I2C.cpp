@@ -199,7 +199,7 @@ void HAL_InitializeI2C(HAL_I2CPort port, int32_t* status) {
   hal::init::CheckInit();
   hal::vmx::SetI2CResult(
       hal::vmx::GetI2CManager().Initialize(port), status,
-      "VMX I2C onboard and MXP ports alias physical channels 26/27",
+      "VMX I2C onboard and MXP ports alias physical channels 32/33",
       static_cast<int32_t>(port));
 }
 
