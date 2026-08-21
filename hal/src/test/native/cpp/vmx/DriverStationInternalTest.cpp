@@ -105,6 +105,16 @@ TEST(VMXDriverStationStateTest, FailsSafeUntilFreshDataAndOnTimeout) {
   EXPECT_FALSE(state.GetControlWord(&word) == HAL_SUCCESS && word.enabled);
   EXPECT_FALSE(word.dsAttached);
   EXPECT_GE(wakeups, 2);
+
+  packet.wireSequence = 0;
+  packet.controlWord.enabled = true;
+  packet.controlWord.dsAttached = true;
+  now += 1;
+  state.CommitUdp(packet, now);
+  EXPECT_EQ(state.GetControlWord(&word), HAL_SUCCESS);
+  EXPECT_TRUE(word.enabled);
+  EXPECT_TRUE(word.dsAttached);
+  EXPECT_TRUE(state.Refresh());
 }
 
 TEST(VMXDriverStationStateTest, JoystickDescriptorMatchAndOutputSemantics) {
