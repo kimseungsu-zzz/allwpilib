@@ -8,7 +8,7 @@
 
 namespace hal::init {
 extern std::atomic_bool HAL_IsInitialized;
-void RunInitialize();
+extern void RunInitialize();
 
 inline void CheckInit() {
   if (!HAL_IsInitialized.load(std::memory_order_acquire)) {

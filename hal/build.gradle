@@ -53,12 +53,16 @@ ext {
             it.sources {
                 vmxCpp(CppSourceSet) {
                     source {
-                        srcDirs 'src/main/native/vmx'
+                        srcDirs = [
+                            'src/main/native/vmx',
+                            'src/main/native/shared'
+                        ]
                         include '**/*.cpp'
                     }
                     exportedHeaders {
                         srcDir 'src/main/native/include'
                         srcDir generatedHeaders
+                        srcDir 'src/main/native/shared'
                         srcDir project(':vmxdrivers').projectDir
                         project(':vmxdrivers').vmxSdkIncludeDirs.each { srcDir it }
                     }
@@ -93,6 +97,10 @@ sourceSets.main.java.srcDir "${projectDir}/src/generated/main/java"
 cppSourcesZip {
     from('src/main/native/athena') {
         into '/athena'
+    }
+
+    from('src/main/native/shared') {
+        into '/shared'
     }
 
     from('src/main/native/sim') {
@@ -153,4 +161,18 @@ tasks.register('printHalBackendSelection') {
             println "VMX build directory: ${layout.buildDirectory.get().asFile}"
         }
     }
+}
+
+def halCoveragePython = System.getProperty('os.name').toLowerCase().contains('windows')
+        ? 'python'
+        : 'python3'
+tasks.register('checkHalCoverage', Exec) {
+    group = 'verification'
+    description = 'Checks that every public HAL declaration has VMX coverage status.'
+    workingDir rootDir
+    commandLine halCoveragePython, file('tools/verify_hal_coverage.py').absolutePath
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('checkHalCoverage')
 }

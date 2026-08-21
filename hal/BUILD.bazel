@@ -15,7 +15,21 @@ filegroup(
     visibility = ["//hal:__subpackages__"],
 )
 
-ATHENA_SRCS = glob(["src/main/native/athena/**"])
+ATHENA_SRCS = glob(
+    ["src/main/native/athena/**"],
+    exclude = [
+        "src/main/native/athena/CTREPCM.cpp",
+        "src/main/native/athena/CTREPDP.cpp",
+        "src/main/native/athena/PowerDistribution.cpp",
+        "src/main/native/athena/REVPDH.cpp",
+        "src/main/native/athena/REVPH.cpp",
+    ],
+)
+
+# CAN-backed power and pneumatics implementations are shared by the athena
+# and VMX flavors. The athena wrappers remain for source compatibility, while
+# the canonical implementation is compiled once from this directory.
+SHARED_SRCS = glob(["src/main/native/shared/**"])
 
 ATHENA_DEPS = ["@bzlmodrio-ni//libraries/cpp/ni:shared"]
 
@@ -31,7 +45,7 @@ HAL_DEPS = select({
 filegroup(
     name = "platform-srcs",
     srcs = select({
-        "@rules_bzlmodrio_toolchains//constraints/is_roborio:roborio": ATHENA_SRCS,
+        "@rules_bzlmodrio_toolchains//constraints/is_roborio:roborio": ATHENA_SRCS + SHARED_SRCS,
         "//conditions:default": SIM_SRCS,
     }),
 )

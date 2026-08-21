@@ -108,8 +108,7 @@ public final class Colore extends JNIWrapper implements AutoCloseable {
     return setReference(name, x, y, 0.05f);
   }
 
-  public synchronized boolean setReference(String name, float x, float y,
-                                            float threshold) {
+  public synchronized boolean setReference(String name, float x, float y, float threshold) {
     if (name == null || name.isEmpty()) {
       lastStatus = -22;
       return false;
@@ -170,8 +169,8 @@ public final class Colore extends JNIWrapper implements AutoCloseable {
 
   private static native int learnColor(long handle, String name, float threshold);
 
-  private static native int setReference(long handle, String name, float x,
-                                         float y, float threshold);
+  private static native int setReference(
+      long handle, String name, float x, float y, float threshold);
 
   private static native String matchLabel(long handle);
 

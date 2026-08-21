@@ -50,8 +50,8 @@ primitive is available, and the HAL-owned AutoSPI engine supports periodic
 rate transfers plus DIO rising, falling, and both-edge triggers. AnalogTrigger
 sources and exact FPGA AutoSPI stall timing remain explicitly unsupported;
 sensor-level status is still separate from the matrix's HAL/API status.
-ADXRS450 now has its required standard-SPI plus AutoSPI HAL path, with sensor
-integration testing pending. VMX-Pi and VMX2 deployment targets are Linux
+ADXRS450 now has its required standard-SPI plus AutoSPI HAL path, and its
+class-level host contract is software-validated. VMX-Pi and VMX2 deployment targets are Linux
 AArch64 only. The currently available VMXPi SDK shared library is ELF32 ARM
 EABI5 and is classified as a legacy/incompatible artifact; Gradle rejects it
 before compilation/linking. ARM32/armhf targets, helper bridges, and forced
@@ -101,13 +101,29 @@ The VMX CAN core now covers the raw CAN C ABI and CANAPI on one global VMX CAN
 bus. It sets the bus to FRC-compatible 1 Mbps normal mode once at runtime
 startup, maps one-shot/periodic/cancel sends, standard/extended/RTR IDs,
 hardware timestamps/status, software-owned stream sessions, logical CANAPI
-handles, and New/Latest/Timeout receive generations. CTRE PCM, REV Pneumatics
-Hub, PDP, and PDH dependencies have been audited but remain physical-device
-integration work rather than premature support claims. The hardware watchdog
-is SDK-backed with FlexDIO and HighCurrentDIO managed, CommDIO left unmanaged,
-and feeding gated by fresh Driver Station data, a recent user-program
-heartbeat, runtime health, and eStop state; timeout, eStop, runtime failure,
-and shutdown expire it immediately.
+handles, and New/Latest/Timeout receive generations. The canonical WPILib
+CTRE PCM, REV Pneumatics Hub, PDP, and PDH implementations now compile from a
+shared source layer for both roboRIO and VMX, with no copied frame encoders or
+decoders. Raw VMX CAN frame fixtures and real Java
+`PneumaticsControlModule`/`PneumaticHub`/`Compressor`/`Solenoid`/
+`DoubleSolenoid`/`PowerDistribution` class harnesses pass with
+`softwareValidated=true`; `hardwareValidated=false` remains explicit until a
+physical VMX-Pi/VMX2 run. The hardware watchdog is SDK-backed with FlexDIO and
+HighCurrentDIO managed, CommDIO left unmanaged, and feeding gated by fresh
+Driver Station data, a recent user-program heartbeat, runtime health, and
+eStop state; timeout, eStop, runtime failure, and shutdown expire it
+immediately.
+
+The same class-level closure now covers VMX `DigitalInput`/limit-switch and
+beam-break patterns, `DigitalOutput`, `PWMVictorSPX`, and `Servo` through the
+standard DIO/PWM HAL. The mechanical public HAL audit is recorded in
+[VMX_HAL_COVERAGE.md](hal/src/main/native/vmx/VMX_HAL_COVERAGE.md): it covers 38
+headers and 502 declarations with status counts emitted by
+`./gradlew :hal:checkHalCoverage`, and fails when a newly added public symbol
+is unclassified. The next feasible gaps are general DigitalPWM, hardware
+AnalogTrigger coexistence, Counter pulse-length mode, USB `kUSB1`/`kUSB2`, and
+DIO glitch filtering; FPGA-only DMA/relay/radio-LED/main surfaces remain
+deliberate unsupported/not-applicable boundaries.
 
 The VMX onboard AHRS is now available through the separate
 `studica::VMXIMU` vendor layer and a versioned `StudicaVMXIMU_*` C ABI. Java

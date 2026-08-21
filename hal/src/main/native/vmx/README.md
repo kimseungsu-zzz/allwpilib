@@ -521,11 +521,30 @@ age, and Timeout returns it only while its VMX timestamp is within the caller's
 limit. Repeating writes and stop-repeating are tracked for cleanup at
 `HAL_CleanCAN()` and HAL shutdown.
 
-The CAN and CANAPI HAL paths are `SUPPORTED` at the adapter/API level. CTRE
-PCM, REV Pneumatics Hub, PDP, and PDH code paths have been dependency-audited
-against CANAPI, but physical device construction, frame decoding, and hardware
-smoke tests remain pending; they are not promoted to supported sensor/device
-rows by CAN compilation alone.
+The CAN and CANAPI HAL paths are `SUPPORTED` at the adapter/API level. The
+canonical WPILib CTRE PCM, REV Pneumatics Hub, PDP, and PDH implementations
+are compiled from `hal/src/main/native/shared` for both the roboRIO and VMX
+flavors; the VMX flavor supplies the same HAL CANAPI contract and does not
+duplicate frame encoding/decoding. `HAL_Initialize()` starts their shared
+CANAPI discovery after the VMX CAN runtime is ready.
+
+Host validation now has two layers. `hal/testCpp` injects representative raw
+CTRE/REV CAN frames through the real VMX receive manager and checks logical
+device identity, payload, and timestamp handling. The Java test
+`VMXClassLevelIntegrationTest` instantiates the actual
+`PneumaticsControlModule`, `PneumaticHub`, `Solenoid`, `DoubleSolenoid`,
+`Compressor`, and `PowerDistribution` classes against their simulation data,
+covering compressor modes, pressure/current/status, solenoid state, channel
+current, voltage, energy, and fault/reset lifecycle. These rows are
+`softwareValidated=true`, `hardwareValidated=false`: the host tests do not
+claim a physical VMX-Pi/VMX2 device run, and the REV simulation backend's
+generic type reporting is not used to claim REV hardware identity.
+
+The synchronized [sensor compatibility matrix](VMX_SENSOR_COMPATIBILITY.md)
+records the class-level result. The complete public HAL declaration audit is
+in [VMX_HAL_COVERAGE.md](VMX_HAL_COVERAGE.md); run
+`./gradlew :hal:checkHalCoverage` to fail a build when a new public symbol has
+no status or an `IMPLEMENTED` status has no VMX/shared definition.
 
 ## Hardware watchdog
 

@@ -57,8 +57,8 @@ ID and a 50 ms keepalive worker. Physical board validation remains separate.
 
 | WPILib sensor/class | Status | Current HAL path | Evidence and next validation |
 | --- | --- | --- | --- |
-| DigitalInput / limit switch | `NOT_TESTED` | Input-capable VMX DIO | Logical DIO 0??9 maps through the capability layer; selected FlexDIO/HighCurrent/CommDIO input capability and hardware smoke test remain. |
-| Beam Break / digital sensor | `NOT_TESTED` | Input-capable VMX DIO | Same input-capability and interrupt/resource constraints as a limit switch. |
+| DigitalInput / limit switch | `SUPPORTED` | Input-capable VMX DIO | `softwareValidated=true`, `hardwareValidated=false`; the real `DigitalInput` class reads a mock `DIOSim` state and closes cleanly. |
+| Beam Break / digital sensor | `SUPPORTED` | Input-capable VMX DIO | `softwareValidated=true`, `hardwareValidated=false`; beam-break active-low/inverted pattern is covered by the same real-class harness. |
 | AnalogInput | `SUPPORTED` | VMX AnalogInput / AccumulatorInput | Logical analog channels 0??, voltage conversion, averaging, and resource lifecycle are implemented and covered by native tests. |
 | AnalogPotentiometer | `SUPPORTED` | Existing WPILib class -> AnalogInput | `softwareValidated=true`, `hardwareValidated=false`; real-class voltage scaling and lifecycle pass in `VMXSensorClassIntegrationTest`. |
 | AnalogAccelerometer | `SUPPORTED` | Existing WPILib class -> AnalogInput average voltage | `softwareValidated=true`, `hardwareValidated=false`; zero/sensitivity/units are covered by the class harness. |
@@ -71,7 +71,9 @@ ID and a 50 ms keepalive worker. Physical board validation remains separate.
 | Tachometer | `SUPPORTED` | Counter single-source InputCapture | `softwareValidated=true`, `hardwareValidated=false`; real class construction/configuration passes. |
 | Counter | `PARTIAL` | VMX InputCapture Counter + DIO sources | Six official pairs are recognized. TwoPulse supports the shared VMX up/down capture resource for a valid pair (and the same source for both inputs); SemiPeriod is hardware-backed; ExternalDirection is limited to pairs 0+1 through 8+9; PulseLength remains unsupported. |
 | Ultrasonic | `SUPPORTED` | Output-capable DIO ping + Counter SemiPeriod echo | `softwareValidated=true`, `hardwareValidated=false`; mock pulse/range/validity conversion passes through the real class. |
-| PWM output / PWMVictorSPX | `NOT_TESTED` | PWMGenerator-capable logical PWM | Logical PWM 0??7 maps to physical 0??1 and 26??1; SDK output capability and shared resource ownership are enforced. |
+| PWM output / PWMVictorSPX | `SUPPORTED` | PWMGenerator-capable logical PWM | `softwareValidated=true`, `hardwareValidated=false`; real `PWMVictorSPX` generation/readback and lifecycle pass through `PWMSim`. |
+| DigitalOutput | `SUPPORTED` | Output-capable VMX DIO | `softwareValidated=true`, `hardwareValidated=false`; real `DigitalOutput` set/get and close pass through `DIOSim`. |
+| Servo | `SUPPORTED` | Standard VMX PWM | `softwareValidated=true`, `hardwareValidated=false`; real `Servo` position/angle and lifecycle pass through `PWMSim`. |
 | ADXL345_I2C | `SUPPORTED` | WPILib `I2C` ??VMX MXP I2C HAL | Standard WPILib register transactions now reach the shared VMX I2C resource. The ADXL345 WHO_AM_I and one-register read/write sequence are the first sensor-level I2C smoke test. |
 | ADXL345_SPI | `SUPPORTED` | Basic SPI transactions on VMX MXP | `softwareValidated=true`, `hardwareValidated=false`; the real class verifies XYZ scaling through the SPI mock path. |
 | ADXL362 | `SUPPORTED` | Basic SPI transactions on VMX SPI connector | `softwareValidated=true`, `hardwareValidated=false`; onboard-CS1 construction and XYZ scaling pass. |
@@ -93,7 +95,8 @@ physical VMX board test (`hardwareValidated=false`).
 
 | Class-level audit target | Current result | Remaining VMX evidence |
 | --- | --- | --- |
-| DigitalInput / limit switch | `NOT_TESTED` | A class-level readback fixture is still needed; the VMX DIO native contract is covered. |
+| DigitalInput / limit switch / beam break | `SUPPORTED` | `softwareValidated=true`, `hardwareValidated=false`; real `DigitalInput` and `DIOSim` readback/inversion fixture passes. |
+| DigitalOutput / PWMVictorSPX / Servo | `SUPPORTED` | `softwareValidated=true`, `hardwareValidated=false`; real WPILib classes and DIO/PWM simulation fixtures pass. |
 | AnalogPotentiometer / AnalogAccelerometer / AnalogEncoder / SharpIR | `SUPPORTED` | `softwareValidated=true`, `hardwareValidated=false` in `VMXSensorClassIntegrationTest`. |
 | Encoder / DutyCycleEncoder / DutyCycle (DutyCycleInput) / Tachometer | `SUPPORTED` | `softwareValidated=true`, `hardwareValidated=false`; class readback/lifecycle and native pair/timer contracts pass. |
 | Ultrasonic | `SUPPORTED` | `softwareValidated=true`, `hardwareValidated=false`; class range/validity conversion passes. |
@@ -102,16 +105,19 @@ physical VMX board test (`hardwareValidated=false`).
 
 ## WPILib CAN hardware dependency audit
 
-These rows record the existing WPILib vendor-device dependency on CANAPI. A
-working CAN HAL is not evidence that a particular physical device has been
-validated; each remains pending frame-level and hardware integration tests.
+These rows record the existing WPILib vendor-device dependency on CANAPI. The
+shared implementation is now compiled into the VMX flavor without copying
+frame encoders/decoders. Host tests inject representative CAN frames and the
+real WPILib Java classes are instantiated against the corresponding simulation
+data. This establishes `softwareValidated=true`; no physical VMX-Pi/VMX2 board
+has been tested, so every row remains `hardwareValidated=false`.
 
 | WPILib device class | Status | Current dependency | Next validation |
 | --- | --- | --- | --- |
-| CTRE PCM | `NOT_TESTED` | Existing `CTREPCM` implementation over logical CANAPI handle and timeout reads | Construct against a VMX CAN bus and validate compressor/solenoid frame decoding on hardware. |
-| REV Pneumatics Hub | `NOT_TESTED` | Existing `REVPH` implementation over logical CANAPI handle and timeout reads | Validate device discovery, solenoid/compressor status, and frame timing on hardware. |
-| PDP | `NOT_TESTED` | Existing `CTREPDP` implementation over CANAPI and stream sessions | Validate status/energy stream frames and current/voltage decoding on hardware. |
-| PDH | `NOT_TESTED` | Existing `REVPDH` implementation over CANAPI and stream sessions | Validate status/current/energy stream frames and sticky-fault behavior on hardware. |
+| CTRE PCM | `SUPPORTED` | Shared `CTREPCM` implementation over VMX CANAPI handle and timeout reads | `softwareValidated=true`, `hardwareValidated=false`; real `PneumaticsControlModule`, `Solenoid`, and `Compressor` harness plus raw frame fixture cover module/status/solenoid lifecycle. |
+| REV Pneumatics Hub | `SUPPORTED` | Shared `REVPH` implementation over VMX CANAPI handle and timeout reads | `softwareValidated=true`, `hardwareValidated=false`; real `PneumaticHub`, `DoubleSolenoid`, and `Compressor` harness plus raw frame fixture cover digital/analog/hybrid configuration paths. |
+| PDP | `SUPPORTED` | Shared `CTREPDP` implementation over VMX CANAPI and stream sessions | `softwareValidated=true`, `hardwareValidated=false`; real `PowerDistribution`/`PDPSim` current/voltage/energy/status path and raw frame fixture pass. |
+| PDH | `SUPPORTED` | Shared `REVPDH` implementation over VMX CANAPI and stream sessions | `softwareValidated=true`, `hardwareValidated=false`; real `PowerDistribution`/`PDPSim` channel/total/status path and raw frame fixture pass. REV sim currently reports its generic CTRE type; hardware identity remains unclaimed. |
 
 ## Current VMX HAL core snapshot
 
@@ -122,20 +128,20 @@ validated; each remains pending frame-level and hardware integration tests.
 | AnalogInput | `SUPPORTED` | Four logical analog channels backed by the VMX AccumulatorInput resource. |
 | AnalogAccumulator | `SUPPORTED` | Standard accumulator surface on logical channels 0 and 1, including atomic value/count output and continuity offsets. |
 | Counter | `PARTIAL` | TwoPulse, single-source SemiPeriod, and restricted ExternalDirection InputCapture paths; PulseLength remains unsupported. |
-| Encoder | `NOT_TESTED` | Quadrature encoder path with official pair validation and DIO index reset source. |
+| Encoder | `SUPPORTED` | Quadrature encoder path with official pair validation and DIO index reset source; class-level software validation is complete and hardwareValidated remains false. |
 | Interrupt | `PARTIAL` | DIO interrupt sources and VMX timestamps are available; AnalogTrigger sources remain blocked. |
 | AnalogTrigger | `PARTIAL` | AnalogInput-backed raw/voltage trigger state and window semantics are available; filtered mode, pulse outputs, and DutyCycle sources are blocked. |
 | Timing / Notifier | `SUPPORTED` | VMX monotonic time and one global VMX timer-notification scheduler. |
 | DriverStation | `PARTIAL` | KauaiLabs VMX-pi UDP v1 control/joystick transport on 1110 plus TCP metadata on 1740, snapshot state, timeout/malformed-packet failsafe, eStop output interlock, refresh generation, events, modes, match info, and output peer. Local error/console output is supported; full physical DS smoke and outbound TCP message validation remain. |
 | RobotController power/status | `PARTIAL` | VMX system voltage, Linux thermal sysfs, runtime readiness, and wall-clock validity | Vin voltage is hardware-backed and CPU temperature uses a discovered CPU-like thermal zone. Current, user rails, fault reset, brownout/undervoltage, FPGA button, RSL, and Driver Station disable count are explicit `INCOMPATIBLE_STATE` results because the SDK has no equivalent APIs; VMX overcurrent is not brownout. RTC bootstrap is a separate best-effort runtime service; monotonic FPGA time is unchanged. |
 | CAN / raw CAN C ABI | `SUPPORTED` | One global VMX CAN bus, one wildcard SDK receive stream, adapter-owned software streams, one-shot/periodic/cancel TX, masked RX, 11/29-bit and RTR flags, hardware timestamps, and hardware status mapping | VMX physical CAN loopback and device-bus smoke tests remain deployment validation. |
-| CANAPI | `SUPPORTED` | FIRST-layout logical device handles, packet write/repeat/RTR/stop, New/Latest/Timeout generation and age semantics, and stream cleanup | CTRE/REV/PDP/PDH frame-level integration remains pending. |
+| CANAPI | `SUPPORTED` | FIRST-layout logical device handles, packet write/repeat/RTR/stop, New/Latest/Timeout generation and age semantics, and stream cleanup | CTRE/REV/PDP/PDH host frame fixtures pass; physical CAN/device validation remains separate. |
 | Hardware Watchdog | `SUPPORTED` | VMXIO 100 ms watchdog; FlexDIO and HighCurrentDIO managed, CommDIO unmanaged; DS freshness, program heartbeat, runtime health, eStop, and shutdown failsafe gate | Physical actuator-output disable and recovery test on VMX-Pi/VMX2 remain pending. |
 | I2C | `SUPPORTED` | One VMX physical bus at 32/33, shared and reference-counted by the kOnboard/kMXP aliases. |
 | AddressableLED | `SUPPORTED` | One VMX LEDArray_OneWire resource selected through the central channel capability and physical registry layers; the WPILib PWM handle is suspended and restored around LED ownership. |
 | BuiltInAccelerometer | `SUPPORTED` | Shared VMX AHRS raw acceleration reader; no separate IMU allocation or AHRS shutdown is performed for standby. |
 | DutyCycle | `SUPPORTED` | FlexDIO 0-11 VMX PWMCapture adapter with shared timer-group ownership and DIO handoff. |
-| SPI | `NOT_TESTED` | One physical CommDIO SPI bus at 28/29/30/31; `HAL_InitializeSPI`, transaction/write/read, clock, mode 0-3, and CS polarity use one shared resource. All five WPILib port names alias it. HAL-owned AutoSPI rate and DIO trigger (rising/falling/both) use timestamped fixed-capacity buffering; AnalogTrigger sources and exact AutoStall timing are unsupported. Sensor-level integration and physical validation remain. |
+| SPI | `PARTIAL` | One physical CommDIO SPI bus at 28/29/30/31; `HAL_InitializeSPI`, transaction/write/read, clock, mode 0-3, and CS polarity use one shared resource. All five WPILib port names alias it. HAL-owned AutoSPI rate and DIO trigger (rising/falling/both) use timestamped fixed-capacity buffering; AnalogTrigger sources and exact AutoStall timing are unsupported. ADXL/ADXRS class-level software validation is complete; ADIS remains blocked by exact AutoStall/routing requirements. |
 | Serial / UART | `PARTIAL` | WPILib `kMXP` ??VMX TTL UART at 26/27 | Baud 0..230400, blocking read/write, default 8-N-1/no-flow configuration, software chunk limits for read/write buffers, timeout, termination, blocking flush, and receive clear are adapter-backed. Non-default data/parity/stop/flow settings, raw FD, onboard RS-232, and USB ports are explicit incompatible-state results. |
 | Studica vendor transport | `SUPPORTED` | Shared `StudicaVendorTransport` contract with VMX CAN runtime transport, Linux USB-CDC transport, fixed status mapping, partial-I/O deadlines, reconnect ownership, and exclusive `(bus,device)` / path registry. This is separate from WPILib SerialPort USB aliases. |
 

@@ -1,0 +1,175 @@
+#!/usr/bin/env python3
+"""Verify that every public WPILib HAL declaration has a VMX status.
+
+The VMX coverage document intentionally uses header defaults plus explicit
+symbol overrides.  This keeps the manifest reviewable while still making the
+check mechanical: adding a public HAL function without adding a manifest
+row (or an override for a mixed header) fails the build.
+"""
+
+from __future__ import annotations
+
+import re
+import sys
+from pathlib import Path
+
+
+STATUSES = {
+    "IMPLEMENTED",
+    "PARTIAL",
+    "MISSING_FEASIBLE",
+    "UNSUPPORTED_HARDWARE",
+    "NOT_APPLICABLE",
+    "HARDWARE_VALIDATION_REQUIRED",
+}
+
+ROOT = Path(__file__).resolve().parents[2]
+HAL_INCLUDE = ROOT / "hal" / "src" / "main" / "native" / "include" / "hal"
+GENERATED_INCLUDE = ROOT / "hal" / "src" / "generated" / "main" / "native" / "include" / "hal"
+MANIFEST = ROOT / "hal" / "src" / "main" / "native" / "vmx" / "VMX_HAL_COVERAGE.md"
+VMX_SOURCES = (
+    ROOT / "hal" / "src" / "main" / "native" / "vmx",
+    ROOT / "hal" / "src" / "main" / "native" / "shared",
+)
+
+SYMBOL_RE = re.compile(r"\b(HAL_[A-Za-z0-9_]+)\s*\(")
+COMMENT_RE = re.compile(r"//[^\n]*|/\*.*?\*/", re.DOTALL)
+
+
+def strip_comments(text: str) -> str:
+    return COMMENT_RE.sub("", text)
+
+
+def public_headers() -> dict[str, Path]:
+    headers: dict[str, Path] = {}
+    for root in (HAL_INCLUDE, GENERATED_INCLUDE):
+        if not root.exists():
+            continue
+        for path in root.glob("*.h"):
+            # Simulation/type plumbing is not a VMX production HAL contract.
+            if path.name in {"ChipObject.h", "Errors.h", "Types.h"}:
+                continue
+            if path.name.endswith("Types.h"):
+                continue
+            headers[path.name] = path
+    return headers
+
+
+def declared_symbols(path: Path) -> set[str]:
+    text = strip_comments(path.read_text(encoding="utf-8"))
+    return {
+        match.group(1)
+        for match in SYMBOL_RE.finditer(text)
+        if match.group(1) not in {"HAL_ENUM"}
+    }
+
+
+def backend_text() -> str:
+    chunks: list[str] = []
+    for root in VMX_SOURCES:
+        if root.exists():
+            chunks.extend(
+                path.read_text(encoding="utf-8")
+                for path in root.rglob("*.cpp")
+            )
+    return "\n".join(chunks)
+
+
+def parse_manifest() -> dict[str, tuple[str, dict[str, str]]]:
+    rows: dict[str, tuple[str, dict[str, str]]] = {}
+    for line in MANIFEST.read_text(encoding="utf-8").splitlines():
+        if not line.startswith("|") or line.startswith("| ---"):
+            continue
+        columns = [column.strip() for column in line.strip().strip("|").split("|")]
+        if len(columns) < 4 or columns[0] in {"Header", "Status"}:
+            continue
+        header = columns[0].strip("`")
+        default = columns[1].strip("`")
+        override_text = columns[2]
+        notes = columns[3]
+        if default not in STATUSES:
+            raise ValueError(f"{header}: invalid default status {default!r}")
+        if header in rows:
+            raise ValueError(f"duplicate manifest row for {header}")
+        overrides: dict[str, str] = {}
+        if override_text not in {"", "-", "—"}:
+            for item in override_text.split(";"):
+                item = item.strip()
+                if not item:
+                    continue
+                symbol, separator, status = item.partition("=")
+                if not separator or status not in STATUSES:
+                    raise ValueError(f"{header}: invalid override {item!r}")
+                if symbol in overrides:
+                    raise ValueError(f"{header}: duplicate override for {symbol}")
+                overrides[symbol] = status
+        rows[header] = (default, overrides)
+    return rows
+
+
+def main() -> int:
+    try:
+        headers = public_headers()
+        manifest = parse_manifest()
+        missing_rows = sorted(set(headers) - set(manifest))
+        extra_rows = sorted(
+            name
+            for name in set(manifest) - set(headers)
+            # These headers are generated during a normal HAL build. They may
+            # not exist yet when this standalone verification task is invoked
+            # from a clean checkout.
+            if name not in {"FRCUsageReporting.h", "UsageReporting.h"}
+        )
+        if missing_rows or extra_rows:
+            if missing_rows:
+                print("HAL coverage: headers without a manifest row:", file=sys.stderr)
+                print("  " + " ".join(missing_rows), file=sys.stderr)
+            if extra_rows:
+                print("HAL coverage: stale manifest rows:", file=sys.stderr)
+                print("  " + " ".join(extra_rows), file=sys.stderr)
+            return 1
+
+        backend = backend_text()
+        counts = {status: 0 for status in sorted(STATUSES)}
+        symbol_count = 0
+        absent_implemented: list[str] = []
+        for header, path in sorted(headers.items()):
+            default, overrides = manifest[header]
+            symbols = declared_symbols(path)
+            unknown_overrides = sorted(set(overrides) - symbols)
+            if unknown_overrides:
+                print(
+                    f"HAL coverage: {header} overrides unknown symbols: "
+                    + " ".join(unknown_overrides),
+                    file=sys.stderr,
+                )
+                return 1
+            for symbol in symbols:
+                status = overrides.get(symbol, default)
+                counts[status] += 1
+                symbol_count += 1
+                if status == "IMPLEMENTED" and not re.search(
+                    rf"\b{re.escape(symbol)}\s*\(", backend
+                ):
+                    absent_implemented.append(f"{header}:{symbol}")
+
+        if absent_implemented:
+            print(
+                "HAL coverage: IMPLEMENTED symbols missing from VMX/shared sources:",
+                file=sys.stderr,
+            )
+            print("  " + " ".join(absent_implemented), file=sys.stderr)
+            return 1
+
+        print(
+            f"HAL coverage OK: {len(headers)} headers, {symbol_count} symbols; "
+            + ", ".join(f"{status}={counts[status]}" for status in sorted(counts))
+        )
+        return 0
+    except (OSError, ValueError) as error:
+        print(f"HAL coverage: {error}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -19,24 +19,24 @@ import java.nio.charset.StandardCharsets;
  * timestamps and are not FPGA time.
  */
 public final class VMXIMU extends JNIWrapper implements AutoCloseable {
-  private long handle;
+  private long m_handle;
 
   /** Creates a wrapper over the shared VMX runtime AHRS. */
   public VMXIMU() {
-    handle = create();
+    m_handle = create();
   }
 
   /** Returns whether the shared VMX AHRS is available and connected. */
   public synchronized boolean isAvailable() {
-    return handle != 0 && getSnapshot().isConnected();
+    return m_handle != 0 && getSnapshot().isConnected();
   }
 
   /** Reads one coherent vendor snapshot. */
   public synchronized Snapshot getSnapshot() {
-    if (handle == 0) {
+    if (m_handle == 0) {
       return Snapshot.unavailable();
     }
-    byte[] data = readSnapshot(handle);
+    byte[] data = readSnapshot(m_handle);
     return data == null ? Snapshot.unavailable() : Snapshot.fromBytes(data);
   }
 
@@ -174,19 +174,23 @@ public final class VMXIMU extends JNIWrapper implements AutoCloseable {
 
   /** Zeros the current yaw reference. */
   public synchronized boolean zeroYaw() {
-    return handle != 0 && zeroYaw(handle) == 0;
+    return m_handle != 0 && zeroYaw(m_handle) == 0;
   }
+
+  private static native int zeroYaw(long handle);
 
   /** Resets the AHRS continuous angle/displacement state. */
   public synchronized boolean reset() {
-    return handle != 0 && reset(handle) == 0;
+    return m_handle != 0 && reset(m_handle) == 0;
   }
+
+  private static native int reset(long handle);
 
   @Override
   public synchronized void close() {
-    if (handle != 0) {
-      destroy(handle);
-      handle = 0;
+    if (m_handle != 0) {
+      destroy(m_handle);
+      m_handle = 0;
     }
   }
 
@@ -195,10 +199,6 @@ public final class VMXIMU extends JNIWrapper implements AutoCloseable {
   private static native void destroy(long handle);
 
   private static native byte[] readSnapshot(long handle);
-
-  private static native int zeroYaw(long handle);
-
-  private static native int reset(long handle);
 
   /** Immutable values read from one VMX AHRS sample. */
   public static final class Snapshot {
@@ -211,39 +211,39 @@ public final class VMXIMU extends JNIWrapper implements AutoCloseable {
     private static final int FIRMWARE_LENGTH = 96;
     private static final int ABI_VERSION = 1;
 
-    private final double yaw;
-    private final double pitch;
-    private final double roll;
-    private final double accumulatedAngle;
-    private final double yawRate;
-    private final double quaternionW;
-    private final double quaternionX;
-    private final double quaternionY;
-    private final double quaternionZ;
-    private final double rawGyroX;
-    private final double rawGyroY;
-    private final double rawGyroZ;
-    private final double rawAccelX;
-    private final double rawAccelY;
-    private final double rawAccelZ;
-    private final double rawMagX;
-    private final double rawMagY;
-    private final double rawMagZ;
-    private final double worldLinearAccelX;
-    private final double worldLinearAccelY;
-    private final double worldLinearAccelZ;
-    private final double compassHeading;
-    private final double fusedHeading;
-    private final double temperatureC;
-    private final double pressure;
-    private final double altitude;
-    private final long sensorTimestamp;
-    private final boolean moving;
-    private final boolean rotating;
-    private final boolean calibrating;
-    private final boolean connected;
-    private final boolean altitudeValid;
-    private final String firmwareVersion;
+    private final double m_yaw;
+    private final double m_pitch;
+    private final double m_roll;
+    private final double m_accumulatedAngle;
+    private final double m_yawRate;
+    private final double m_quaternionW;
+    private final double m_quaternionX;
+    private final double m_quaternionY;
+    private final double m_quaternionZ;
+    private final double m_rawGyroX;
+    private final double m_rawGyroY;
+    private final double m_rawGyroZ;
+    private final double m_rawAccelX;
+    private final double m_rawAccelY;
+    private final double m_rawAccelZ;
+    private final double m_rawMagX;
+    private final double m_rawMagY;
+    private final double m_rawMagZ;
+    private final double m_worldLinearAccelX;
+    private final double m_worldLinearAccelY;
+    private final double m_worldLinearAccelZ;
+    private final double m_compassHeading;
+    private final double m_fusedHeading;
+    private final double m_temperatureC;
+    private final double m_pressure;
+    private final double m_altitude;
+    private final long m_sensorTimestamp;
+    private final boolean m_moving;
+    private final boolean m_rotating;
+    private final boolean m_calibrating;
+    private final boolean m_connected;
+    private final boolean m_altitudeValid;
+    private final String m_firmwareVersion;
 
     private Snapshot(
         double yaw,
@@ -279,39 +279,39 @@ public final class VMXIMU extends JNIWrapper implements AutoCloseable {
         boolean connected,
         boolean altitudeValid,
         String firmwareVersion) {
-      this.yaw = yaw;
-      this.pitch = pitch;
-      this.roll = roll;
-      this.accumulatedAngle = accumulatedAngle;
-      this.yawRate = yawRate;
-      this.quaternionW = quaternionW;
-      this.quaternionX = quaternionX;
-      this.quaternionY = quaternionY;
-      this.quaternionZ = quaternionZ;
-      this.rawGyroX = rawGyroX;
-      this.rawGyroY = rawGyroY;
-      this.rawGyroZ = rawGyroZ;
-      this.rawAccelX = rawAccelX;
-      this.rawAccelY = rawAccelY;
-      this.rawAccelZ = rawAccelZ;
-      this.rawMagX = rawMagX;
-      this.rawMagY = rawMagY;
-      this.rawMagZ = rawMagZ;
-      this.worldLinearAccelX = worldLinearAccelX;
-      this.worldLinearAccelY = worldLinearAccelY;
-      this.worldLinearAccelZ = worldLinearAccelZ;
-      this.compassHeading = compassHeading;
-      this.fusedHeading = fusedHeading;
-      this.temperatureC = temperatureC;
-      this.pressure = pressure;
-      this.altitude = altitude;
-      this.sensorTimestamp = sensorTimestamp;
-      this.moving = moving;
-      this.rotating = rotating;
-      this.calibrating = calibrating;
-      this.connected = connected;
-      this.altitudeValid = altitudeValid;
-      this.firmwareVersion = firmwareVersion;
+      m_yaw = yaw;
+      m_pitch = pitch;
+      m_roll = roll;
+      m_accumulatedAngle = accumulatedAngle;
+      m_yawRate = yawRate;
+      m_quaternionW = quaternionW;
+      m_quaternionX = quaternionX;
+      m_quaternionY = quaternionY;
+      m_quaternionZ = quaternionZ;
+      m_rawGyroX = rawGyroX;
+      m_rawGyroY = rawGyroY;
+      m_rawGyroZ = rawGyroZ;
+      m_rawAccelX = rawAccelX;
+      m_rawAccelY = rawAccelY;
+      m_rawAccelZ = rawAccelZ;
+      m_rawMagX = rawMagX;
+      m_rawMagY = rawMagY;
+      m_rawMagZ = rawMagZ;
+      m_worldLinearAccelX = worldLinearAccelX;
+      m_worldLinearAccelY = worldLinearAccelY;
+      m_worldLinearAccelZ = worldLinearAccelZ;
+      m_compassHeading = compassHeading;
+      m_fusedHeading = fusedHeading;
+      m_temperatureC = temperatureC;
+      m_pressure = pressure;
+      m_altitude = altitude;
+      m_sensorTimestamp = sensorTimestamp;
+      m_moving = moving;
+      m_rotating = rotating;
+      m_calibrating = calibrating;
+      m_connected = connected;
+      m_altitudeValid = altitudeValid;
+      m_firmwareVersion = firmwareVersion;
     }
 
     private static Snapshot unavailable() {
@@ -376,135 +376,135 @@ public final class VMXIMU extends JNIWrapper implements AutoCloseable {
     }
 
     public double getYaw() {
-      return yaw;
+      return m_yaw;
     }
 
     public double getPitch() {
-      return pitch;
+      return m_pitch;
     }
 
     public double getRoll() {
-      return roll;
+      return m_roll;
     }
 
     public double getAccumulatedAngle() {
-      return accumulatedAngle;
+      return m_accumulatedAngle;
     }
 
     public double getYawRate() {
-      return yawRate;
+      return m_yawRate;
     }
 
     public double getQuaternionW() {
-      return quaternionW;
+      return m_quaternionW;
     }
 
     public double getQuaternionX() {
-      return quaternionX;
+      return m_quaternionX;
     }
 
     public double getQuaternionY() {
-      return quaternionY;
+      return m_quaternionY;
     }
 
     public double getQuaternionZ() {
-      return quaternionZ;
+      return m_quaternionZ;
     }
 
     public double getRawGyroX() {
-      return rawGyroX;
+      return m_rawGyroX;
     }
 
     public double getRawGyroY() {
-      return rawGyroY;
+      return m_rawGyroY;
     }
 
     public double getRawGyroZ() {
-      return rawGyroZ;
+      return m_rawGyroZ;
     }
 
     public double getRawAccelX() {
-      return rawAccelX;
+      return m_rawAccelX;
     }
 
     public double getRawAccelY() {
-      return rawAccelY;
+      return m_rawAccelY;
     }
 
     public double getRawAccelZ() {
-      return rawAccelZ;
+      return m_rawAccelZ;
     }
 
     public double getRawMagX() {
-      return rawMagX;
+      return m_rawMagX;
     }
 
     public double getRawMagY() {
-      return rawMagY;
+      return m_rawMagY;
     }
 
     public double getRawMagZ() {
-      return rawMagZ;
+      return m_rawMagZ;
     }
 
     public double getWorldLinearAccelX() {
-      return worldLinearAccelX;
+      return m_worldLinearAccelX;
     }
 
     public double getWorldLinearAccelY() {
-      return worldLinearAccelY;
+      return m_worldLinearAccelY;
     }
 
     public double getWorldLinearAccelZ() {
-      return worldLinearAccelZ;
+      return m_worldLinearAccelZ;
     }
 
     public double getCompassHeading() {
-      return compassHeading;
+      return m_compassHeading;
     }
 
     public double getFusedHeading() {
-      return fusedHeading;
+      return m_fusedHeading;
     }
 
     public boolean isMoving() {
-      return moving;
+      return m_moving;
     }
 
     public boolean isRotating() {
-      return rotating;
+      return m_rotating;
     }
 
     public boolean isCalibrating() {
-      return calibrating;
+      return m_calibrating;
     }
 
     public boolean isConnected() {
-      return connected;
+      return m_connected;
     }
 
     public long getSensorTimestamp() {
-      return sensorTimestamp;
+      return m_sensorTimestamp;
     }
 
     public double getTemperatureC() {
-      return temperatureC;
+      return m_temperatureC;
     }
 
     public double getPressure() {
-      return pressure;
+      return m_pressure;
     }
 
     public double getAltitude() {
-      return altitude;
+      return m_altitude;
     }
 
     public boolean isAltitudeValid() {
-      return altitudeValid;
+      return m_altitudeValid;
     }
 
     public String getFirmwareVersion() {
-      return firmwareVersion;
+      return m_firmwareVersion;
     }
   }
 }

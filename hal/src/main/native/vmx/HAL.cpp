@@ -28,6 +28,13 @@ namespace {
 std::mutex gHalLifecycleMutex;
 }
 
+namespace hal {
+// The shared CAN device implementations retain the roboRIO automatic-module
+// initialization hook.  VMX has no Driver Station startup epoch, so automatic
+// discovery starts immediately after the VMX runtime is available.
+uint64_t GetDSInitializeTime() { return 0; }
+}  // namespace hal
+
 extern "C" {
 
 HAL_PortHandle HAL_GetPort(int32_t channel) {
@@ -68,6 +75,10 @@ HAL_Bool HAL_Initialize(int32_t timeout, int32_t mode) {
       hal::vmx::ShutdownRuntime();
       return false;
     }
+    hal::init::InitializeCTREPCM();
+    hal::init::InitializeREVPH();
+    hal::init::InitializeCTREPDP();
+    hal::init::InitializeREVPDH();
     hal::vmx::InitializeDriverStation();
     if (!hal::vmx::InitializeHardwareWatchdog()) {
       hal::vmx::ShutdownDriverStation();
