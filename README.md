@@ -73,7 +73,8 @@ and TCP metadata protocol through a VMX-owned transport/state adapter. It
 provides validated control-word and joystick snapshots, mode/alliance/FMS
 state, match metadata, new-data events, refresh sequence semantics, observe
 program heartbeats, and rumble/output peer handling, with a disabled/detached
-failsafe when packets time out or are malformed. Host parser/state tests are
+failsafe when packets time out or are malformed; an eStop bit also forces
+`enabled=false` and disables outputs. Host parser/state tests are
 transport-injectable; physical DS enable/disable, joystick, reconnect, and
 match smoke tests remain `PARTIAL`, and error/console calls are guaranteed
 locally rather than claiming unverified TCP forwarding.

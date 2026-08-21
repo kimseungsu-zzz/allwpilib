@@ -131,8 +131,9 @@ joystick axes/buttons/POVs and descriptors, match time/info, game data,
 timeout handling are implemented. No packet or fresh heartbeat forces a
 disabled, detached, zero-input failsafe; shutdown uses the same path.
 `HAL_ObserveUserProgram*()` and joystick rumble/output use the active DS UDP
-peer when present. Error and console calls always remain visible on the local
-VMX console; full KauaiLabs TCP forwarding is not claimed until a physical DS
+peer when present. An eStop bit always forces `enabled=false` and disables
+outputs. Error and console calls always remain visible on the local VMX
+console; full KauaiLabs TCP forwarding is not claimed until a physical DS
 smoke test confirms the encoder and lifecycle.
 
 Current Driver Station status is `PARTIAL`: transport-independent parser/state
