@@ -415,8 +415,9 @@ software sleep is used to fake that timing.
 The host class-closure harness in
 `wpilibc/src/test/native/cpp/VMXSensorClassIntegrationTest.cpp` now instantiates
 the real AnalogPotentiometer, AnalogAccelerometer, AnalogEncoder, SharpIR,
-Encoder, DutyCycleEncoder, Tachometer, Ultrasonic, ADXL345 (I2C/SPI), ADXL362,
-ADXRS450, and AnalogGyro classes and verifies public readback from mock HAL
+Encoder, DutyCycleEncoder, DutyCycle (the WPILib duty-cycle input), Tachometer,
+Ultrasonic, ADXL345 (I2C/SPI), ADXL362, ADXRS450, and AnalogGyro classes and
+verifies public readback from mock HAL
 data. The matching VMX native adapter tests cover the C ABI/resource side;
 these rows are `softwareValidated=true`, while `hardwareValidated=false`
 remains explicit until a physical board run.

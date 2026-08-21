@@ -67,7 +67,7 @@ ID and a 50 ms keepalive worker. Physical board validation remains separate.
 | Encoder | `SUPPORTED` | VMX Encoder + valid DIO pair | `softwareValidated=true`, `hardwareValidated=false`; mock count/distance/reverse readback and lifecycle pass. Only FRC pairs 0+1, 2+3, 4+5, 6+7, and 8+9 are accepted. |
 | DutyCycle | `SUPPORTED` | FlexDIO 0-11 + VMX PWMCapture | Existing `hal/DutyCycle.h` ABI is implemented with period/high-time conversion, DIO ownership handoff, shared FlexTimer groups, and stable logical FPGA indices. AnalogTrigger, HighCurrent, and CommDIO sources are explicitly rejected. Hardware smoke test remains. |
 | DutyCycleEncoder | `SUPPORTED` | Existing WPILib class + DutyCycle HAL | `softwareValidated=true`, `hardwareValidated=false`; mock position/connected state and close pass. |
-| DutyCycleInput | `SUPPORTED` | Existing WPILib duty-cycle wrapper + DutyCycle HAL | `softwareValidated=true`, `hardwareValidated=false`; shared source-lifetime contract passes. |
+| DutyCycle (DutyCycleInput) | `SUPPORTED` | Existing WPILib `DutyCycle` wrapper + DutyCycle HAL | `softwareValidated=true`, `hardwareValidated=false`; frequency/output readback and shared source lifetime pass. |
 | Tachometer | `SUPPORTED` | Counter single-source InputCapture | `softwareValidated=true`, `hardwareValidated=false`; real class construction/configuration passes. |
 | Counter | `PARTIAL` | VMX InputCapture Counter + DIO sources | Six official pairs are recognized. TwoPulse supports the shared VMX up/down capture resource for a valid pair (and the same source for both inputs); SemiPeriod is hardware-backed; ExternalDirection is limited to pairs 0+1 through 8+9; PulseLength remains unsupported. |
 | Ultrasonic | `SUPPORTED` | Output-capable DIO ping + Counter SemiPeriod echo | `softwareValidated=true`, `hardwareValidated=false`; mock pulse/range/validity conversion passes through the real class. |
@@ -95,7 +95,7 @@ physical VMX board test (`hardwareValidated=false`).
 | --- | --- | --- |
 | DigitalInput / limit switch | `NOT_TESTED` | A class-level readback fixture is still needed; the VMX DIO native contract is covered. |
 | AnalogPotentiometer / AnalogAccelerometer / AnalogEncoder / SharpIR | `SUPPORTED` | `softwareValidated=true`, `hardwareValidated=false` in `VMXSensorClassIntegrationTest`. |
-| Encoder / DutyCycleEncoder / DutyCycleInput / Tachometer | `SUPPORTED` | `softwareValidated=true`, `hardwareValidated=false`; class readback/lifecycle and native pair/timer contracts pass. |
+| Encoder / DutyCycleEncoder / DutyCycle (DutyCycleInput) / Tachometer | `SUPPORTED` | `softwareValidated=true`, `hardwareValidated=false`; class readback/lifecycle and native pair/timer contracts pass. |
 | Ultrasonic | `SUPPORTED` | `softwareValidated=true`, `hardwareValidated=false`; class range/validity conversion passes. |
 | ADXL345_I2C / ADXL345_SPI / ADXL362 / ADXRS450_Gyro | `SUPPORTED` | `softwareValidated=true`, `hardwareValidated=false`; axis and angle/rate mock paths pass, with ADXRS AutoSPI HAL tests. |
 | AnalogGyro / BuiltInAccelerometer / AddressableLED | `SUPPORTED` / `SUPPORTED` / `SUPPORTED` | All have host class/native contracts; `hardwareValidated=false` remains explicit. |

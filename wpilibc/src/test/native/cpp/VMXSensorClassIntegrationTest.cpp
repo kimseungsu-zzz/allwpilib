@@ -20,6 +20,7 @@
 #include "frc/AnalogInput.h"
 #include "frc/AnalogPotentiometer.h"
 #include "frc/DigitalInput.h"
+#include "frc/DutyCycle.h"
 #include "frc/DutyCycleEncoder.h"
 #include "frc/Encoder.h"
 #include "frc/SharpIR.h"
@@ -31,6 +32,7 @@
 #include "frc/simulation/AnalogEncoderSim.h"
 #include "frc/simulation/AnalogInputSim.h"
 #include "frc/simulation/AnalogGyroSim.h"
+#include "frc/simulation/DutyCycleSim.h"
 #include "frc/simulation/DutyCycleEncoderSim.h"
 #include "frc/simulation/EncoderSim.h"
 #include "frc/simulation/SharpIRSim.h"
@@ -86,6 +88,14 @@ TEST(VMXSensorClassIntegrationTest, EncoderDutyCycleAndTachometerReadbacks) {
   Tachometer tachometer{tachInput};
   tachometer.SetEdgesPerRevolution(2);
   EXPECT_EQ(tachometer.GetEdgesPerRevolution(), 2);
+
+  DigitalInput dutyInput{8};
+  DutyCycle dutyCycle{dutyInput};
+  sim::DutyCycleSim inputDutyCycleSim{dutyCycle};
+  inputDutyCycleSim.SetFrequency(1000);
+  inputDutyCycleSim.SetOutput(0.375);
+  EXPECT_EQ(dutyCycle.GetFrequency(), 1000);
+  EXPECT_DOUBLE_EQ(dutyCycle.GetOutput(), 0.375);
 }
 
 TEST(VMXSensorClassIntegrationTest, UltrasonicUsesPulseRangeAndValidity) {
