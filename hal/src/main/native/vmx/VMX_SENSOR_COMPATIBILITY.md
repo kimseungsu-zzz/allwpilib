@@ -48,6 +48,12 @@ same fixed layout and the Python-facing boundary is the exported C ABI. A
 physical AHRS smoke test is still required before setting
 `hardwareValidated=true`.
 
+The Titan milestone adds a separate Studica vendor contract. It is not a
+WPILib motor-controller or encoder-row promotion. Native host tests cover ABI
+validation and unavailable-hardware behavior; Java JNI/C++ facades use the
+same C ABI, while the VMX adapter uses one shared imported Titan object per CAN
+ID and a 50 ms keepalive worker. Physical board validation remains separate.
+
 | WPILib sensor/class | Status | Current HAL path | Evidence and next validation |
 | --- | --- | --- | --- |
 | DigitalInput / limit switch | `NOT_TESTED` | Input-capable VMX DIO | Logical DIO 0??9 maps through the capability layer; selected FlexDIO/HighCurrent/CommDIO input capability and hardware smoke test remain. |
@@ -142,7 +148,7 @@ unchanged `vmxdrivers` sources and then bound to Java, C++, and Python.
 | Vendor sensor/module | Status | Boundary |
 | --- | --- | --- |
 | VMX onboard IMU / NavX-style data | `VENDOR_API` | `studica::VMXIMU` reads the shared VMXRuntime AHRS and exposes orientation, continuous angle/rate, quaternion, raw/world acceleration, gyro/magnetometer, heading, state, timestamp, temperature, firmware, and validity-guarded pressure/altitude. `hardwareValidated=false`; it is not WPILib `BuiltInAccelerometer` or `AnalogGyro`. |
-| Titan | `VENDOR_API` | Next vendor milestone; use the existing CAN core as transport, with device semantics in a separate adapter. |
+| Titan Quad / Titan Quad Encoder | `VENDOR_API` | `studica::TitanQuad`, `studica::TitanQuadEncoder`, Java `com.studica.frc` wrappers, and `StudicaTitan_*` C ABI. CAN IDs 1--62, motor ports 0--3, shared controller per CAN ID, 50 ms watchdog refresh, motor/encoder/absolute-angle/limit/configuration paths, and explicit safe zero/disable on stale DS/e-stop/close. `hardwareValidated=false`; this does not promote WPILib motor-controller, Encoder, or DutyCycleEncoder rows. |
 | Studica Cobra | `VENDOR_API` | Use the Studica driver API through a separate adapter. |
 | Studica Sharp | `VENDOR_API` | Distinct from the WPILib `SharpIR` analog class; use the Studica driver API. |
 | Studica Parsec | `VENDOR_API` | Use the Studica driver API through a separate adapter. |
@@ -180,5 +186,6 @@ separate vendor wrapper module.
    Tachometer and Ultrasonic.
 8. Run physical AddressableLED and BuiltInAccelerometer class smoke tests and
    promote their separate `hardwareValidated` field only after those tests.
-9. Implement vendor adapters in order: Titan, Cobra, Parsec/Colore, and Light
-   Tower, with VMX-specific Power/SOC as a capability-gated API.
+9. Implement vendor adapters in order: Cobra, Parsec/Colore, and Light Tower,
+   with VMX-specific Power/SOC as a capability-gated API; Titan is complete
+   at the native/Java/Python-ABI layer and awaits physical board validation.

@@ -126,10 +126,42 @@ period scheduling, DIO trigger waiters, bounded buffering, dropped-sample
 accounting, and race-safe stop/close behavior. Its host tests remain the
 source of truth for those semantics.
 
+## Studica Titan vendor API
+
+Titan is exposed outside the WPILib HAL sensor/motor-controller contracts.
+`hal/src/main/native/include/studica/Titan.h` defines the fixed-width
+`StudicaTitan_*` C ABI, `studica::TitanQuad` and
+`studica::TitanQuadEncoder` C++ facades, and the Java JNI wrappers
+`com.studica.frc.TitanQuad` / `TitanQuadEncoder`. The same ABI is intended for
+Python ctypes; no language-specific hardware implementation is required.
+
+The adapter validates CAN IDs 1--62, motor ports 0--3, and motor frequency
+before allocating a handle. It creates one shared imported
+`vmxdrivers::Titan` object per CAN ID and gives each motor view only a channel
+index. All SDK operations for that controller are serialized. A controller
+worker refreshes the last commanded speeds every 50 ms, below the imported
+driver's documented 150 ms keepalive (and the device's approximately 200 ms
+watchdog). `Set`, inversion, enable/disable, stop, encoder count/distance/RPM,
+distance-per-tick, reset/reverse, Cypher absolute angle, and forward/reverse
+limit switches are available. Limit values are returned as `true=triggered` at
+the compatibility boundary. Closed-loop target, current-limit, stop-mode, and
+PID configuration calls map to the imported driver where present; changing the
+controller's configured motor frequency after allocation is explicitly
+unsupported because the Titan object configures all four channels together.
+
+The adapter never treats the device watchdog as the safety path. It commands
+zero and disables before stopping a worker on a final handle close, and the
+same safe stop is issued for stale/disabled Driver Station data, e-stop, and
+HAL shutdown. Firmware and hardware strings are copied through bounded C ABI
+buffers and report `STUDICA_TITAN_BUFFER_TOO_SMALL` instead of truncating.
+The host binding intentionally reports `available=false`; physical Titan
+validation is tracked separately as `hardwareValidated=false` in the matrix.
+The imported `vmxdrivers/` source files remain unchanged.
+
 ## Studica vendor backlog
 
 Studica-specific modules stay outside WPILib's standard sensor surface. The
-implementation order is VMX IMU (this milestone), Titan, Cobra,
+implementation order is VMX IMU, Titan (implemented), Cobra,
 Parsec/Colore, then Light Tower. VMX-specific power/SOC telemetry is also a
 vendor API candidate. Standard WPILib APIs remain the preferred path for
 Encoder, DutyCycleEncoder, DIO, Servo, Ultrasonic, and supported Sharp models;

@@ -119,8 +119,16 @@ pressure/altitude carry an explicit validity flag. The unchanged
 The AutoTransmit SDK engine was audited but is not selected for AutoSPI because
 it lacks WPILib-compatible per-sample timestamps, full edge semantics, and
 precise AutoStall configuration; the tested HAL-owned software engine remains
-the backend. Vendor backlog order is IMU, Titan, Cobra, Parsec/Colore, then
-Light Tower, with VMX-specific Power/SOC as a capability-gated vendor API.
+the backend. The Titan Quad vendor layer is now available as
+`studica::TitanQuad`/`studica::TitanQuadEncoder`, Java
+`com.studica.frc` compatibility wrappers, and a fixed-width
+`StudicaTitan_*` C ABI suitable for Python ctypes. It keeps one shared
+`vmxdrivers::Titan` controller per CAN ID, refreshes outputs every 50 ms,
+exposes motor/encoder/RPM/Cypher-angle/limit/configuration paths, and
+explicitly zeros/disables on close, stale Driver Station state, e-stop, or HAL
+shutdown. `hardwareValidated=false` until board tests run. The remaining
+vendor backlog is Cobra, Parsec/Colore, then Light Tower, with VMX-specific
+Power/SOC as a capability-gated vendor API.
 The synchronized sensor matrix records the remaining class-level `NOT_TESTED`
 rows explicitly: existing WPILib simulation tests and native HAL unit tests
 are not promoted to VMX `SUPPORTED` until a VMX-targeted Java class test can
