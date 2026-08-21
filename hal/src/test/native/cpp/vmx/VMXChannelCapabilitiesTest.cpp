@@ -4,6 +4,8 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
+
 #include "../../../../main/native/vmx/VMXChannelCapabilities.h"
 #include "../../../../main/native/vmx/VMXConstants.h"
 
@@ -37,16 +39,26 @@ TEST(VMXChannelMappingTest, PhysicalBanksAndOfficialPairsAreExplicit) {
 
 TEST(VMXChannelMappingTest, CommunicationAliasesUseDocumentedPhysicalPins) {
   const auto map = kDefaultVMXCommDIOChannelMap;
-  EXPECT_EQ(map.i2cSDA, 26);
-  EXPECT_EQ(map.i2cSCL, 27);
-  EXPECT_EQ(map.uartTX, 28);
-  EXPECT_EQ(map.uartRX, 29);
-  EXPECT_EQ(map.spiCLK, 30);
-  EXPECT_EQ(map.spiMOSI, 31);
-  EXPECT_EQ(map.spiMISO, 32);
-  EXPECT_EQ(map.spiCS, 33);
-  EXPECT_NE(map.i2cSDA, map.uartTX);
+  EXPECT_EQ(map.uartTX, 26);
+  EXPECT_EQ(map.uartRX, 27);
+  EXPECT_EQ(map.spiCLK, 28);
+  EXPECT_EQ(map.spiMOSI, 29);
+  EXPECT_EQ(map.spiMISO, 30);
+  EXPECT_EQ(map.spiCS, 31);
+  EXPECT_EQ(map.i2cSDA, 32);
+  EXPECT_EQ(map.i2cSCL, 33);
   EXPECT_NE(map.uartRX, map.spiCLK);
+  EXPECT_NE(map.spiCS, map.i2cSDA);
+}
+
+TEST(VMXChannelMappingTest, CommunicationBusesHaveDisjointPhysicalResources) {
+  const auto map = kDefaultVMXCommDIOChannelMap;
+  std::array<int32_t, 8> channels{{map.uartTX, map.uartRX, map.spiCLK,
+                                   map.spiMOSI, map.spiMISO, map.spiCS,
+                                   map.i2cSDA, map.i2cSCL}};
+  std::sort(channels.begin(), channels.end());
+  EXPECT_EQ(channels, (std::array<int32_t, 8>{{26, 27, 28, 29, 30, 31, 32,
+                                               33}}));
 }
 
 TEST(VMXChannelCapabilityTest, MockSdkCapabilitiesModelJumperAndCommDio) {

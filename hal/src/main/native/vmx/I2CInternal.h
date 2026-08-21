@@ -104,7 +104,7 @@ class I2CManager final {
     std::scoped_lock lock{state.mutex};
     if (state.referenceCount == 0) {
       // The official VMX map places the MXP I2C SDA/SCL pair at CommDIO
-      // physical 26/27. Reserve it before opening the SDK resource so a
+      // physical 32/33. Reserve it before opening the SDK resource so a
       // generic logical DIO/PWM allocation gets a deterministic conflict
       // rather than an opaque SDK activation failure.
       VMXCommDIOChannelMap map;

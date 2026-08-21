@@ -61,17 +61,17 @@ struct VMXChannelInventory {
 // the logical DIO surface.  Keep this map in the capability layer so every
 // adapter (DIO, I2C, SPI, and UART) makes the same physical reservation.
 struct VMXCommDIOChannelMap {
-  int32_t i2cSDA = 26;
-  int32_t i2cSCL = 27;
-  // The documented CommDIO connector order is I2C (26/27), TTL UART
-  // (28/29), then SPI (30/31/32/33).  These are physical channels, not
-  // WPILib port numbers; all SPI and I2C aliases reserve the same pair/bus.
-  int32_t spiCLK = 30;
-  int32_t spiMOSI = 31;
-  int32_t spiMISO = 32;
-  int32_t spiCS = 33;
-  int32_t uartTX = 28;
-  int32_t uartRX = 29;
+  // The documented CommDIO connector order is TTL UART (26/27), SPI
+  // (28/29/30/31), then I2C (32/33). These are physical channels, not WPILib
+  // port numbers; all aliases reserve the same physical resources.
+  int32_t uartTX = 26;
+  int32_t uartRX = 27;
+  int32_t spiCLK = 28;
+  int32_t spiMOSI = 29;
+  int32_t spiMISO = 30;
+  int32_t spiCS = 31;
+  int32_t i2cSDA = 32;
+  int32_t i2cSCL = 33;
   bool valid = true;
   bool i2cValid = true;
   bool spiValid = true;

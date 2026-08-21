@@ -38,7 +38,7 @@ README](hal/src/main/native/vmx/README.md) and [sensor compatibility
 matrix](hal/src/main/native/vmx/VMX_SENSOR_COMPATIBILITY.md).
 
 The current communication-port mapping is fixed by the VMX CommDIO connector:
-I2C `26/27`, TTL UART `28/29`, and SPI `30/31/32/33` (CLK/MOSI/MISO/CS).
+TTL UART `26/27`, SPI `28/29/30/31` (CLK/MOSI/MISO/CS), and I2C `32/33`.
 WPILib I2C onboard/MXP names and SPI onboard CS0-3/MXP names are aliases for
 the same physical resources and share the registry. Serial `kMXP` is backed by
 the SDK UART with baud rates `0..230400`; onboard RS-232 and USB serial

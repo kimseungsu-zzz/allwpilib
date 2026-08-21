@@ -82,7 +82,7 @@ The public WPILib channel number is a logical address, not always a VMX pin:
 | --- | --- | --- | --- |
 | DIO 0-11 / PWM 0-11 | 0-11 | FlexDIO | SDK-selected input/output; interrupt, encoder, counter and PWM routes are available when advertised. |
 | DIO 12-21 / PWM 12-21 | 12-21 | HighCurrent DIO | One bank-wide jumper selects INPUT or OUTPUT. `HAL_SetDIODirection()` never changes it. |
-| DIO 22-29 / PWM 22-27 | 26-33 | CommDIO | Fixed I2C (26/27), TTL UART (28/29), and SPI (30/31/32/33) capabilities; no runtime direction switch. |
+| DIO 22-29 / PWM 22-27 | 26-33 | CommDIO | Fixed TTL UART (26/27), SPI (28/29/30/31), and I2C (32/33) capabilities; no runtime direction switch. |
 | Analog 0-3 | 22-25 | AnalogIn | Dedicated analog input and AccumulatorInput resources. |
 
 `VMXChannelCapabilities` is the adapter-side capability layer. Static FRC
@@ -189,7 +189,7 @@ Current DIO feature status:
 ## I2C support
 
 The VMX SDK exposes one independent I2C bus: the sole channels advertising
-`I2C_SDA` and `I2C_SCL` at physical 26/27. The VMX-pi communication port map
+`I2C_SDA` and `I2C_SCL` at physical 32/33. The VMX-pi communication port map
 identifies this as the one WPILib I2C connector. `HAL_I2C_kOnboard` and
 `HAL_I2C_kMXP` are compatibility aliases for that same resource; they cannot
 be used as two independent buses. One VMX I2C resource is shared by all objects
@@ -216,7 +216,7 @@ sensors.
 ## SPI support
 
 The VMX SPI adapter exposes one physical CommDIO SPI resource at
-physical CLK/MOSI/MISO/CS `30/31/32/33`. `HAL_SPI_kOnboardCS0` through
+physical CLK/MOSI/MISO/CS `28/29/30/31`. `HAL_SPI_kOnboardCS0` through
 `HAL_SPI_kOnboardCS3` and `HAL_SPI_kMXP` are compatibility aliases for that same
 bus, not five independent chip-select resources. The SDK capability inventory
 remains the runtime source of truth and the shared physical registry reserves
@@ -265,7 +265,7 @@ is the status source for these distinctions.
 ## Serial / UART support
 
 The VMX TTL UART is the sole SDK serial resource on CommDIO physical TX/RX
-channels `28/29`, exposed as WPILib `HAL_SerialPort_MXP`. `kOnboard` is the
+channels `26/27`, exposed as WPILib `HAL_SerialPort_MXP`. `kOnboard` is the
 unimplemented VMX RS-232 path, while `kUSB1`/`kUSB2` are Linux USB serial
 devices and are intentionally left for a separate enumeration milestone; the
 adapter never hardcodes `/dev/ttyUSB0`-style names. Every kMXP object gets a
