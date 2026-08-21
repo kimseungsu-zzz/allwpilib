@@ -29,8 +29,9 @@ required for the rows in the WPILib section.
 this snapshot. Missing WPILib primitives are `BLOCKED_BY_HAL`, and paths that
 are available but still awaiting sensor verification are `NOT_TESTED`.
 
-For this milestone, `SUPPORTED` means the WPILib HAL/class dependency path is
-covered by a host/mock contract test and `hardwareValidated=false`. A row is
+For this milestone, `SUPPORTED` means the WPILib class-level contract and VMX
+adapter/mock-SDK contract both pass on the host (`softwareValidated=true`,
+`hardwareValidated=false`). A row is
 changed to `hardwareValidated=true` only after the same WPILib class is run on
 physical VMX-Pi or VMX2 hardware; no such claim is made below.
 
@@ -59,47 +60,45 @@ ID and a 50 ms keepalive worker. Physical board validation remains separate.
 | DigitalInput / limit switch | `NOT_TESTED` | Input-capable VMX DIO | Logical DIO 0??9 maps through the capability layer; selected FlexDIO/HighCurrent/CommDIO input capability and hardware smoke test remain. |
 | Beam Break / digital sensor | `NOT_TESTED` | Input-capable VMX DIO | Same input-capability and interrupt/resource constraints as a limit switch. |
 | AnalogInput | `SUPPORTED` | VMX AnalogInput / AccumulatorInput | Logical analog channels 0??, voltage conversion, averaging, and resource lifecycle are implemented and covered by native tests. |
-| AnalogPotentiometer | `NOT_TESTED` | Existing WPILib class ??AnalogInput | No additional HAL is required. Add a compatibility test for voltage-to-position scaling and channel lifetime. |
-| AnalogAccelerometer | `NOT_TESTED` | Existing WPILib class ??AnalogInput average voltage | No additional HAL is required. Add a compatibility test for zero, sensitivity, and units. |
-| AnalogEncoder | `NOT_TESTED` | Existing WPILib class ??AnalogInput voltage | No additional HAL is required. Add a compatibility test for 5 V normalization, range mapping, and inversion. |
-| SharpIR (WPILib) | `NOT_TESTED` | Existing WPILib class ??AnalogInput voltage | No additional HAL is required. Add a compatibility test for the published voltage-to-distance curves and clamping. |
-| Encoder | `NOT_TESTED` | VMX Encoder + valid DIO pair | Only FRC pairs 0+1, 2+3, 4+5, 6+7, and 8+9 are accepted; invalid pairs are rejected before activation. |
+| AnalogPotentiometer | `SUPPORTED` | Existing WPILib class -> AnalogInput | `softwareValidated=true`, `hardwareValidated=false`; real-class voltage scaling and lifecycle pass in `VMXSensorClassIntegrationTest`. |
+| AnalogAccelerometer | `SUPPORTED` | Existing WPILib class -> AnalogInput average voltage | `softwareValidated=true`, `hardwareValidated=false`; zero/sensitivity/units are covered by the class harness. |
+| AnalogEncoder | `SUPPORTED` | Existing WPILib class -> AnalogInput voltage | `softwareValidated=true`, `hardwareValidated=false`; class-level absolute-position contract passes. |
+| SharpIR (WPILib) | `SUPPORTED` | Existing WPILib class -> AnalogInput voltage | `softwareValidated=true`, `hardwareValidated=false`; range/clamping behavior passes through the real class. |
+| Encoder | `SUPPORTED` | VMX Encoder + valid DIO pair | `softwareValidated=true`, `hardwareValidated=false`; mock count/distance/reverse readback and lifecycle pass. Only FRC pairs 0+1, 2+3, 4+5, 6+7, and 8+9 are accepted. |
 | DutyCycle | `SUPPORTED` | FlexDIO 0-11 + VMX PWMCapture | Existing `hal/DutyCycle.h` ABI is implemented with period/high-time conversion, DIO ownership handoff, shared FlexTimer groups, and stable logical FPGA indices. AnalogTrigger, HighCurrent, and CommDIO sources are explicitly rejected. Hardware smoke test remains. |
-| DutyCycleEncoder | `NOT_TESTED` | Existing WPILib class + DutyCycle HAL | The standard class now has its required HAL path. Validate frequency threshold, connected/disconnected behavior, offset/scaling, and selected FlexDIO hardware on VMX. |
-| DutyCycleInput | `NOT_TESTED` | Existing WPILib class + DutyCycle HAL | The shared HAL path is present; add a sensor-level test for the WPILib wrapper and source lifetime. |
-| Tachometer | `NOT_TESTED` | Counter single-source InputCapture | Single-source hardware-backed activation is available; sensor-level period validation remains. |
+| DutyCycleEncoder | `SUPPORTED` | Existing WPILib class + DutyCycle HAL | `softwareValidated=true`, `hardwareValidated=false`; mock position/connected state and close pass. |
+| DutyCycleInput | `SUPPORTED` | Existing WPILib duty-cycle wrapper + DutyCycle HAL | `softwareValidated=true`, `hardwareValidated=false`; shared source-lifetime contract passes. |
+| Tachometer | `SUPPORTED` | Counter single-source InputCapture | `softwareValidated=true`, `hardwareValidated=false`; real class construction/configuration passes. |
 | Counter | `PARTIAL` | VMX InputCapture Counter + DIO sources | Six official pairs are recognized. TwoPulse supports the shared VMX up/down capture resource for a valid pair (and the same source for both inputs); SemiPeriod is hardware-backed; ExternalDirection is limited to pairs 0+1 through 8+9; PulseLength remains unsupported. |
-| Ultrasonic | `NOT_TESTED` | Output-capable DIO ping + Counter SemiPeriod echo | DIO output capability and single-source SemiPeriod must both be available on the selected physical channels; add a hardware smoke test. |
+| Ultrasonic | `SUPPORTED` | Output-capable DIO ping + Counter SemiPeriod echo | `softwareValidated=true`, `hardwareValidated=false`; mock pulse/range/validity conversion passes through the real class. |
 | PWM output / PWMVictorSPX | `NOT_TESTED` | PWMGenerator-capable logical PWM | Logical PWM 0??7 maps to physical 0??1 and 26??1; SDK output capability and shared resource ownership are enforced. |
 | ADXL345_I2C | `SUPPORTED` | WPILib `I2C` ??VMX MXP I2C HAL | Standard WPILib register transactions now reach the shared VMX I2C resource. The ADXL345 WHO_AM_I and one-register read/write sequence are the first sensor-level I2C smoke test. |
-| ADXL345_SPI | `NOT_TESTED` | Basic SPI transactions on VMX MXP | The WPILib path uses mode 3, active-high CS, and 500 kHz; the VMX basic path can represent these settings, but construction/configuration and WHO_AM_I data have not been tested on hardware. |
-| ADXL362 | `NOT_TESTED` | Basic SPI transactions on VMX SPI connector | The default WPILib constructor selects onboard CS1, which aliases the VMX SPI connector; the basic mode-3, active-low transaction path still needs sensor-level validation. |
-| ADXRS450_Gyro | `NOT_TESTED` | Basic SPI plus HAL-owned AutoSPI accumulator | Onboard CS0 aliases the VMX SPI connector and the standard transaction plus `SPI::InitAccumulator` path is now available. Sensor-level construction/device-ID and accumulator integration testing remains. |
+| ADXL345_SPI | `SUPPORTED` | Basic SPI transactions on VMX MXP | `softwareValidated=true`, `hardwareValidated=false`; the real class verifies XYZ scaling through the SPI mock path. |
+| ADXL362 | `SUPPORTED` | Basic SPI transactions on VMX SPI connector | `softwareValidated=true`, `hardwareValidated=false`; onboard-CS1 construction and XYZ scaling pass. |
+| ADXRS450_Gyro | `SUPPORTED` | Basic SPI plus HAL-owned AutoSPI accumulator | `softwareValidated=true`, `hardwareValidated=false`; class angle/rate and HAL AutoSPI accumulator contracts pass. |
 | ADIS16448_IMU | `BLOCKED_BY_HAL` | MXP basic SPI, SPI Auto, DIO reset/status pins | The default MXP bus is available for register setup and rate/trigger AutoSPI exists, but the class requires precise `ConfigureAutoStall` semantics, an asynchronous acquire loop, and DIO 18/19/10 resources. Stall timing is the HAL blocker. |
 | ADIS16470_IMU | `BLOCKED_BY_HAL` | Onboard-CS0 basic SPI, SPI Auto, DIO reset/data-ready/LED pins | Rate/trigger AutoSPI exists, but the class requires precise `ConfigureAutoStall`; its roboRIO-fixed DIO 27 reset, 28 status LED, and 26 data-ready routing also conflicts with VMX CommDIO/SPI physical resources. |
-| AnalogGyro | `NOT_TESTED` | Existing AnalogInput + AccumulatorInput resource through the VMX AnalogGyro HAL | The complete AnalogGyro C ABI is implemented for logical channels 0 and 1 with fixed 46.5 kS/s scaling, injectable five-second calibration, center/offset, deadband, reset, angle, and rate paths. Sensor-level construction and physical validation remain. |
+| AnalogGyro | `SUPPORTED` | Existing AnalogInput + AccumulatorInput resource through the VMX AnalogGyro HAL | `softwareValidated=true`, `hardwareValidated=false`; real-class angle/rate/reset path passes. Logical channels remain 0 and 1. |
 | AddressableLED | `SUPPORTED` | VMX `LEDArray_OneWire` resource through the standard AddressableLED C ABI | Color order, length/data lifecycle, strict bit-timing conversion, start/stop/render, PWM-handle handoff, and physical registry conflicts are covered by `VMXSensorIntegrationTest`; hardwareValidated=false. |
 | BuiltInAccelerometer | `SUPPORTED` | VMX AHRS `GetRawAccelX/Y/Z()` through the standard accelerometer C ABI | Raw calibrated sensor-frame values in G (gravity included) use identity X/Y/Z mapping. Active state is HAL-local; requested range is retained but VMX's fixed hardware range is not misreported as changed. Host/mock coverage exists; hardwareValidated=false. |
 
 ## Class-level integration closure audit
 
-The WPILib Java classes listed below have existing class-level simulation tests
-in `wpilibj/src/test/java` that validate public calculations and lifecycle.
-Those tests intentionally exercise WPILib's simulation HAL and are not
-counted as VMX evidence. The VMX adapter tests in `hal/src/test/native/cpp`
-cover the native resource and mock-SDK side separately; a row is promoted to
-`SUPPORTED` only when both sides are connected by a VMX-targeted class test.
-This keeps the matrix honest while the AArch64 SDK and board smoke fixtures
-are unavailable.
+`wpilibc/src/test/native/cpp/VMXSensorClassIntegrationTest.cpp` now instantiates
+the actual WPILib classes and drives their public reads through HAL mock data.
+The VMX adapter tests in `hal/src/test/native/cpp/vmx` cover the corresponding
+C ABI/resource operations against mock SDK backends. Together they are the
+host software contract (`softwareValidated=true`); they do not imply a
+physical VMX board test (`hardwareValidated=false`).
 
 | Class-level audit target | Current result | Remaining VMX evidence |
 | --- | --- | --- |
-| DigitalInput / limit switch | `NOT_TESTED` | VMX HAL class test with a mocked DIO input and physical capability claim. |
-| AnalogPotentiometer / AnalogAccelerometer / AnalogEncoder / SharpIR | `NOT_TESTED` | VMX-targeted Java class test must feed mock AnalogInput values through the selected native backend. |
-| Encoder / DutyCycleEncoder / DutyCycleInput / Tachometer | `NOT_TESTED` | VMX-targeted class construction, readback, and close test; native pair/timer tests already exist. |
-| Ultrasonic | `NOT_TESTED` | VMX-targeted ping/echo class test with mocked DIO/period capture. |
-| ADXL345_I2C / ADXL345_SPI / ADXL362 / ADXRS450_Gyro | `NOT_TESTED` | Device-register mock plus VMX Java class path; ADXRS additionally needs AutoSPI accumulator validation. |
-| AnalogGyro / BuiltInAccelerometer / AddressableLED | `NOT_TESTED` / `SUPPORTED` / `SUPPORTED` | AnalogGyro still needs class-level VMX test; the latter two already have native host/mock contracts but remain hardwareValidated=false. |
+| DigitalInput / limit switch | `NOT_TESTED` | A class-level readback fixture is still needed; the VMX DIO native contract is covered. |
+| AnalogPotentiometer / AnalogAccelerometer / AnalogEncoder / SharpIR | `SUPPORTED` | `softwareValidated=true`, `hardwareValidated=false` in `VMXSensorClassIntegrationTest`. |
+| Encoder / DutyCycleEncoder / DutyCycleInput / Tachometer | `SUPPORTED` | `softwareValidated=true`, `hardwareValidated=false`; class readback/lifecycle and native pair/timer contracts pass. |
+| Ultrasonic | `SUPPORTED` | `softwareValidated=true`, `hardwareValidated=false`; class range/validity conversion passes. |
+| ADXL345_I2C / ADXL345_SPI / ADXL362 / ADXRS450_Gyro | `SUPPORTED` | `softwareValidated=true`, `hardwareValidated=false`; axis and angle/rate mock paths pass, with ADXRS AutoSPI HAL tests. |
+| AnalogGyro / BuiltInAccelerometer / AddressableLED | `SUPPORTED` / `SUPPORTED` / `SUPPORTED` | All have host class/native contracts; `hardwareValidated=false` remains explicit. |
 
 ## WPILib CAN hardware dependency audit
 
@@ -149,11 +148,11 @@ unchanged `vmxdrivers` sources and then bound to Java, C++, and Python.
 | --- | --- | --- |
 | VMX onboard IMU / NavX-style data | `VENDOR_API` | `studica::VMXIMU` reads the shared VMXRuntime AHRS and exposes orientation, continuous angle/rate, quaternion, raw/world acceleration, gyro/magnetometer, heading, state, timestamp, temperature, firmware, and validity-guarded pressure/altitude. `hardwareValidated=false`; it is not WPILib `BuiltInAccelerometer` or `AnalogGyro`. |
 | Titan Quad / Titan Quad Encoder | `VENDOR_API` | `studica::TitanQuad`, `studica::TitanQuadEncoder`, Java `com.studica.frc` wrappers, and `StudicaTitan_*` C ABI. CAN IDs 1--62, motor ports 0--3, shared controller per CAN ID, 50 ms watchdog refresh, motor/encoder/absolute-angle/limit/configuration paths, and explicit safe zero/disable on stale DS/e-stop/close. `hardwareValidated=false`; this does not promote WPILib motor-controller, Encoder, or DutyCycleEncoder rows. |
-| Studica Cobra | `VENDOR_API` | Use the Studica driver API through a separate adapter. |
+| Studica Cobra | `VENDOR_API` | `softwareValidated=true`, `hardwareValidated=false`; `StudicaCobra_*`, `studica::Cobra`, Java `com.studica.frc.Cobra`, and the future Python ctypes binding wrap immutable `vmxdrivers::Cobra`. Four raw/voltage channels (0--3), strict validation, shared I2C reservation, and metadata access are implemented. |
 | Studica Sharp | `VENDOR_API` | Distinct from the WPILib `SharpIR` analog class; use the Studica driver API. |
 | Studica Parsec | `VENDOR_API` | Use the Studica driver API through a separate adapter. |
 | Studica Colore | `VENDOR_API` | Use the Studica driver API through a separate adapter. |
-| Studica Light Tower | `VENDOR_API` | Future separate adapter; do not add product-specific fields to WPILib HAL. |
+| Studica Light Tower | `VENDOR_API` | `softwareValidated=true`, `hardwareValidated=false`; `StudicaLightTower_*`, `studica::LightTower`, and Java `com.studica.frc.LightTower` delegate solid/blink, red/yellow/green/buzzer, and off to immutable `vmxdrivers::LightTower`. Five physical outputs are centrally reserved. |
 | VMX-specific Power/SOC | `VENDOR_API` | Future capability-gated telemetry wrapper; standard RobotController semantics remain separate. |
 
 `vmxdrivers/` remains an upstream-source area. It must not receive WPILib
@@ -163,29 +162,25 @@ separate vendor wrapper module.
 
 ## Validation order
 
-1. Run the VMX-targeted class-level mock suite for the remaining `NOT_TESTED`
-   rows (AnalogPotentiometer, AnalogAccelerometer, AnalogEncoder, SharpIR,
-   AnalogGyro, Ultrasonic, and ADXL345_I2C first) without changing public
-   APIs; simulation-only tests do not promote a row.
-2. Validate DutyCycle, DutyCycleEncoder, and DutyCycleInput on physical VMX
-   hardware.
-3. Validate the basic SPI sensor paths for ADXL345_SPI and ADXL362, then run
+1. Run physical VMX-Pi/VMX2 checks for the class-level rows that now have
+   `softwareValidated=true` (analog, encoder, duty-cycle, tachometer,
+   ultrasonic, ADXL, ADXRS450, and AnalogGyro).
+2. Validate the basic SPI sensor paths for ADXL345_SPI and ADXL362, then run
    the ADXRS450_Gyro standard-SPI plus AutoSPI accumulator integration path.
    ADIS16448_IMU and ADIS16470_IMU remain blocked until precise AutoStall and
    their additional DIO routing requirements are resolved.
-4. Run a real VMX-Pi/VMX2 Driver Station smoke test: UDP control-word modes,
+3. Run a real VMX-Pi/VMX2 Driver Station smoke test: UDP control-word modes,
    timeout/reconnect, all six joystick slots, TCP descriptors/match/game data,
    new-data events, observe-program heartbeats, and rumble/output. Keep the
    local-console-only error/console boundary explicit until outbound TCP
    encoding is validated.
-5. Validate VMX CAN loopback and then CTRE PCM, REV PH, PDP, and PDH frame
+4. Validate VMX CAN loopback and then CTRE PCM, REV PH, PDP, and PDH frame
    integration without changing their public WPILib APIs.
-6. Validate hardware watchdog output disable/recovery with fresh/stale DS data,
+5. Validate hardware watchdog output disable/recovery with fresh/stale DS data,
    program heartbeat timeout, eStop, and HAL shutdown.
-7. Close the Counter single-source/semiperiod gap before validating
-   Tachometer and Ultrasonic.
-8. Run physical AddressableLED and BuiltInAccelerometer class smoke tests and
+6. Run physical AddressableLED and BuiltInAccelerometer class smoke tests and
    promote their separate `hardwareValidated` field only after those tests.
-9. Implement vendor adapters in order: Cobra, Parsec/Colore, and Light Tower,
-   with VMX-specific Power/SOC as a capability-gated API; Titan is complete
-   at the native/Java/Python-ABI layer and awaits physical board validation.
+7. Validate the Cobra and Light Tower vendor adapters on hardware, then
+   implement Parsec/Colore. VMX-specific Power/SOC remains a capability-gated
+   API candidate; Titan is complete at the native/Java/Python-ABI layer and
+   awaits physical board validation.

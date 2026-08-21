@@ -126,13 +126,22 @@ the backend. The Titan Quad vendor layer is now available as
 `vmxdrivers::Titan` controller per CAN ID, refreshes outputs every 50 ms,
 exposes motor/encoder/RPM/Cypher-angle/limit/configuration paths, and
 explicitly zeros/disables on close, stale Driver Station state, e-stop, or HAL
-shutdown. `hardwareValidated=false` until board tests run. The remaining
-vendor backlog is Cobra, Parsec/Colore, then Light Tower, with VMX-specific
-Power/SOC as a capability-gated vendor API.
-The synchronized sensor matrix records the remaining class-level `NOT_TESTED`
-rows explicitly: existing WPILib simulation tests and native HAL unit tests
-are not promoted to VMX `SUPPORTED` until a VMX-targeted Java class test can
-feed mock SDK data through the selected backend.
+shutdown. `hardwareValidated=false` until board tests run. The Cobra vendor
+layer now wraps immutable `vmxdrivers::Cobra` through the fixed-width
+`StudicaCobra_*` ABI, `studica::Cobra`, and `com.studica.frc.Cobra`; it exposes
+four raw/voltage channels and shares only the physical I2C bus with WPILib I2C.
+The Light Tower vendor layer similarly exposes `StudicaLightTower_*`,
+`studica::LightTower`, and `com.studica.frc.LightTower`, delegating
+solid/blink, red/yellow/green/buzzer, and off to immutable
+`vmxdrivers::LightTower` while centrally reserving five physical outputs.
+Both vendor rows are `softwareValidated=true` and `hardwareValidated=false`.
+The synchronized matrix now records the class-level closure harness:
+`wpilibc/src/test/native/cpp/VMXSensorClassIntegrationTest.cpp` instantiates
+the real WPILib classes and drives public reads through HAL mock data, while
+the VMX native tests cover the corresponding adapter/mock-SDK contracts. The
+listed analog, encoder, duty-cycle, tachometer, ultrasonic, ADXL, ADXRS450,
+and AnalogGyro rows are software-validated; physical validation is still
+separate and never implied.
 
 The ordinary Android CMake workflow remains VMX-isolated and now passes the
 ABI explicitly as both `ANDROID_ABI` and `CMAKE_ANDROID_ARCH_ABI`, including

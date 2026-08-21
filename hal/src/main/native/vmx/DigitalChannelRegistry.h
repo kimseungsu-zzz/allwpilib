@@ -24,6 +24,10 @@ enum class DigitalChannelOwner {
   kUART,
   kDutyCycle,
   kAddressableLED,
+  // Studica vendor resources.  Cobra shares the physical I2C bus with the
+  // standard WPILib I2C aliases; LightTower owns its output pins exclusively.
+  kCobra,
+  kLightTower,
 };
 
 struct DigitalChannelReservation {
@@ -64,6 +68,64 @@ class DigitalChannelRegistry final {
     auto& entry = m_entries[channel];
     if (entry.owner == owner) {
       entry = {};
+    }
+  }
+
+  // Reserve one of the two physical I2C pins for a resource that can share
+  // the bus with the compatible owner.  Generic DIO/PWM/SPI/UART resources
+  // still conflict normally.  Keeping the reference counts in the central
+  // registry prevents one shared user from releasing the other user's
+  // reservation.
+  DigitalChannelReservation ReserveShared(
+      int32_t channel, DigitalChannelOwner owner,
+      std::string_view allocationLocation,
+      DigitalChannelOwner compatibleOwner) {
+    std::scoped_lock lock{m_mutex};
+    if (channel < 0 || channel >= kNumPhysicalChannels ||
+        !IsI2CSharedOwner(owner) || !IsI2CSharedOwner(compatibleOwner) ||
+        owner == compatibleOwner) {
+      return {};
+    }
+
+    auto& entry = m_entries[channel];
+    if (entry.owner == DigitalChannelOwner::kNone) {
+      entry.owner = owner;
+      entry.allocationLocation = allocationLocation;
+      SetSharedReference(entry, owner, 1);
+      return {true, DigitalChannelOwner::kNone, {}};
+    }
+
+    if (entry.owner != owner && entry.owner != compatibleOwner) {
+      return {false, entry.owner, entry.allocationLocation};
+    }
+    // A legacy direct Reserve() may have populated the owner without a
+    // shared count.  Treat that owner as one active reference before adding
+    // the compatible resource.
+    EnsureSharedReference(entry, entry.owner);
+    AddSharedReference(entry, owner);
+    return {true, entry.owner, entry.allocationLocation};
+  }
+
+  void ReleaseShared(int32_t channel, DigitalChannelOwner owner) noexcept {
+    std::scoped_lock lock{m_mutex};
+    if (channel < 0 || channel >= kNumPhysicalChannels ||
+        !IsI2CSharedOwner(owner)) {
+      return;
+    }
+    auto& entry = m_entries[channel];
+    if (GetSharedReference(entry, owner) == 0) {
+      return;
+    }
+    SetSharedReference(entry, owner, GetSharedReference(entry, owner) - 1);
+    if (entry.i2cReferences == 0 && entry.cobraReferences == 0) {
+      entry = {};
+    } else if (entry.owner == owner && GetSharedReference(entry, owner) == 0) {
+      entry.owner = owner == DigitalChannelOwner::kI2C
+                        ? DigitalChannelOwner::kCobra
+                        : DigitalChannelOwner::kI2C;
+      entry.allocationLocation = entry.owner == DigitalChannelOwner::kI2C
+                                     ? "VMX I2C shared bus"
+                                     : "Studica Cobra shared bus";
     }
   }
 
@@ -133,6 +195,8 @@ class DigitalChannelRegistry final {
   struct Entry {
     DigitalChannelOwner owner = DigitalChannelOwner::kNone;
     std::string allocationLocation;
+    uint32_t i2cReferences = 0;
+    uint32_t cobraReferences = 0;
   };
 
   struct TimerEntry {
@@ -144,6 +208,39 @@ class DigitalChannelRegistry final {
     return physicalChannel >= 0 && physicalChannel < 12
                ? physicalChannel / 2
                : -1;
+  }
+
+  static constexpr bool IsI2CSharedOwner(DigitalChannelOwner owner) noexcept {
+    return owner == DigitalChannelOwner::kI2C ||
+           owner == DigitalChannelOwner::kCobra;
+  }
+
+  static uint32_t GetSharedReference(
+      const Entry& entry, DigitalChannelOwner owner) noexcept {
+    return owner == DigitalChannelOwner::kI2C ? entry.i2cReferences
+                                              : entry.cobraReferences;
+  }
+
+  static void SetSharedReference(Entry& entry, DigitalChannelOwner owner,
+                                 uint32_t value) noexcept {
+    if (owner == DigitalChannelOwner::kI2C) {
+      entry.i2cReferences = value;
+    } else if (owner == DigitalChannelOwner::kCobra) {
+      entry.cobraReferences = value;
+    }
+  }
+
+  static void EnsureSharedReference(Entry& entry,
+                                    DigitalChannelOwner owner) noexcept {
+    if (GetSharedReference(entry, owner) == 0) {
+      SetSharedReference(entry, owner, 1);
+    }
+  }
+
+  static void AddSharedReference(Entry& entry,
+                                 DigitalChannelOwner owner) noexcept {
+    auto references = GetSharedReference(entry, owner);
+    SetSharedReference(entry, owner, references + 1);
   }
 
   std::mutex m_mutex;

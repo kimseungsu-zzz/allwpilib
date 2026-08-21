@@ -88,8 +88,8 @@ class I2CManager final {
     auto& state = m_port;
     std::scoped_lock lock{state.mutex};
     if (state.referenceCount > 0) {
-      m_registry.Release(state.sdaChannel, DigitalChannelOwner::kI2C);
-      m_registry.Release(state.sclChannel, DigitalChannelOwner::kI2C);
+      m_registry.ReleaseShared(state.sdaChannel, DigitalChannelOwner::kI2C);
+      m_registry.ReleaseShared(state.sclChannel, DigitalChannelOwner::kI2C);
     }
     state.referenceCount = 0;
     state.backend.reset();
@@ -119,15 +119,17 @@ class I2CManager final {
       }
       int32_t sda = map.i2cSDA;
       int32_t scl = map.i2cSCL;
-      auto sdaReservation = m_registry.Reserve(
-          sda, DigitalChannelOwner::kI2C, "VMX I2C SDA");
+      auto sdaReservation = m_registry.ReserveShared(
+          sda, DigitalChannelOwner::kI2C, "VMX I2C SDA",
+          DigitalChannelOwner::kCobra);
       if (!sdaReservation.reserved) {
         return I2CResult::kResourceConflict;
       }
-      auto sclReservation = m_registry.Reserve(
-          scl, DigitalChannelOwner::kI2C, "VMX I2C SCL");
+      auto sclReservation = m_registry.ReserveShared(
+          scl, DigitalChannelOwner::kI2C, "VMX I2C SCL",
+          DigitalChannelOwner::kCobra);
       if (!sclReservation.reserved) {
-        m_registry.Release(sda, DigitalChannelOwner::kI2C);
+        m_registry.ReleaseShared(sda, DigitalChannelOwner::kI2C);
         return I2CResult::kResourceConflict;
       }
       try {
@@ -136,27 +138,29 @@ class I2CManager final {
         state.backend.reset();
       }
       if (!state.backend) {
-        m_registry.Release(sda, DigitalChannelOwner::kI2C);
-        m_registry.Release(scl, DigitalChannelOwner::kI2C);
+        m_registry.ReleaseShared(sda, DigitalChannelOwner::kI2C);
+        m_registry.ReleaseShared(scl, DigitalChannelOwner::kI2C);
         return I2CResult::kHardwareFailure;
       }
       int32_t actualSda = sda;
       int32_t actualScl = scl;
       if (state.backend->GetPhysicalChannels(actualSda, actualScl) &&
           (actualSda != sda || actualScl != scl)) {
-        m_registry.Release(sda, DigitalChannelOwner::kI2C);
-        m_registry.Release(scl, DigitalChannelOwner::kI2C);
-        auto actualSdaReservation = m_registry.Reserve(
-            actualSda, DigitalChannelOwner::kI2C, "VMX I2C SDA");
-        auto actualSclReservation = m_registry.Reserve(
-            actualScl, DigitalChannelOwner::kI2C, "VMX I2C SCL");
+        m_registry.ReleaseShared(sda, DigitalChannelOwner::kI2C);
+        m_registry.ReleaseShared(scl, DigitalChannelOwner::kI2C);
+        auto actualSdaReservation = m_registry.ReserveShared(
+            actualSda, DigitalChannelOwner::kI2C, "VMX I2C SDA",
+            DigitalChannelOwner::kCobra);
+        auto actualSclReservation = m_registry.ReserveShared(
+            actualScl, DigitalChannelOwner::kI2C, "VMX I2C SCL",
+            DigitalChannelOwner::kCobra);
         if (!actualSdaReservation.reserved ||
             !actualSclReservation.reserved) {
           if (actualSdaReservation.reserved) {
-            m_registry.Release(actualSda, DigitalChannelOwner::kI2C);
+            m_registry.ReleaseShared(actualSda, DigitalChannelOwner::kI2C);
           }
           if (actualSclReservation.reserved) {
-            m_registry.Release(actualScl, DigitalChannelOwner::kI2C);
+            m_registry.ReleaseShared(actualScl, DigitalChannelOwner::kI2C);
           }
           state.backend.reset();
           return I2CResult::kResourceConflict;
@@ -183,8 +187,8 @@ class I2CManager final {
     }
     --state.referenceCount;
     if (state.referenceCount == 0) {
-      m_registry.Release(state.sdaChannel, DigitalChannelOwner::kI2C);
-      m_registry.Release(state.sclChannel, DigitalChannelOwner::kI2C);
+      m_registry.ReleaseShared(state.sdaChannel, DigitalChannelOwner::kI2C);
+      m_registry.ReleaseShared(state.sclChannel, DigitalChannelOwner::kI2C);
       state.backend.reset();
       state.sdaChannel = -1;
       state.sclChannel = -1;

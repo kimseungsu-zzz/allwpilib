@@ -19,6 +19,8 @@
 #include "VMXCANInternal.h"
 #include "hal/handles/HandlesInternal.h"
 #include "studica/Titan.h"
+#include "studica/Cobra.h"
+#include "studica/LightTower.h"
 
 namespace {
 std::mutex gHalLifecycleMutex;
@@ -69,6 +71,8 @@ HAL_Bool HAL_Initialize(int32_t timeout, int32_t mode) {
       hal::vmx::ShutdownDriverStation();
       hal::vmx::ShutdownCAN();
       StudicaTitan_ShutdownAll();
+      StudicaCobra_ShutdownAll();
+      StudicaLightTower_ShutdownAll();
       hal::init::HAL_IsInitialized.store(false, std::memory_order_release);
       hal::vmx::ShutdownRuntime();
       return false;
@@ -82,6 +86,8 @@ HAL_Bool HAL_Initialize(int32_t timeout, int32_t mode) {
     hal::vmx::ShutdownDriverStation();
     hal::vmx::ShutdownCAN();
     StudicaTitan_ShutdownAll();
+    StudicaCobra_ShutdownAll();
+    StudicaLightTower_ShutdownAll();
     hal::vmx::ShutdownRuntime();
     return false;
   }
@@ -99,6 +105,8 @@ void HAL_Shutdown(void) {
   // Vendor workers must stop and command zero before the shared VMXPi context
   // is released by ShutdownRuntime().
   StudicaTitan_ShutdownAll();
+  StudicaCobra_ShutdownAll();
+  StudicaLightTower_ShutdownAll();
   hal::vmx::ShutdownRuntime();
 }
 

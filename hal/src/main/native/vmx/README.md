@@ -158,11 +158,44 @@ The host binding intentionally reports `available=false`; physical Titan
 validation is tracked separately as `hardwareValidated=false` in the matrix.
 The imported `vmxdrivers/` source files remain unchanged.
 
+## Studica Cobra vendor API
+
+`hal/src/main/native/include/studica/Cobra.h` defines the fixed-width
+`StudicaCobra_*` C ABI, `studica::Cobra` facade, and Java
+`com.studica.frc.Cobra`; the same C layout is suitable for Python ctypes. The
+VMX adapter delegates to the pinned, unchanged `vmxdrivers::Cobra` and exposes
+four channels (`0..3`) with raw ADC and voltage reads, channel count, and
+reference voltage. Invalid channels and reference voltages are rejected before
+allocation, and unavailable host builds return explicit status values rather
+than synthetic sensor data.
+
+Cobra is an I2C-based vendor device, not a second implementation of WPILib's
+I2C class. Its SDA/SCL claims use the central registry's shared-I2C facility:
+Cobra can coexist with other I2C slaves on the same bus, but a generic DIO,
+PWM, SPI, or UART claim on physical `32/33` blocks activation. All bindings
+reuse the existing `VMXRuntime` context; no VMX driver source is modified.
+
+## Studica Light Tower vendor API
+
+`StudicaLightTower_*`, `studica::LightTower`, and
+`com.studica.frc.LightTower` are separate vendor bindings for the pinned
+`vmxdrivers::LightTower`. The adapter exposes red, yellow, green, and buzzer
+outputs plus the driver's continuous pin as `SetSolid()`/`SetBlink()` and
+`Off()`. It does not invent custom-frequency blink or turn the tower into a
+WPILib HAL DIO abstraction. Constructor pin arguments are VMX physical DIO
+channels and all five must be distinct; the central registry rejects overlap
+with DIO/PWM/encoder/counter/other Light Tower resources. Host bindings retain
+the output API but report `available=false` and never fake hardware state.
+
+Both vendor APIs record `softwareValidated=true` and
+`hardwareValidated=false` until a physical VMX-Pi/VMX2 board test is run. The
+`vmxdrivers/` source directory remains byte-for-byte unchanged.
+
 ## Studica vendor backlog
 
 Studica-specific modules stay outside WPILib's standard sensor surface. The
-implementation order is VMX IMU, Titan (implemented), Cobra,
-Parsec/Colore, then Light Tower. VMX-specific power/SOC telemetry is also a
+implementation order is VMX IMU, Titan (implemented), Cobra (implemented),
+Light Tower (implemented), then Parsec/Colore. VMX-specific power/SOC telemetry is also a
 vendor API candidate. Standard WPILib APIs remain the preferred path for
 Encoder, DutyCycleEncoder, DIO, Servo, Ultrasonic, and supported Sharp models;
 the vendor layer is reserved for VMX IMU, Titan, Cobra, Parsec, Colore, Light
@@ -379,9 +412,15 @@ explicit incompatible-state error because the SDK cannot represent the
 roboRIO CS-to-SCLK, inter-read stall, and power-of-two byte semantics; no
 software sleep is used to fake that timing.
 
-ADXL345_SPI and ADXL362 remain `NOT_TESTED` pending sensor-level validation.
-ADXRS450 now has its standard-SPI plus AutoSPI accumulator dependency path,
-with its integration test still pending. ADIS16448 and ADIS16470 remain
+The host class-closure harness in
+`wpilibc/src/test/native/cpp/VMXSensorClassIntegrationTest.cpp` now instantiates
+the real AnalogPotentiometer, AnalogAccelerometer, AnalogEncoder, SharpIR,
+Encoder, DutyCycleEncoder, Tachometer, Ultrasonic, ADXL345 (I2C/SPI), ADXL362,
+ADXRS450, and AnalogGyro classes and verifies public readback from mock HAL
+data. The matching VMX native adapter tests cover the C ABI/resource side;
+these rows are `softwareValidated=true`, while `hardwareValidated=false`
+remains explicit until a physical board run.
+ADIS16448 and ADIS16470 remain
 `BLOCKED_BY_HAL`: both require precise AutoStall semantics, and ADIS16470 also
 uses roboRIO-fixed DIO routing that conflicts with VMX CommDIO resources.
 The synchronized [sensor compatibility matrix](VMX_SENSOR_COMPATIBILITY.md)
