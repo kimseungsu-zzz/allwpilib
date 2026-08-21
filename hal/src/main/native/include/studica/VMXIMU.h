@@ -4,8 +4,12 @@
 
 #pragma once
 
+#ifdef __cplusplus
 #include <cstdint>
 #include <string>
+#else
+#include <stdint.h>
+#endif
 
 // This is a vendor API.  It deliberately does not add orientation fields to
 // the WPILib HAL accelerometer or gyro contracts.  The C layout below is the
