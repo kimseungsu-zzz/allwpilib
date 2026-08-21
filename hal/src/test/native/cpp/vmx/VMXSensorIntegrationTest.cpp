@@ -86,10 +86,10 @@ TEST(VMXAddressableLEDIntegrationTest, LifecycleAndDataValidation) {
             AddressableLEDResult::kOk);
   EXPECT_EQ(port.GetLength(), 1);
 
-  HAL_AddressableLEDData pixel{3, 2, 1, 0};
+  HAL_AddressableLEDData pixels[2]{{3, 2, 1, 0}, {0, 0, 0, 0}};
   EXPECT_EQ(port.Write(nullptr, 1), AddressableLEDResult::kInvalidParameter);
-  EXPECT_EQ(port.Write(&pixel, 2), AddressableLEDResult::kInvalidParameter);
-  EXPECT_EQ(port.Write(&pixel, 1), AddressableLEDResult::kOk);
+  EXPECT_EQ(port.Write(pixels, 2), AddressableLEDResult::kInvalidParameter);
+  EXPECT_EQ(port.Write(pixels, 1), AddressableLEDResult::kOk);
   EXPECT_EQ(backend->lastData[0].r, 1);
   EXPECT_EQ(backend->lastData[0].g, 2);
   EXPECT_EQ(backend->lastData[0].b, 3);
