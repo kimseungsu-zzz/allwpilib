@@ -13,6 +13,8 @@
 #include "NotifierInternal.h"
 #include "SPIAutoInternal.h"
 #include "VMXRuntime.h"
+#include "VMXWatchdogInternal.h"
+#include "VMXCANInternal.h"
 #include "hal/handles/HandlesInternal.h"
 
 namespace {
@@ -51,11 +53,28 @@ HAL_Bool HAL_Initialize(int32_t timeout, int32_t mode) {
       return false;
     }
     hal::init::HAL_IsInitialized.store(true, std::memory_order_release);
+    if (!hal::vmx::InitializeCAN()) {
+      hal::init::HAL_IsInitialized.store(false, std::memory_order_release);
+      hal::vmx::ShutdownRuntime();
+      return false;
+    }
     hal::vmx::InitializeDriverStation();
+    if (!hal::vmx::InitializeHardwareWatchdog()) {
+      hal::vmx::ShutdownDriverStation();
+      hal::vmx::ShutdownCAN();
+      hal::init::HAL_IsInitialized.store(false, std::memory_order_release);
+      hal::vmx::ShutdownRuntime();
+      return false;
+    }
     return true;
   } catch (...) {
     // No C++ exception may cross the public C HAL ABI used by JNI/RobotPy.
     std::fputs("VMX HAL initialization failed: unexpected exception\n", stderr);
+    hal::init::HAL_IsInitialized.store(false, std::memory_order_release);
+    hal::vmx::ShutdownHardwareWatchdog();
+    hal::vmx::ShutdownDriverStation();
+    hal::vmx::ShutdownCAN();
+    hal::vmx::ShutdownRuntime();
     return false;
   }
 }
@@ -63,7 +82,9 @@ HAL_Bool HAL_Initialize(int32_t timeout, int32_t mode) {
 void HAL_Shutdown(void) {
   std::scoped_lock lock{gHalLifecycleMutex};
   hal::init::HAL_IsInitialized.store(false, std::memory_order_release);
+  hal::vmx::ShutdownHardwareWatchdog();
   hal::vmx::ShutdownDriverStation();
+  hal::vmx::ShutdownCAN();
   hal::vmx::ShutdownSPIAuto();
   hal::vmx::ShutdownNotifiers();
   hal::vmx::ShutdownRuntime();

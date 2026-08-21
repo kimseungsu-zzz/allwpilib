@@ -79,6 +79,23 @@ transport-injectable; physical DS enable/disable, joystick, reconnect, and
 match smoke tests remain `PARTIAL`, and error/console calls are guaranteed
 locally rather than claiming unverified TCP forwarding.
 
+The VMX CAN core now covers the raw CAN C ABI and CANAPI on one global VMX CAN
+bus. It sets the bus to FRC-compatible 1 Mbps normal mode once at runtime
+startup, maps one-shot/periodic/cancel sends, standard/extended/RTR IDs,
+hardware timestamps/status, software-owned stream sessions, logical CANAPI
+handles, and New/Latest/Timeout receive generations. CTRE PCM, REV Pneumatics
+Hub, PDP, and PDH dependencies have been audited but remain physical-device
+integration work rather than premature support claims. The hardware watchdog
+is SDK-backed with FlexDIO and HighCurrentDIO managed, CommDIO left unmanaged,
+and feeding gated by fresh Driver Station data, a recent user-program
+heartbeat, runtime health, and eStop state; timeout, eStop, runtime failure,
+and shutdown expire it immediately.
+
+The ordinary Android CMake workflow remains VMX-isolated and now passes the
+ABI explicitly as both `ANDROID_ABI` and `CMAKE_ANDROID_ARCH_ABI`, including
+the Android X64 configure path. VMX production builds remain explicit Linux
+AArch64-only builds.
+
 # Quick Start
 
 Below is a list of instructions that guide you through cloning, building, publishing and using local allwpilib binaries in a robot project. This quick start is not intended as a replacement for the information further listed in this document.

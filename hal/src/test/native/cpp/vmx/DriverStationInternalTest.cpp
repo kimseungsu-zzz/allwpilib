@@ -172,6 +172,24 @@ TEST(VMXDriverStationStateTest, InvalidPacketImmediatelyDisablesFreshState) {
   EXPECT_FALSE(word.dsAttached);
 }
 
+TEST(VMXDriverStationStateTest, FreshDataAndProgramHeartbeatAreSeparateSafetyInputs) {
+  uint64_t now = 1'000'000;
+  VMXDriverStationState state{[&now] { return now; }};
+  VMXDriverStationPacket packet;
+  packet.valid = true;
+  packet.controlWord.dsAttached = true;
+  state.CommitUdp(packet, now);
+  EXPECT_TRUE(state.IsFresh(now));
+  EXPECT_FALSE(state.IsProgramHeartbeatFresh(now));
+  state.ObserveProgram(0);
+  EXPECT_TRUE(state.IsProgramHeartbeatFresh(now));
+  now += 500'001;
+  EXPECT_TRUE(state.IsFresh(now));
+  EXPECT_FALSE(state.IsProgramHeartbeatFresh(now));
+  now += 1'500'000;
+  EXPECT_FALSE(state.IsFresh(now));
+}
+
 TEST(VMXDriverStationStateTest, ShutdownRejectsMutationsAndReadsSafeDefaults) {
   VMXDriverStationState state;
   state.Shutdown();

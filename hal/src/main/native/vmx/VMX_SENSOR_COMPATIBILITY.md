@@ -57,6 +57,19 @@ are available but still awaiting sensor verification are `NOT_TESTED`.
 | AnalogGyro | `NOT_TESTED` | Existing AnalogInput + AccumulatorInput resource through the VMX AnalogGyro HAL | The complete AnalogGyro C ABI is implemented for logical channels 0 and 1 with fixed 46.5 kS/s scaling, injectable five-second calibration, center/offset, deadband, reset, angle, and rate paths. Sensor-level construction and physical validation remain. |
 | BuiltInAccelerometer | `BLOCKED_BY_HAL` | Required accelerometer HAL is not present in the VMX backend | VMX onboard IMU data may be usable, but range, axis orientation, calibration, and g-vs-m/s² units must be verified before exposing `HAL_GetAccelerometerX/Y/Z`. |
 
+## WPILib CAN hardware dependency audit
+
+These rows record the existing WPILib vendor-device dependency on CANAPI. A
+working CAN HAL is not evidence that a particular physical device has been
+validated; each remains pending frame-level and hardware integration tests.
+
+| WPILib device class | Status | Current dependency | Next validation |
+| --- | --- | --- | --- |
+| CTRE PCM | `NOT_TESTED` | Existing `CTREPCM` implementation over logical CANAPI handle and timeout reads | Construct against a VMX CAN bus and validate compressor/solenoid frame decoding on hardware. |
+| REV Pneumatics Hub | `NOT_TESTED` | Existing `REVPH` implementation over logical CANAPI handle and timeout reads | Validate device discovery, solenoid/compressor status, and frame timing on hardware. |
+| PDP | `NOT_TESTED` | Existing `CTREPDP` implementation over CANAPI and stream sessions | Validate status/energy stream frames and current/voltage decoding on hardware. |
+| PDH | `NOT_TESTED` | Existing `REVPDH` implementation over CANAPI and stream sessions | Validate status/current/energy stream frames and sticky-fault behavior on hardware. |
+
 ## Current VMX HAL core snapshot
 
 | HAL/core | Status | Scope |
@@ -72,6 +85,9 @@ are available but still awaiting sensor verification are `NOT_TESTED`.
 | Timing / Notifier | `SUPPORTED` | VMX monotonic time and one global VMX timer-notification scheduler. |
 | DriverStation | `PARTIAL` | KauaiLabs VMX-pi UDP v1 control/joystick transport on 1110 plus TCP metadata on 1740, snapshot state, timeout/malformed-packet failsafe, eStop output interlock, refresh generation, events, modes, match info, and output peer. Local error/console output is supported; full physical DS smoke and outbound TCP message validation remain. |
 | RobotController power/status | `PARTIAL` | VMX system voltage, Linux thermal sysfs, runtime readiness, and wall-clock validity | Vin voltage is hardware-backed and CPU temperature uses a discovered CPU-like thermal zone. Current, user rails, fault reset, brownout/undervoltage, FPGA button, RSL, and Driver Station disable count are explicit `INCOMPATIBLE_STATE` results because the SDK has no equivalent APIs; VMX overcurrent is not brownout. RTC synchronization remains a separate runtime service. |
+| CAN / raw CAN C ABI | `SUPPORTED` | One global VMX CAN bus, one wildcard SDK receive stream, adapter-owned software streams, one-shot/periodic/cancel TX, masked RX, 11/29-bit and RTR flags, hardware timestamps, and hardware status mapping | VMX physical CAN loopback and device-bus smoke tests remain deployment validation. |
+| CANAPI | `SUPPORTED` | FIRST-layout logical device handles, packet write/repeat/RTR/stop, New/Latest/Timeout generation and age semantics, and stream cleanup | CTRE/REV/PDP/PDH frame-level integration remains pending. |
+| Hardware Watchdog | `SUPPORTED` | VMXIO 100 ms watchdog; FlexDIO and HighCurrentDIO managed, CommDIO unmanaged; DS freshness, program heartbeat, runtime health, eStop, and shutdown failsafe gate | Physical actuator-output disable and recovery test on VMX-Pi/VMX2 remain pending. |
 | I2C | `SUPPORTED` | One VMX physical bus at 32/33, shared and reference-counted by the kOnboard/kMXP aliases. |
 | DutyCycle | `SUPPORTED` | FlexDIO 0-11 VMX PWMCapture adapter with shared timer-group ownership and DIO handoff. |
 | SPI | `NOT_TESTED` | One physical CommDIO SPI bus at 28/29/30/31; `HAL_InitializeSPI`, transaction/write/read, clock, mode 0-3, and CS polarity use one shared resource. All five WPILib port names alias it. HAL-owned AutoSPI rate and DIO trigger (rising/falling/both) use timestamped fixed-capacity buffering; AnalogTrigger sources and exact AutoStall timing are unsupported. Sensor-level integration and physical validation remain. |
@@ -112,7 +128,11 @@ separate vendor wrapper module.
    new-data events, observe-program heartbeats, and rumble/output. Keep the
    local-console-only error/console boundary explicit until outbound TCP
    encoding is validated.
-5. Close the Counter single-source/semiperiod gap before validating
+5. Validate VMX CAN loopback and then CTRE PCM, REV PH, PDP, and PDH frame
+   integration without changing their public WPILib APIs.
+6. Validate hardware watchdog output disable/recovery with fresh/stale DS data,
+   program heartbeat timeout, eStop, and HAL shutdown.
+7. Close the Counter single-source/semiperiod gap before validating
    Tachometer and Ultrasonic.
-6. Verify VMX IMU mappings separately before deciding whether any
+8. Verify VMX IMU mappings separately before deciding whether any
    BuiltInAccelerometer compatibility claim is justified.

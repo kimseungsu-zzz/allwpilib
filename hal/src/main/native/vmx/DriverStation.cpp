@@ -26,6 +26,7 @@
 #include "HALInitializer.h"
 #include "hal/DriverStation.h"
 #include "hal/Errors.h"
+#include "VMXWatchdogInternal.h"
 
 namespace hal::vmx {
 namespace {
@@ -316,7 +317,10 @@ struct VMXDriverStationRuntime final {
   VMXDriverStationTransport transport;
 
   VMXDriverStationRuntime()
-      : state{VMXDriverStationState::Clock{}, [this] { events.Wakeup(); }} {
+      : state{VMXDriverStationState::Clock{}, [this] {
+          events.Wakeup();
+          NotifyWatchdogStateChanged();
+        }} {
     state.SetOutput([this](int32_t joystick, int64_t outputs, int32_t left,
                            int32_t right) {
       return transport.SendJoystickOutputs(joystick, outputs, left, right);

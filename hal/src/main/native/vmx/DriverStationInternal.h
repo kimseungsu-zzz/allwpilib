@@ -543,6 +543,7 @@ class VMXDriverStationState final {
     {
       std::scoped_lock lock{m_mutex};
       m_programMode = mode;
+      m_lastProgramObservation = m_clock();
       program = m_program;
     }
     if (program) {
@@ -587,6 +588,31 @@ class VMXDriverStationState final {
     std::scoped_lock lock{m_mutex};
     const auto word = EffectiveControlWordLocked();
     return word.enabled && word.dsAttached && !word.eStop;
+  }
+
+  bool IsFresh(uint64_t now = 0) const {
+    if (now == 0) {
+      now = m_clock();
+    }
+    std::scoped_lock lock{m_mutex};
+    return !m_shutdown && m_fresh && now >= m_lastPacket &&
+           now - m_lastPacket <= m_timeoutMicros;
+  }
+
+  bool IsEStop() const {
+    std::scoped_lock lock{m_mutex};
+    return !m_shutdown && m_fresh && m_packet.controlWord.eStop;
+  }
+
+  bool IsProgramHeartbeatFresh(uint64_t now = 0,
+                               uint64_t timeoutMicros = 500'000) const {
+    if (now == 0) {
+      now = m_clock();
+    }
+    std::scoped_lock lock{m_mutex};
+    return !m_shutdown && m_lastProgramObservation != 0 &&
+           now >= m_lastProgramObservation &&
+           now - m_lastProgramObservation <= timeoutMicros;
   }
 
  private:
@@ -682,6 +708,7 @@ class VMXDriverStationState final {
   Program m_program;
   VMXDriverStationPacket m_packet;
   uint64_t m_lastPacket = 0;
+  uint64_t m_lastProgramObservation = 0;
   uint64_t m_timeoutMicros = 2'000'000;
   uint64_t m_generation = 0;
   uint64_t m_lastRefreshGeneration = 0;

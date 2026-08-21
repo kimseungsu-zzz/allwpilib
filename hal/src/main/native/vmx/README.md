@@ -292,6 +292,62 @@ uses roboRIO-fixed DIO routing that conflicts with VMX CommDIO resources.
 The synchronized [sensor compatibility matrix](VMX_SENSOR_COMPATIBILITY.md)
 is the status source for these distinctions.
 
+## CAN and CANAPI support
+
+The raw `hal/CAN.h` ABI and the complete `hal/CANAPI.h` device-level ABI are
+implemented by the VMX adapter. Runtime startup configures the shared VMX CAN
+controller once to FRC-compatible 1 Mbps normal mode; CAN HAL calls do not
+reset the controller. `HAL_CAN_SendMessage()` maps WPILib's period values
+directly to the SDK: `0` is a one-shot, a positive value is an immediate send
+with periodic retransmission, and `-1` cancels retransmission for the same CAN
+ID. Standard 11-bit IDs, extended 29-bit IDs, and the WPILib RTR flag are
+validated and passed through the SDK's frame-ID flags. The SDK contract
+supports RTR, so `HAL_WriteCANRTRFrame()` is a real remote frame rather than a
+data-frame approximation.
+
+One receive manager owns one wildcard VMX SDK retrieval stream. It timestamps
+frames with the SDK's `sysTimeStampUS`/`timeStampMS` values in the canonical VMX
+monotonic clock domain, keeps a bounded latest/history cache, and multiplexes
+WPILib stream sessions in adapter-owned handles. Raw receive is therefore a
+newest-matching-frame lookup; it never opens, reads, and closes an SDK stream
+for every packet. Public stream handles carry their own mask, queue depth,
+overflow state, and lifetime. Invalid, double-close, read-after-close,
+open-failure, and shutdown paths return HAL errors without exposing SDK
+handles. `HAL_CAN_GetCANStatus()` reports the SDK bus-utilization, bus-off,
+TX-full, RX/TX error, warning, passive, overflow, and bus-error fields without
+inventing software status.
+
+CANAPI handles are logical views of the one physical bus, so multiple
+manufacturer/device handles coexist. IDs use the FIRST layout (device type in
+bits 24..28, manufacturer in 16..23, 10-bit API in 6..15, device ID in 0..5).
+New, Latest, and Timeout reads have separate per-handle/API caches: New consumes
+each receive generation once, Latest returns the cached frame regardless of
+age, and Timeout returns it only while its VMX timestamp is within the caller's
+limit. Repeating writes and stop-repeating are tracked for cleanup at
+`HAL_CleanCAN()` and HAL shutdown.
+
+The CAN and CANAPI HAL paths are `SUPPORTED` at the adapter/API level. CTRE
+PCM, REV Pneumatics Hub, PDP, and PDH code paths have been dependency-audited
+against CANAPI, but physical device construction, frame decoding, and hardware
+smoke tests remain pending; they are not promoted to supported sensor/device
+rows by CAN compilation alone.
+
+## Hardware watchdog
+
+The VMX hardware watchdog is configured through the SDK `VMXIO` object with a
+100 ms timeout. FlexDIO and HighCurrentDIO are managed actuator groups;
+CommDIO remains unmanaged so active SPI/I2C/UART communication is not cut by a
+failsafe. A dedicated adapter worker, not the Driver Station receiver thread,
+feeds the watchdog only when all of these are true: the VMX runtime is healthy,
+Driver Station data is fresh, a user-program observe heartbeat was seen within
+500 ms, and eStop is clear. DS timeout, malformed/disconnected state, eStop,
+heartbeat expiry, runtime failure, and HAL shutdown call the SDK's
+`ExpireWatchdogNow()`. Shutdown stops the worker, expires first, disables the
+watchdog, and only then tears down DS/CAN/runtime resources. Configuration,
+feed, expiry, managed-output, recovery, and idempotent lifecycle behavior are
+covered by host tests; physical output-disable validation remains a deployment
+check.
+
 ## Serial / UART support
 
 The VMX TTL UART is the sole SDK serial resource on CommDIO physical TX/RX
