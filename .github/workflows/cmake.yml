@@ -41,6 +41,11 @@ jobs:
       - name: Install dependencies (macOS)
         if: runner.os == 'macOS'
         run: brew install opencv protobuf@29 ninja
+        env:
+          # GitHub-hosted macOS images may have preinstalled third-party taps
+          # that are not trusted by the runner's Homebrew version.  This is a
+          # dependency-installation policy issue, not a build/test result.
+          HOMEBREW_NO_REQUIRE_TAP_TRUST: "1"
 
       - uses: ilammy/msvc-dev-cmd@v1.13.0
         if: runner.os == 'Windows'
