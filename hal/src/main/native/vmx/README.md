@@ -74,6 +74,65 @@ between supported HAL paths, incomplete primitives, and separate Studica
 vendor APIs, is maintained in
 [VMX_SENSOR_COMPATIBILITY.md](VMX_SENSOR_COMPATIBILITY.md).
 
+## Shared Studica transport
+
+Parsec and Colore use one adapter-owned `StudicaVendorTransport` contract
+from `hal/src/main/native/include/studica/Transport.h`. Its
+`StudicaCANTransport` implementation is backed by the existing shared
+`VMXRuntime` CAN context, while `StudicaUSBSerialTransport` is a Linux-only
+vendor USB-CDC transport for an explicit `/dev/ttyACM*` or stable
+`/dev/serial/by-id/` path. This is intentionally separate from WPILib
+`SerialPort` (`kUSB1`/`kUSB2`); selecting a vendor USB device never claims or
+pretends to implement the WPILib serial-port aliases.
+
+The transport boundary reports fixed status values for invalid arguments,
+partial reads/writes, timeout, disconnect, resource conflict, unsupported
+operation, and internal failure. Reads and writes are serialized with close,
+and the Linux implementation uses poll-based deadlines and handles partial
+I/O. `StudicaTransportRegistry` exclusively owns each `(CAN channel, device
+ID)` pair and each USB path, permitting distinct CAN devices while rejecting
+physical duplicate claims. Reconnect is an explicit new owner acquisition;
+shutdown releases the registry claim. Host tests use the same interface with
+a mock transport, so Windows/Android/macOS builds do not include Linux
+termios syscalls.
+
+The immutable pinned `vmxdrivers` classes remain the protocol/parser source:
+their Parsec/Colore CAN and USB drivers are constructed only by the VMX
+adapter. The shared transport is the project-owned lifecycle/ownership seam;
+no WPILib types, HAL status, or wrapper code is added to `vmxdrivers`.
+
+## Studica Parsec vendor API
+
+`StudicaParsec_*` in `hal/src/main/native/include/studica/Parsec.h` is a
+versioned fixed-width C ABI for Parsec over CAN or vendor USB. The C++
+`studica::Parsec`, Java `com.studica.frc.Parsec`, and future Python ctypes
+bindings all share that layout. Snapshots have a fixed 64-zone array and
+explicit resolution/zone-count metadata: 4x4 is 16 zones and 8x8 is 64.
+Raw millimetres preserve `0..4000`, `-1` disabled, and `-2` invalid/no-return
+values. `GetMinDistance()` ignores both sentinels and returns an explicit
+valid flag when every zone is invalid/disabled. CAN IDs are validated to
+`0..63`; USB paths are never inferred from WPILib serial-port names. The raw
+configuration response is copied into a bounded fixed array because classic
+CAN and USB configuration payloads have different lengths.
+
+## Studica Colore vendor API
+
+`StudicaColore_*` in `hal/src/main/native/include/studica/Colore.h` provides
+XYZ, normalized sRGB, chromaticity, sequence, connection, and configuration
+snapshots over the same CAN/USB transport split. Brightness is strict
+`0..100`; values outside that range return `INVALID_ARGUMENT` rather than
+being clamped. Color matching is a separate in-memory CIE-xy layer with a
+fixed `char label[32]`, confidence, measured coordinates, and valid flag.
+`LearnColor()` and `SetReference()` do not persist calibration across restart;
+`GetLearnedReference()` exposes the current process-local reference. Unknown
+matches are valid API results with `valid=0`, not synthetic labels.
+
+The four vendor rows (Parsec CAN/USB and Colore CAN/USB) are tracked
+independently as `VENDOR_API`, `softwareValidated=true`, and
+`hardwareValidated=false` in the synchronized matrix. The C ABI is the stable
+boundary for Python; C++ and Java are facades/bindings over that same native
+handle and never construct a second VMX runtime context.
+
 ## VMX onboard IMU vendor API
 
 Orientation and AHRS data are exposed through the separate
@@ -194,12 +253,13 @@ Both vendor APIs record `softwareValidated=true` and
 ## Studica vendor backlog
 
 Studica-specific modules stay outside WPILib's standard sensor surface. The
-implementation order is VMX IMU, Titan (implemented), Cobra (implemented),
-Light Tower (implemented), then Parsec/Colore. VMX-specific power/SOC telemetry is also a
-vendor API candidate. Standard WPILib APIs remain the preferred path for
-Encoder, DutyCycleEncoder, DIO, Servo, Ultrasonic, and supported Sharp models;
-the vendor layer is reserved for VMX IMU, Titan, Cobra, Parsec, Colore, Light
-Tower, and VMX-specific power/SOC data.
+implementation order is VMX IMU (implemented), Titan (implemented), Cobra
+(implemented), Light Tower (implemented), and now Parsec/Colore (implemented).
+The next vendor candidates are Titan feature expansion followed by VMX-specific
+power/SOC telemetry and any remaining Studica modules. Standard WPILib APIs
+remain the preferred path for Encoder, DutyCycleEncoder, DIO, Servo, Ultrasonic,
+and supported Sharp models; the vendor layer is reserved for VMX IMU, Titan,
+Cobra, Parsec, Colore, Light Tower, and VMX-specific power/SOC data.
 
 ## I/O capability and channel mapping audit
 

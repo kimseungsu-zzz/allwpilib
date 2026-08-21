@@ -135,6 +135,20 @@ The Light Tower vendor layer similarly exposes `StudicaLightTower_*`,
 solid/blink, red/yellow/green/buzzer, and off to immutable
 `vmxdrivers::LightTower` while centrally reserving five physical outputs.
 Both vendor rows are `softwareValidated=true` and `hardwareValidated=false`.
+The Parsec and Colore vendor layers now share the fixed-width
+`StudicaVendorTransport` contract and process-local CAN/USB ownership
+registry. CAN uses the existing shared VMX CAN runtime; USB is a separate
+Linux vendor transport for explicit `/dev/ttyACM*` or
+`/dev/serial/by-id/` paths and is not WPILib `SerialPort` USB support. The
+fixed `StudicaParsec_*` and `StudicaColore_*` C ABIs, `studica::Parsec` /
+`studica::Colore` facades, and Java `com.studica.frc` bindings all use one
+snapshot layout suitable for Python ctypes. Parsec preserves 4x4/8x8 raw
+millimetres including `-1` disabled and `-2` invalid sentinels; minimum
+distance excludes those sentinels. Colore exposes XYZ, normalized sRGB,
+strict 0..100 brightness, and in-memory (non-persistent) CIE-xy matching.
+CAN and USB rows are software-validated separately, while
+`hardwareValidated=false` remains explicit. Pinned `vmxdrivers` sources are
+unchanged; protocol/lifecycle adaptation lives under `hal/src/main/native/vmx`.
 The synchronized matrix now records the class-level closure harness:
 `wpilibc/src/test/native/cpp/VMXSensorClassIntegrationTest.cpp` instantiates
 the real WPILib classes and drives public reads through HAL mock data, while

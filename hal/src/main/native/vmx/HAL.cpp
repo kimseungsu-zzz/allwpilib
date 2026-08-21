@@ -21,6 +21,8 @@
 #include "studica/Titan.h"
 #include "studica/Cobra.h"
 #include "studica/LightTower.h"
+#include "studica/Parsec.h"
+#include "studica/Colore.h"
 
 namespace {
 std::mutex gHalLifecycleMutex;
@@ -73,6 +75,8 @@ HAL_Bool HAL_Initialize(int32_t timeout, int32_t mode) {
       StudicaTitan_ShutdownAll();
       StudicaCobra_ShutdownAll();
       StudicaLightTower_ShutdownAll();
+      StudicaParsec_ShutdownAll();
+      StudicaColore_ShutdownAll();
       hal::init::HAL_IsInitialized.store(false, std::memory_order_release);
       hal::vmx::ShutdownRuntime();
       return false;
@@ -88,6 +92,8 @@ HAL_Bool HAL_Initialize(int32_t timeout, int32_t mode) {
     StudicaTitan_ShutdownAll();
     StudicaCobra_ShutdownAll();
     StudicaLightTower_ShutdownAll();
+    StudicaParsec_ShutdownAll();
+    StudicaColore_ShutdownAll();
     hal::vmx::ShutdownRuntime();
     return false;
   }
@@ -107,6 +113,8 @@ void HAL_Shutdown(void) {
   StudicaTitan_ShutdownAll();
   StudicaCobra_ShutdownAll();
   StudicaLightTower_ShutdownAll();
+  StudicaParsec_ShutdownAll();
+  StudicaColore_ShutdownAll();
   hal::vmx::ShutdownRuntime();
 }
 
