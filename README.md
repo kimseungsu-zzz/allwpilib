@@ -106,6 +106,26 @@ and feeding gated by fresh Driver Station data, a recent user-program
 heartbeat, runtime health, and eStop state; timeout, eStop, runtime failure,
 and shutdown expire it immediately.
 
+The VMX onboard AHRS is now available through the separate
+`studica::VMXIMU` vendor layer and a versioned `StudicaVMXIMU_*` C ABI. Java
+JNI and the future Python/ctypes binding use the same fixed-layout snapshot over
+the shared `VMXRuntime` `VMXPi::getAHRS()` instance; no second VMXPi is created
+and no yaw/pitch/roll fields were added to WPILib core HAL. Raw acceleration
+(sensor-frame G including gravity) remains distinct from world-linear
+acceleration (gravity-corrected/world-frame). The SDK's last sensor timestamp
+is exposed as an opaque sensor-domain value, never converted to FPGA time;
+pressure/altitude carry an explicit validity flag. The unchanged
+`vmxdrivers/` source area remains upstream-derived and has zero modifications.
+The AutoTransmit SDK engine was audited but is not selected for AutoSPI because
+it lacks WPILib-compatible per-sample timestamps, full edge semantics, and
+precise AutoStall configuration; the tested HAL-owned software engine remains
+the backend. Vendor backlog order is IMU, Titan, Cobra, Parsec/Colore, then
+Light Tower, with VMX-specific Power/SOC as a capability-gated vendor API.
+The synchronized sensor matrix records the remaining class-level `NOT_TESTED`
+rows explicitly: existing WPILib simulation tests and native HAL unit tests
+are not promoted to VMX `SUPPORTED` until a VMX-targeted Java class test can
+feed mock SDK data through the selected backend.
+
 The ordinary Android CMake workflow remains VMX-isolated and now passes the
 ABI explicitly as both `ANDROID_ABI` and `CMAKE_ANDROID_ARCH_ABI`, including
 the Android X64 configure path. VMX production builds remain explicit Linux

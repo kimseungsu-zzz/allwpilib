@@ -74,6 +74,68 @@ between supported HAL paths, incomplete primitives, and separate Studica
 vendor APIs, is maintained in
 [VMX_SENSOR_COMPATIBILITY.md](VMX_SENSOR_COMPATIBILITY.md).
 
+## VMX onboard IMU vendor API
+
+Orientation and AHRS data are exposed through the separate
+`studica::VMXIMU` vendor layer. The fixed-layout C ABI in
+`hal/src/main/native/include/studica/VMXIMU.h` is the native contract for
+future Python/ctypes bindings; `hal/src/main/java/studica/vmx/VMXIMU.java`
+and its JNI adapter use that same snapshot contract. No yaw, pitch, roll, or
+quaternion members were added to WPILib's core HAL.
+
+The wrapper reads `VMXRuntime`'s existing `shared_ptr<VMXPi>` and its
+`VMXPi::getAHRS()` object. It never constructs a second VMXPi/AHRS and its
+destructor never calls `AHRS::Stop()`, so BuiltInAccelerometer and every other
+HAL facility continue to use the same runtime. The unchanged Studica driver
+sources remain an upstream area; this adapter handles the shared-lifetime
+correction required by the imported driver's convenience destructor.
+
+The API includes yaw/pitch/roll, continuous accumulated angle, yaw rate,
+ZeroYaw/reset, quaternion, raw gyro (deg/s), raw accelerometer (G), raw
+magnetometer (microtesla), world-linear acceleration, compass/fused heading,
+moving/rotating and calibrating/connected state, temperature, firmware
+version, pressure/altitude, and `IsAltitudeValid()`. Raw acceleration is the
+unprocessed sensor-frame value with gravity included; world-linear
+acceleration is gravity-corrected and world-frame. Pressure/altitude are
+returned only with their validity flag and are never presented as universally
+available.
+
+`GetLastSensorTimestamp()` is copied from the SDK's last sample timestamp as
+an opaque signed 64-bit value. The official AHRS API documents that it is a
+sensor timestamp but does not define a unit or epoch (and it is unavailable
+for serial-register input). The vendor layer therefore does not convert it to
+`HAL_GetFPGATime()` or claim FPGA-clock equivalence. The fixed C snapshot is
+versioned (`STUDICA_VMX_IMU_ABI_VERSION`) and contains no C++ ownership types,
+so Python can bind it without a language-specific hardware implementation.
+
+## AutoSPI engine audit
+
+The SDK exposes `AutoTransmit_Allocate`, `AutoTransmit_SetData`, periodic and
+single-edge trigger start, immediate transfer, buffered `GetData`, dropped
+count, stop, and deallocate. The current HAL-owned AutoSPI engine remains the
+backend because the SDK contract does not return a per-sample timestamp, does
+not expose WPILib's precise AutoStall/CS-to-SCLK timing configuration, and its
+trigger API accepts one SDK edge rather than WPILib's full rising/falling/both
+edge semantics. SDK dropped-byte accounting is compatible in isolation but
+cannot close those timestamp and stall gaps. ADIS16448/16470 must therefore
+not be made to appear supported by sleeping in software; they remain blocked
+until an exact hardware or separately validated timing path exists.
+
+The software engine continues to provide VMX-time-stamped samples, absolute
+period scheduling, DIO trigger waiters, bounded buffering, dropped-sample
+accounting, and race-safe stop/close behavior. Its host tests remain the
+source of truth for those semantics.
+
+## Studica vendor backlog
+
+Studica-specific modules stay outside WPILib's standard sensor surface. The
+implementation order is VMX IMU (this milestone), Titan, Cobra,
+Parsec/Colore, then Light Tower. VMX-specific power/SOC telemetry is also a
+vendor API candidate. Standard WPILib APIs remain the preferred path for
+Encoder, DutyCycleEncoder, DIO, Servo, Ultrasonic, and supported Sharp models;
+the vendor layer is reserved for VMX IMU, Titan, Cobra, Parsec, Colore, Light
+Tower, and VMX-specific power/SOC data.
+
 ## I/O capability and channel mapping audit
 
 The public WPILib channel number is a logical address, not always a VMX pin:

@@ -40,6 +40,14 @@ Current milestone overrides: AddressableLED and BuiltInAccelerometer are
 `SUPPORTED` with `hardwareValidated=false`; their host/mock adapter contracts
 are exercised by `VMXSensorIntegrationTest.cpp`.
 
+This milestone adds a separate VMX onboard-IMU vendor contract. It is not a
+WPILib sensor-row promotion: BuiltInAccelerometer continues to use the
+standard HAL subset and the vendor wrapper does not duplicate it. The native
+snapshot ABI and C++ wrapper are covered by `VMXIMUTest.cpp`; Java JNI uses the
+same fixed layout and the Python-facing boundary is the exported C ABI. A
+physical AHRS smoke test is still required before setting
+`hardwareValidated=true`.
+
 | WPILib sensor/class | Status | Current HAL path | Evidence and next validation |
 | --- | --- | --- | --- |
 | DigitalInput / limit switch | `NOT_TESTED` | Input-capable VMX DIO | Logical DIO 0??9 maps through the capability layer; selected FlexDIO/HighCurrent/CommDIO input capability and hardware smoke test remain. |
@@ -66,6 +74,26 @@ are exercised by `VMXSensorIntegrationTest.cpp`.
 | AnalogGyro | `NOT_TESTED` | Existing AnalogInput + AccumulatorInput resource through the VMX AnalogGyro HAL | The complete AnalogGyro C ABI is implemented for logical channels 0 and 1 with fixed 46.5 kS/s scaling, injectable five-second calibration, center/offset, deadband, reset, angle, and rate paths. Sensor-level construction and physical validation remain. |
 | AddressableLED | `SUPPORTED` | VMX `LEDArray_OneWire` resource through the standard AddressableLED C ABI | Color order, length/data lifecycle, strict bit-timing conversion, start/stop/render, PWM-handle handoff, and physical registry conflicts are covered by `VMXSensorIntegrationTest`; hardwareValidated=false. |
 | BuiltInAccelerometer | `SUPPORTED` | VMX AHRS `GetRawAccelX/Y/Z()` through the standard accelerometer C ABI | Raw calibrated sensor-frame values in G (gravity included) use identity X/Y/Z mapping. Active state is HAL-local; requested range is retained but VMX's fixed hardware range is not misreported as changed. Host/mock coverage exists; hardwareValidated=false. |
+
+## Class-level integration closure audit
+
+The WPILib Java classes listed below have existing class-level simulation tests
+in `wpilibj/src/test/java` that validate public calculations and lifecycle.
+Those tests intentionally exercise WPILib's simulation HAL and are not
+counted as VMX evidence. The VMX adapter tests in `hal/src/test/native/cpp`
+cover the native resource and mock-SDK side separately; a row is promoted to
+`SUPPORTED` only when both sides are connected by a VMX-targeted class test.
+This keeps the matrix honest while the AArch64 SDK and board smoke fixtures
+are unavailable.
+
+| Class-level audit target | Current result | Remaining VMX evidence |
+| --- | --- | --- |
+| DigitalInput / limit switch | `NOT_TESTED` | VMX HAL class test with a mocked DIO input and physical capability claim. |
+| AnalogPotentiometer / AnalogAccelerometer / AnalogEncoder / SharpIR | `NOT_TESTED` | VMX-targeted Java class test must feed mock AnalogInput values through the selected native backend. |
+| Encoder / DutyCycleEncoder / DutyCycleInput / Tachometer | `NOT_TESTED` | VMX-targeted class construction, readback, and close test; native pair/timer tests already exist. |
+| Ultrasonic | `NOT_TESTED` | VMX-targeted ping/echo class test with mocked DIO/period capture. |
+| ADXL345_I2C / ADXL345_SPI / ADXL362 / ADXRS450_Gyro | `NOT_TESTED` | Device-register mock plus VMX Java class path; ADXRS additionally needs AutoSPI accumulator validation. |
+| AnalogGyro / BuiltInAccelerometer / AddressableLED | `NOT_TESTED` / `SUPPORTED` / `SUPPORTED` | AnalogGyro still needs class-level VMX test; the latter two already have native host/mock contracts but remain hardwareValidated=false. |
 
 ## WPILib CAN hardware dependency audit
 
@@ -107,17 +135,20 @@ validated; each remains pending frame-level and hardware integration tests.
 
 ## Studica / VMX vendor sensors
 
-These are not substitutes for WPILib core sensor compatibility. They should
-be exposed, if desired, through a separate shared native vendor wrapper over
-the unchanged `vmxdrivers` sources and then bound to Java, C++, and Python.
+These are not substitutes for WPILib core sensor compatibility. They are
+exposed, if desired, through separate shared native vendor wrappers over the
+unchanged `vmxdrivers` sources and then bound to Java, C++, and Python.
 
 | Vendor sensor/module | Status | Boundary |
 | --- | --- | --- |
-| VMX onboard IMU / NavX-style data | `VENDOR_API` | `vmxdrivers::Imu` exposes orientation, acceleration, gyro, magnetometer, and related values. Do not label it as WPILib `BuiltInAccelerometer` or `AnalogGyro` until the corresponding HAL semantics are verified. |
+| VMX onboard IMU / NavX-style data | `VENDOR_API` | `studica::VMXIMU` reads the shared VMXRuntime AHRS and exposes orientation, continuous angle/rate, quaternion, raw/world acceleration, gyro/magnetometer, heading, state, timestamp, temperature, firmware, and validity-guarded pressure/altitude. `hardwareValidated=false`; it is not WPILib `BuiltInAccelerometer` or `AnalogGyro`. |
+| Titan | `VENDOR_API` | Next vendor milestone; use the existing CAN core as transport, with device semantics in a separate adapter. |
 | Studica Cobra | `VENDOR_API` | Use the Studica driver API through a separate adapter. |
 | Studica Sharp | `VENDOR_API` | Distinct from the WPILib `SharpIR` analog class; use the Studica driver API. |
 | Studica Parsec | `VENDOR_API` | Use the Studica driver API through a separate adapter. |
 | Studica Colore | `VENDOR_API` | Use the Studica driver API through a separate adapter. |
+| Studica Light Tower | `VENDOR_API` | Future separate adapter; do not add product-specific fields to WPILib HAL. |
+| VMX-specific Power/SOC | `VENDOR_API` | Future capability-gated telemetry wrapper; standard RobotController semantics remain separate. |
 
 `vmxdrivers/` remains an upstream-source area. It must not receive WPILib
 types, HAL status handling, compatibility shims, or sensor-specific fixes.
@@ -126,9 +157,10 @@ separate vendor wrapper module.
 
 ## Validation order
 
-1. Add the AnalogPotentiometer, AnalogAccelerometer, AnalogEncoder, SharpIR,
-   AnalogGyro, Ultrasonic, and ADXL345_I2C compatibility tests without
-   changing their public APIs.
+1. Run the VMX-targeted class-level mock suite for the remaining `NOT_TESTED`
+   rows (AnalogPotentiometer, AnalogAccelerometer, AnalogEncoder, SharpIR,
+   AnalogGyro, Ultrasonic, and ADXL345_I2C first) without changing public
+   APIs; simulation-only tests do not promote a row.
 2. Validate DutyCycle, DutyCycleEncoder, and DutyCycleInput on physical VMX
    hardware.
 3. Validate the basic SPI sensor paths for ADXL345_SPI and ADXL362, then run
@@ -148,3 +180,5 @@ separate vendor wrapper module.
    Tachometer and Ultrasonic.
 8. Run physical AddressableLED and BuiltInAccelerometer class smoke tests and
    promote their separate `hardwareValidated` field only after those tests.
+9. Implement vendor adapters in order: Titan, Cobra, Parsec/Colore, and Light
+   Tower, with VMX-specific Power/SOC as a capability-gated API.
