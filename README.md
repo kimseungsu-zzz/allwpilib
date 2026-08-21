@@ -36,6 +36,9 @@ APIs and adapts them through the HAL; it does not add a second public robot
 framework. The detailed, synchronized status is maintained in the [VMX HAL
 README](hal/src/main/native/vmx/README.md) and [sensor compatibility
 matrix](hal/src/main/native/vmx/VMX_SENSOR_COMPATIBILITY.md).
+The standalone `vmxdrivers` layer is based on the drivers in the [Studica
+Robotics ROS2 repository](https://github.com/Studica-Robotics/ROS2); its ROS2
+node layer is not used here, and the pinned driver source remains unchanged.
 
 The current communication-port mapping is fixed by the VMX CommDIO connector:
 TTL UART `26/27`, SPI `28/29/30/31` (CLK/MOSI/MISO/CS), and I2C `32/33`.
