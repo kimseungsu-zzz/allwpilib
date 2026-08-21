@@ -115,6 +115,18 @@ TEST(VMXDriverStationStateTest, FailsSafeUntilFreshDataAndOnTimeout) {
   EXPECT_TRUE(word.enabled);
   EXPECT_TRUE(word.dsAttached);
   EXPECT_TRUE(state.Refresh());
+
+  packet.controlWord.eStop = true;
+  packet.controlWord.enabled = true;
+  state.CommitUdp(packet, now + 1);
+  EXPECT_EQ(state.GetControlWord(&word), HAL_SUCCESS);
+  EXPECT_TRUE(word.eStop);
+  EXPECT_FALSE(word.enabled);
+  EXPECT_FALSE(state.OutputsEnabled());
+  state.Disconnect();
+  EXPECT_EQ(state.GetControlWord(&word), HAL_SUCCESS);
+  EXPECT_FALSE(word.enabled);
+  EXPECT_FALSE(word.dsAttached);
 }
 
 TEST(VMXDriverStationStateTest, JoystickDescriptorMatchAndOutputSemantics) {
@@ -144,6 +156,20 @@ TEST(VMXDriverStationStateTest, JoystickDescriptorMatchAndOutputSemantics) {
   HAL_MatchInfo info{};
   ASSERT_EQ(state.GetMatchInfo(&info), HAL_SUCCESS);
   EXPECT_EQ(info.matchNumber, 7);
+}
+
+TEST(VMXDriverStationStateTest, InvalidPacketImmediatelyDisablesFreshState) {
+  VMXDriverStationState state;
+  VMXDriverStationPacket packet;
+  packet.valid = true;
+  packet.controlWord.enabled = true;
+  packet.controlWord.dsAttached = true;
+  state.CommitUdp(packet, 1);
+  state.MarkInvalidPacket();
+  HAL_ControlWord word{};
+  EXPECT_EQ(state.GetControlWord(&word), HAL_SUCCESS);
+  EXPECT_FALSE(word.enabled);
+  EXPECT_FALSE(word.dsAttached);
 }
 
 TEST(VMXDriverStationStateTest, ShutdownRejectsMutationsAndReadsSafeDefaults) {

@@ -388,6 +388,23 @@ class VMXDriverStationState final {
     WakeupIfNeeded();
   }
 
+  void MarkInvalidPacket() {
+    bool changed = false;
+    {
+      std::scoped_lock lock{m_mutex};
+      if (!m_shutdown && m_fresh) {
+        FailSafeLocked();
+        ++m_generation;
+        changed = true;
+      }
+    }
+    if (changed) {
+      WakeupIfNeeded();
+    }
+  }
+
+  void Disconnect() { MarkInvalidPacket(); }
+
   bool PollTimeout(uint64_t now = 0) {
     if (now == 0) {
       now = m_clock();
@@ -569,7 +586,7 @@ class VMXDriverStationState final {
   bool OutputsEnabled() {
     std::scoped_lock lock{m_mutex};
     const auto word = EffectiveControlWordLocked();
-    return word.enabled && word.dsAttached;
+    return word.enabled && word.dsAttached && !word.eStop;
   }
 
  private:
@@ -605,6 +622,9 @@ class VMXDriverStationState final {
     HAL_ControlWord word{};
     if (m_fresh && !m_shutdown) {
       word = m_packet.controlWord;
+      if (word.eStop) {
+        word.enabled = false;
+      }
     }
     return word;
   }

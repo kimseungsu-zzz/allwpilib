@@ -216,6 +216,11 @@ class VMXDriverStationTransport final {
             if (m_state) {
               m_state->CommitUdp(packet);
             }
+          } else {
+            std::scoped_lock lock{m_mutex};
+            if (m_state) {
+              m_state->MarkInvalidPacket();
+            }
           }
         }
       }
