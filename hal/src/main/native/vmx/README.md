@@ -183,10 +183,11 @@ driver area.
 RTC is deliberately a separate wall-clock concern. VMX `GetRTCTime()`,
 `GetRTCDate()`, RTC setters, and daylight-savings settings are not used by
 `HAL_GetFPGATime()`, Notifier, interrupt timestamps, or TimedRobot scheduling;
-the SDK explicitly distinguishes its RTC and hardware timer APIs. A future VMX
-runtime/service will use the VMX RTC as the offline boot-time source for the
-Linux system clock and will provide an administrative Linux/PC-to-VMX RTC sync
-command. That service boundary does not alter the monotonic HAL time domain.
+the SDK explicitly distinguishes its RTC and hardware timer APIs. The current
+HAL startup performs a best-effort RTC-to-Linux-system-clock bootstrap through
+an internal helper; the future runtime/service will expose an administrative
+Linux/PC-to-VMX RTC sync command. That service boundary does not alter the
+monotonic HAL time domain.
 
 ## DIO support
 
@@ -512,6 +513,52 @@ count atomically, rejects a failed or zero-count sample set, rounds the center,
 stores the residual offset, and resets only after the new center is installed
 successfully. Native tests inject the wait callback, so calibration tests never
 sleep for five seconds.
+
+## AddressableLED support
+
+The standard `hal/AddressableLED.h` ABI is backed by one VMX
+`LEDArray_OneWire` resource. WPILib's PWM output handle is validated against
+the central `VMXChannelCapabilities` provider, temporarily suspended, and
+transferred in the shared physical registry to the LED resource. Freeing the
+LED closes the SDK resource and restores the PWM owner, so overlapping DIO,
+PWM, encoder, duty-cycle, SPI, I2C, and UART allocations fail through one
+registry instead of through scattered channel constants.
+
+All six WPILib RGB color orders map to the SDK's three-channel pixel formats.
+Length, null/zero-length data, start/stop, write, render, and repeated cleanup
+retain the C ABI's validation and lifecycle semantics. The SDK has one target
+frequency and one high-time per symbol. The adapter converts WPILib's two
+high/low timing pairs only when both symbol periods are identical and exactly
+representable at the resulting integer frequency; otherwise it returns an
+explicit parameter error rather than dropping low-time information. The SDK
+reset wait is mapped from WPILib sync time. Host/mock lifecycle, timing, and
+physical-conflict coverage is in `VMXSensorIntegrationTest.cpp`; no physical
+hardware validation is claimed yet.
+
+## BuiltInAccelerometer support
+
+The standard `hal/Accelerometer.h` ABI reads the shared VMX AHRS
+`GetRawAccelX/Y/Z()` values. These are calibrated raw sensor-frame values in
+G and include gravity; the adapter intentionally does not use the AHRS world
+linear-acceleration (gravity-removed) accessors. The VMX X/Y/Z axes map
+directly to WPILib X/Y/Z. `HAL_SetAccelerometerActive()` gates HAL reads in
+adapter-local state and never stops or resets the shared AHRS, so other VMX
+users remain alive. WPILib range requests are retained for compatibility, but
+the current SDK exposes no range setter; the fixed VMX hardware range is not
+reported as changed. Host/mock raw-axis, standby, range, and non-finite-value
+tests are present, while `hardwareValidated` remains false.
+
+## RTC wall-clock bootstrap
+
+RTC is deliberately separate from the monotonic WPILib time domain. During
+`HAL_Initialize()`, the VMX adapter makes a best-effort read of
+`GetRTCDate()`/`GetRTCTime()` and sets the Linux `CLOCK_REALTIME` value when the
+RTC value is valid. Failure (missing RTC, permissions, or unavailable SDK) is
+non-fatal to HAL startup. `HAL_GetFPGATime()`, Notifier deadlines, interrupt
+timestamps, and TimedRobot scheduling continue to use
+`VMXTime::GetCurrentTotalMicroseconds()` and never use RTC. The inverse
+Linux/PC-to-VMX RTC sync is an internal helper reserved for a future runtime
+management command; it is not a new public HAL API.
 
 ## RobotController power and system status
 

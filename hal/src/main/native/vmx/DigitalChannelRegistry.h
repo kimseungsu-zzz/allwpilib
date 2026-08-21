@@ -23,6 +23,7 @@ enum class DigitalChannelOwner {
   kSPI,
   kUART,
   kDutyCycle,
+  kAddressableLED,
 };
 
 struct DigitalChannelReservation {

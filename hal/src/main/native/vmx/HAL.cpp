@@ -9,10 +9,12 @@
 #include <mutex>
 
 #include "HALInitializer.h"
+#include "AddressableLEDInternal.h"
 #include "DriverStationInternal.h"
 #include "NotifierInternal.h"
 #include "SPIAutoInternal.h"
 #include "VMXRuntime.h"
+#include "VMXRTCInternal.h"
 #include "VMXWatchdogInternal.h"
 #include "VMXCANInternal.h"
 #include "hal/handles/HandlesInternal.h"
@@ -52,6 +54,9 @@ HAL_Bool HAL_Initialize(int32_t timeout, int32_t mode) {
     if (!hal::vmx::InitializeRuntime()) {
       return false;
     }
+    // RTC is a wall-clock bootstrap only.  FPGA time, notifier deadlines, and
+    // interrupt timestamps continue to use VMXTime's monotonic source.
+    static_cast<void>(hal::vmx::BootstrapLinuxSystemClockFromVMXRTC());
     hal::init::HAL_IsInitialized.store(true, std::memory_order_release);
     if (!hal::vmx::InitializeCAN()) {
       hal::init::HAL_IsInitialized.store(false, std::memory_order_release);
@@ -83,6 +88,7 @@ void HAL_Shutdown(void) {
   std::scoped_lock lock{gHalLifecycleMutex};
   hal::init::HAL_IsInitialized.store(false, std::memory_order_release);
   hal::vmx::ShutdownHardwareWatchdog();
+  hal::vmx::GetAddressableLEDManager().Shutdown();
   hal::vmx::ShutdownDriverStation();
   hal::vmx::ShutdownCAN();
   hal::vmx::ShutdownSPIAuto();

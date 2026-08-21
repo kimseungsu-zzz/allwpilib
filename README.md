@@ -60,6 +60,21 @@ The VMX AnalogGyro HAL is now implemented on the existing AnalogInput and
 AccumulatorInput resource. It accepts only logical accumulator channels 0 and
 1, uses the VMX fixed 46,500 samples/second rate for angle/rate scaling, and
 keeps the five-second calibration wait injectable for native tests. The
+AddressableLED HAL now maps the standard color-order, length/data, bit-timing,
+sync, start/stop, and render ABI to the VMX `LEDArray_OneWire` resource. It
+borrows the WPILib-created PWM handle through the central physical registry,
+rejecting SPI/I2C/UART/DIO/PWM/encoder conflicts and restoring PWM ownership on
+free. VMX exposes one target frequency, so timing tuples with different bit
+periods are rejected rather than silently approximated. BuiltInAccelerometer
+uses AHRS raw calibrated X/Y/Z acceleration in G (gravity included); active
+state is local to HAL and range requests are retained without claiming a
+hardware sensitivity change because the SDK has no range setter. Host/mock
+contract tests cover these paths; physical `hardwareValidated` status remains
+false until VMX-Pi/VMX2 smoke tests run.
+The VMX RTC bootstrap is a separate best-effort wall-clock service invoked at
+HAL runtime startup; `HAL_GetFPGATime()`, Notifier, interrupts, and TimedRobot
+continue to use VMX monotonic time. A Linux/PC-to-RTC synchronization helper is
+kept internal for a future runtime management command. The
 RobotController power path reports hardware-backed VMX input voltage and
 Linux thermal-sysfs CPU temperature. VMX input current, 3V3/5V/6V rail
 telemetry/control, brownout status/threshold, FPGA button, RSL, and Driver

@@ -50,6 +50,8 @@ VMXChannelCapability ToSdkCapability(VMXCapability capability) {
       return VMXChannelCapability::UART_TX;
     case VMXCapability::kUARTRX:
       return VMXChannelCapability::UART_RX;
+    case VMXCapability::kAddressableLED:
+      return VMXChannelCapability::LEDArray_OneWire;
   }
   return VMXChannelCapability::NoCapabilities;
 }

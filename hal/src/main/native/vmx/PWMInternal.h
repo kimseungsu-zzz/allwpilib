@@ -481,4 +481,9 @@ class PWMManager final {
   PWMHandleResource m_handles;
 };
 
+// Shared by VMX adapters that temporarily borrow a WPILib PWM handle (for
+// example AddressableLED).  Keeping this accessor in the internal interface
+// preserves one PWM manager and one physical-channel registry.
+PWMManager& GetPWMManager();
+
 }  // namespace hal::vmx

@@ -35,6 +35,7 @@ enum class VMXCapability {
   kSPICS,
   kUARTTX,
   kUARTRX,
+  kAddressableLED,
 };
 
 struct VMXLogicalChannelInfo {
