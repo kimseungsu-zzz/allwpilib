@@ -54,6 +54,8 @@ jobs:
         with:
           repository: wpilibsuite/robotbuilder
           fetch-depth: 0
+      - name: Patch RobotBuilder NewCommands metadata source
+        run: sed -i "s#https://raw.githubusercontent.com/wpilibsuite/allwpilib/main/wpilibNewCommands/WPILibNewCommands.json#https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/main/wpilibNewCommands/WPILibNewCommands.json#" build.gradle
       - uses: actions/download-artifact@v4
         with:
           name: MavenArtifacts
