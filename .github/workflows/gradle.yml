@@ -71,9 +71,9 @@ jobs:
     # The VMX HAL backend is opt-in (-PvmxBuild) and every other platform
     # selects the sim backend, so none of the jobs above ever compile
     # hal/src/main/native/vmx. Run the AArch64 cross compiler over it in
-    # syntax-only mode. The proprietary VMX SDK is not available here, so this
-    # covers the translation units that never reach VMXPi.h and reports the
-    # rest as deferred; add VMX_SDK_ROOT and --require to cover all of them.
+    # syntax-only mode. No SDK install is needed: the MIT-licensed vendor
+    # headers in thirdparty/vmxpi cover all 42 translation units, so --require
+    # holds the job to full coverage.
     name: "VMX AArch64 cross-compile"
     runs-on: ubuntu-22.04
     needs: [validation]
@@ -84,7 +84,7 @@ jobs:
         with:
           image: wpilib/aarch64-cross-ubuntu:bookworm-22.04
           options: -v ${{ github.workspace }}:/work -w /work
-          run: python3 hal/tools/verify_vmx_crosscompile.py
+          run: python3 hal/tools/verify_vmx_crosscompile.py --require
 
   build-host:
     env:

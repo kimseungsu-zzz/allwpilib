@@ -11,16 +11,21 @@ translation unit.
 It deliberately does not stub the VMX SDK.  A stub synthesised from our own
 call sites would only prove that we agree with ourselves; it cannot catch a
 method that does not exist or takes different arguments, which is exactly the
-breakage a first hardware build hits.  Without a real SDK the gate reports
-SKIP rather than pretending to pass.  Pass --require in the CI job that does
-provide a toolchain and an SDK so that a missing one fails the build there.
+breakage a first hardware build hits.  Instead it prefers an installed SDK,
+which is what a real build links against, and otherwise uses the genuine
+MIT-licensed vendor headers vendored in thirdparty/vmxpi.  Only if neither is
+usable does it fall back to the subset of translation units that never reach
+VMXPi.h, and it reports PARTIAL rather than pretending to pass.  Pass
+--require to make anything short of full coverage a failure.
 """
 
 from __future__ import annotations
 
 import argparse
 import concurrent.futures
+import hashlib
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -47,6 +52,7 @@ INCLUDE_DIRS = [
 
 DEFAULT_STANDARD = "c++20"
 AARCH64_TRIPLE = "aarch64-linux-gnu"
+VENDORED_SDK = ROOT / "thirdparty" / "vmxpi" / "include"
 
 
 class Unavailable(Exception):
@@ -89,6 +95,43 @@ def resolve_compiler() -> list[str]:
         f"no AArch64 C++ cross compiler found (looked for $VMX_CROSS_CXX, "
         f"{gnu}, aarch64-*-linux-gnu-g++ on PATH, clang++)"
     )
+
+
+def vendored_sdk_includes() -> list[Path]:
+    """The MIT-licensed VMXPi.h include closure vendored into thirdparty.
+
+    These headers exist so the backend compiles with no SDK installed. They
+    must stay byte-identical to what the gate was verified against, so a local
+    edit -- which would quietly change what the gate proves -- is a failure
+    rather than a silent pass. Digests live beside them in README.md.
+    """
+    if not (VENDORED_SDK / "VMXPi.h").is_file():
+        raise Unavailable(f"vendored VMX headers are missing from {VENDORED_SDK}")
+
+    readme = (VENDORED_SDK.parent / "README.md").read_text(encoding="utf-8")
+    expected = {
+        name: digest
+        for name, digest in re.findall(
+            r"\|\s*`([^`]+\.h)`\s*\|\s*`([0-9a-f]{32})", readme
+        )
+    }
+    if not expected:
+        raise Unavailable("thirdparty/vmxpi/README.md records no digests")
+
+    modified = []
+    for name, prefix in sorted(expected.items()):
+        path = VENDORED_SDK / name
+        if not path.is_file():
+            modified.append(f"{name} (missing)")
+            continue
+        actual = hashlib.sha256(path.read_bytes()).hexdigest()
+        if not actual.startswith(prefix):
+            modified.append(name)
+    if modified:
+        raise Unavailable(
+            "vendored VMX headers were modified: " + ", ".join(modified)
+        )
+    return [VENDORED_SDK]
 
 
 def resolve_sdk_includes() -> list[Path]:
@@ -194,20 +237,26 @@ def main() -> int:
             "cross compiler, or run with --require to make this a failure.",
         )
 
-    # The SDK is optional: without it the translation units that never reach
-    # VMXPi.h still cross-compile, and those are worth gating on their own.
+    # An installed SDK wins, since it is what a real build links against. With
+    # none configured, fall back to the vendored MIT headers so every
+    # translation unit still compiles. Only if both are unusable does the run
+    # degrade to the subset that never reaches VMXPi.h.
     sdk_includes: list[Path] = []
     sdk_reason: Unavailable | None = None
     try:
         sdk_includes = resolve_sdk_includes()
-    except Unavailable as reason:
-        if args.require:
-            print(
-                f"VMX AArch64 cross-compilation gate: FAIL ({reason})",
-                file=sys.stderr,
-            )
-            return 1
-        sdk_reason = reason
+    except Unavailable as installed_reason:
+        try:
+            sdk_includes = vendored_sdk_includes()
+        except Unavailable as vendored_reason:
+            if args.require:
+                print(
+                    f"VMX AArch64 cross-compilation gate: FAIL "
+                    f"({installed_reason}; {vendored_reason})",
+                    file=sys.stderr,
+                )
+                return 1
+            sdk_reason = vendored_reason
 
     missing = [path for path in INCLUDE_DIRS if not path.is_dir()]
     if missing:

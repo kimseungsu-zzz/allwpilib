@@ -564,23 +564,33 @@ directory. `./gradlew :hal:checkVmxCrossCompile` runs an AArch64 cross
 compiler over every VMX and shared translation unit in `-fsyntax-only` mode to
 close that gap, and `:hal:check` depends on it.
 
-The gate reports its own limits rather than overstating them:
+No SDK installation is required. The MIT-licensed VMX-pi headers in
+[`thirdparty/vmxpi`](../../../../../thirdparty/vmxpi) are the complete
+`VMXPi.h` include closure, so all 42 translation units compile on any machine.
 
 | Situation | Result |
 | --- | --- |
 | No AArch64 cross compiler | `SKIP` — nothing was compiled |
-| Compiler but no VMX SDK | `PARTIAL` — the translation units that never reach `VMXPi.h` are compiled; the rest are reported as deferred |
-| Compiler and `VMX_SDK_ROOT` | `PASS` — every translation unit is compiled |
+| Compiler, vendored headers | `PASS` — every translation unit is compiled |
+| Compiler and `VMX_SDK_ROOT` | `PASS` — the installed SDK takes precedence |
+| Compiler, vendored headers edited or removed | `PARTIAL` or `FAIL` |
 
-Pass `--require` to turn a missing compiler or SDK into a failure; the
-`vmxReleaseCheck` gate does this, because a release must not sign off on a
-backend that was never compiled. `VMX_CROSS_CXX` overrides compiler discovery
-and `VMX_CROSS_CXXFLAGS` appends flags.
+An installed SDK wins over the vendored headers, because that is what a real
+build links against. The vendored copies are checked against the SHA-256
+digests recorded in their README, so editing one fails the gate instead of
+quietly changing what it proves.
+
+Pass `--require` to turn anything short of full coverage into a failure; the
+CI job and `vmxReleaseCheck` both do. `VMX_CROSS_CXX` overrides compiler
+discovery and `VMX_CROSS_CXXFLAGS` appends flags.
 
 The SDK is deliberately not stubbed. A stub synthesised from our own call
 sites would only prove that the backend agrees with itself; it cannot catch a
 VMXPi method that does not exist or takes different arguments, which is the
-breakage a first hardware build actually hits.
+breakage a first hardware build actually hits. The vendored headers are the
+genuine vendor headers, not a reconstruction.
+
+Headers only: linking and running still need the real SDK library.
 
 ## Hardware watchdog
 
