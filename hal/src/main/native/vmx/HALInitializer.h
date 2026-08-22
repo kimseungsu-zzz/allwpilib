@@ -4,20 +4,7 @@
 
 #pragma once
 
-#include <atomic>
-
-namespace hal::init {
-extern std::atomic_bool HAL_IsInitialized;
-void RunInitialize();
-
-inline void CheckInit() {
-  if (!HAL_IsInitialized.load(std::memory_order_acquire)) {
-    RunInitialize();
-  }
-}
-
-extern void InitializeCTREPCM();
-extern void InitializeREVPH();
-extern void InitializeCTREPDP();
-extern void InitializeREVPDH();
-}  // namespace hal::init
+// The VMX build compiles src/main/native/shared alongside this directory, so
+// CheckInit and the CAN power/pneumatics initializers are declared there once
+// rather than duplicated per platform.
+#include "../shared/HALInitializer.h"

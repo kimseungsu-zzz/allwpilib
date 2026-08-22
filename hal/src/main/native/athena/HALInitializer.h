@@ -4,20 +4,13 @@
 
 #pragma once
 
-#include <atomic>
+// HAL_IsInitialized, RunInitialize, CheckInit and the CAN power/pneumatics
+// initializers are declared once in the shared header. The athena build
+// compiles src/main/native/shared alongside this directory, so redeclaring
+// CheckInit here would put two different inline definitions in one binary.
+#include "../shared/HALInitializer.h"
 
 namespace hal::init {
-extern std::atomic_bool HAL_IsInitialized;
-extern void RunInitialize();
-inline void CheckInit() {
-  if (HAL_IsInitialized.load(std::memory_order_relaxed)) {
-    return;
-  }
-  RunInitialize();
-}
-
-extern void InitializeCTREPCM();
-extern void InitializeREVPH();
 extern void InitializeAccelerometer();
 extern void InitializeAddressableLED();
 extern void InitializeAnalogAccumulator();
@@ -43,8 +36,6 @@ extern void InitializeInterrupts();
 extern void InitializeLEDs();
 extern void InitializeMain();
 extern void InitializeNotifier();
-extern void InitializeCTREPDP();
-extern void InitializeREVPDH();
 extern void InitializePorts();
 extern void InitializePower();
 extern void InitializePWM();

@@ -39,12 +39,16 @@ ext {
             it.sources {
                 athenaCpp(CppSourceSet) {
                     source {
-                        srcDirs = ['src/main/native/athena']
+                        srcDirs = [
+                            'src/main/native/athena',
+                            'src/main/native/shared'
+                        ]
                         include '**/*.cpp'
                     }
                     exportedHeaders {
                         srcDir 'src/main/native/include'
                         srcDir generatedHeaders
+                        srcDir 'src/main/native/shared'
                     }
                 }
             }
