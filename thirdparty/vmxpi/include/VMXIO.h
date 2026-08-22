@@ -47,6 +47,7 @@ typedef void *LEDArrayBufferHandle;
 class VMXIO {
 
 	friend class VMXPi;
+	friend class VMXZero;
 
 	PIGPIOClient& 		pigpio;
 	IOCXClient&   		iocx;

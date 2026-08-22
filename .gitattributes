@@ -28,3 +28,9 @@
 
 # Generated files
 */src/generated/** linguist-generated
+
+# Vendored VMX-pi SDK headers are copied verbatim from the vendor under MIT,
+# and hal/tools/verify_vmx_crosscompile.py checks their SHA-256 digests. They
+# carry upstream trailing whitespace that must not be rewritten, so exempt
+# them from whitespace checking rather than editing third-party content.
+thirdparty/vmxpi/include/*.h -whitespace

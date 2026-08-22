@@ -38,6 +38,7 @@ class VMXTimeImpl;
 class VMXTime {
 
 	friend class VMXPi;
+	friend class VMXZero;
 	friend class VMXIO;
 
 	PIGPIOClient& pigpio;

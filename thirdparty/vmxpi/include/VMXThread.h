@@ -32,6 +32,7 @@ class PIGPIOClient;
 class VMXThread {
 
 	friend class VMXPi;
+	friend class VMXZero;
 
 	PIGPIOClient& pigpio;
 
@@ -42,6 +43,14 @@ class VMXThread {
 public:
 
 	bool IsSchedulerRealtime();
+
+	/** Returns true if the HAL is running on a PREEMPT_RT (real-time) kernel. */
+	bool IsPreemptRTKernel();
+
+	/** Logs the effective real-time posture to stdout:  the scheduling policy,
+	 * priority and CPU affinity of the calling thread, plus whether a PREEMPT_RT
+	 * kernel is active.  Useful as a startup self-check. */
+	void LogRealtimeStatus();
 };
 
 #endif /* VMXTHREAD_H_ */

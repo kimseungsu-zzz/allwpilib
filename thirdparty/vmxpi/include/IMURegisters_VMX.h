@@ -22,8 +22,8 @@ THE SOFTWARE.
 ===============================================
  */
 
-#ifndef IMU_REGISTERS_H_
-#define IMU_REGISTERS_H_
+#ifndef IMU_REGISTERS_VMX_H_
+#define IMU_REGISTERS_VMX_H_
 
 #include "IMUProtocol.h"
 
@@ -309,7 +309,7 @@ typedef int32_t     s_1616_float;
 
 #define NAVX_INTEGRATION_CTL_RESET_YAW              0x80
 
-class IMURegisters
+class IMURegisters_VMX
 {
 public:
     /************************************************************/
@@ -464,4 +464,4 @@ public:
 };
 
 
-#endif /* IMU_REGISTERS_H_ */
+#endif /* IMU_REGISTERS_VMX_H_ */

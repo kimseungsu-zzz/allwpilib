@@ -72,7 +72,7 @@ jobs:
     # selects the sim backend, so none of the jobs above ever compile
     # hal/src/main/native/vmx. Run the AArch64 cross compiler over it in
     # syntax-only mode. No SDK install is needed: the MIT-licensed vendor
-    # headers in thirdparty/vmxpi cover all 42 translation units, so --require
+    # headers in thirdparty/vmxpi cover all 44 translation units, so --require
     # holds the job to full coverage.
     name: "VMX AArch64 cross-compile"
     runs-on: ubuntu-22.04

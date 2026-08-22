@@ -29,6 +29,7 @@ class MISCClient;
 /** The VMXPower class provides access to VMX power management functions */
 class VMXPower {
 	friend class VMXPi;
+	friend class VMXZero;
 
 	MISCClient& misc;
 

@@ -22,6 +22,7 @@ THE SOFTWARE.
 #ifndef SRC_AHRS_H_
 #define SRC_AHRS_H_
 
+#include <string>
 #include <thread>
 #include "IVMXTimestampedAHRSDataSubscriber.h"
 
@@ -31,6 +32,7 @@ class ContinuousAngleTrackerVMX;
 class SPIClient;
 class PIGPIOClient;
 class VMXPi;
+class VMXZero;
 
 using namespace std;
 
@@ -56,6 +58,7 @@ class AHRSInternal;
 /** The AHRS class provides accesst to the VMX-pi IMU and Attitude/Heading Reference System functionality.*/
 class AHRS {
 	friend class ::VMXPi;
+	friend class ::VMXZero;
 
     AHRS(SPIClient& client, PIGPIOClient& pigpio, uint8_t update_rate_hz);
     virtual ~AHRS();

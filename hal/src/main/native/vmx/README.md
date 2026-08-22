@@ -27,23 +27,28 @@ individual HAL facilities use this adapter boundary.
 
 ## SDK ABI and target decision
 
-VMX-Pi and VMX2 are Linux **AArch64-only** deployment targets. The
-`libvmxpi_hal_cpp.so` copied from `vmxpi-hal-1.1.249-linuxraspbian` currently
-available in the local SDK is reported by `file` as `ELF 32-bit LSB shared
-object, ARM, EABI5`. It is therefore a legacy/incompatible SDK artifact and
-the Gradle build rejects it before native compilation or linking. No armhf or
-other 32-bit VMX target, helper daemon, IPC bridge, or forced ELF32 link is
-supported.
+VMX-Pi and VMX2 are Linux **AArch64-only** deployment targets. An ELF64
+AArch64 SDK is what the build expects: `libvmxpi_hal_cpp.so` and every ELF
+object inside `libvmxpi_hal_cpp.a` must be ELF64 little-endian AArch64.
 
-The official acquisition path is the latest VMX OS/WPILib image published by
-[Studica Robotics](https://learn.studica.com/docs/ws/vmx/os-images), which is
-documented as containing the VMX runtime and WPILib. The download is currently
-behind an authenticated SharePoint link, and the public
-[Studica ROS2 repository](https://github.com/Studica-Robotics/ROS2) does not
-publish an AArch64 `libvmxpi_hal_cpp.so` or a native AArch64 build recipe.
-Until an ELF64 AArch64 SDK is obtained from that image or built from the
-VMX HAL native sources, Linux ARM64 Debug/Release checks are limited to the
-source/header path and a final VMX HAL link is not claimed.
+A legacy `vmxpi-hal-*-linuxraspbian` drop reports as `ELF 32-bit LSB shared
+object, ARM, EABI5`. That artifact is rejected before native compilation or
+linking; no armhf or other 32-bit VMX target, helper daemon, IPC bridge, or
+forced ELF32 link is supported. If `verifyVmxSdk` reports an incompatible
+architecture, the SDK is a legacy drop and a current one is needed.
+
+The acquisition path is the VMX OS/WPILib image published by
+[Studica Robotics](https://learn.studica.com/docs/ws/vmx/os-images), which
+contains the VMX runtime and WPILib; the download sits behind an
+authenticated link, and the public
+[Studica ROS2 repository](https://github.com/Studica-Robotics/ROS2) publishes
+neither an AArch64 `libvmxpi_hal_cpp.so` nor a native AArch64 build recipe.
+
+Compilation of this backend no longer depends on having that SDK to hand.
+The MIT-licensed header closure is vendored in `thirdparty/vmxpi`, so the
+cross-compilation gate below builds every translation unit anywhere. Linking
+and running still require the real SDK library, and no VMX HAL link or
+hardware behaviour is claimed on the strength of a compile.
 
 Every accepted SDK library must satisfy both `file` and `readelf -h` checks:
 `ELF 64-bit` and `Machine: AArch64`. The `vmxdrivers` Gradle verification
@@ -136,8 +141,12 @@ CAN and USB configuration payloads have different lengths.
 ## Studica Colore vendor API
 
 `StudicaColore_*` in `hal/src/main/native/include/studica/Colore.h` provides
-XYZ, normalized sRGB, chromaticity, sequence, connection, and configuration
-snapshots over the same CAN/USB transport split. Brightness is strict
+XYZ, RGB, chromaticity, sequence, connection, and configuration
+snapshots over the same CAN/USB transport split. The RGB components are
+not one colour space: USB passes through the device's own gamma-encoded
+sRGB when it reports it, and every other path derives linear-light values
+from XYZ through the sRGB primaries matrix without the transfer function.
+Chromaticity is the stable basis for matching. Brightness is strict
 `0..100`; values outside that range return `INVALID_ARGUMENT` rather than
 being clamped. Color matching is a separate in-memory CIE-xy layer with a
 fixed `char label[32]`, confidence, measured coordinates, and valid flag.
@@ -575,7 +584,7 @@ close that gap, and `:hal:check` depends on it.
 
 No SDK installation is required. The MIT-licensed VMX-pi headers in
 [`thirdparty/vmxpi`](../../../../../thirdparty/vmxpi) are the complete
-`VMXPi.h` include closure, so all 42 translation units compile on any machine.
+`VMXPi.h` include closure, so all 44 translation units compile on any machine.
 
 | Situation | Result |
 | --- | --- |

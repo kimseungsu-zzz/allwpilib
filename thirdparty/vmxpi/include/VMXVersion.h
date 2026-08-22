@@ -22,12 +22,14 @@ THE SOFTWARE.
 #ifndef VMXVERSION_H_
 #define VMXVERSION_H_
 
+#include <string>
 #include "AHRS.h"
 
 /** The VMXVersion class provides library version management functions. */
 class VMXVersion {
 
 	friend class VMXPi;
+	friend class VMXZero;
 
 	vmx::AHRS& ahrs;
 
