@@ -648,9 +648,43 @@ Two of wpiutil's translation units are excluded, as the real build excludes
 them: the JNI sources belong to a separate library, and `windows/Demangle.cpp`
 is not Linux.
 
-What this does not establish is behaviour. Nothing here has run: that needs
-the board, and every row of the coverage manifest remains
-`hardwareValidated=false`.
+### Running without the board
+
+The AArch64 build has been executed under `qemu-user`, which is enough to
+exercise every path that does not reach the hardware. The unsupported entry
+points behave as designed, each setting `HAL_USE_LAST_ERROR` and a message
+retrievable through `HAL_GetLastError`:
+
+```text
+HAL_InitializeRelayPort         VMX HAL does not support relay outputs
+HAL_InitializeDMA               VMX HAL does not support FPGA DMA
+HAL_InitializeAnalogOutputPort  VMX HAL does not support analog output
+HAL_SetRadioLEDState            VMX HAL does not support the roboRIO radio LED
+```
+
+`HAL_CreateSimDevice` returns 0 silently, `HAL_CheckRelayChannel` and
+`HAL_CheckAnalogOutputChannel` return false, and `HAL_GetErrorMessage` maps
+status codes correctly.
+
+`HAL_Initialize` cannot be reached this way, and not because of anything in
+this adapter. Constructing `VMXPi` segfaults, with none of our code linked in:
+the SDK reads `/proc/cpuinfo`, then opens `/proc/device-tree/model`, and
+dereferences null when that file is absent.
+
+```text
+openat("/proc/device-tree/model") = -1 ENOENT
+--- SIGSEGV si_addr=NULL ---
+```
+
+A Raspberry Pi has that file, so this is specific to running off Pi-class
+hardware rather than to a missing VMX-pi hat. It does mean the SDK cannot be
+brought up at all on a development machine, and it has one consequence worth
+knowing: the rollback in `HAL_Initialize`, which unwinds runtime, CAN,
+DriverStation and watchdog in order when any stage fails, only runs if the SDK
+returns. If the SDK faults first, nothing in this adapter gets the chance.
+
+Behaviour beyond this remains unverified. Every row of the coverage manifest
+is still `hardwareValidated=false`.
 
 ## Hardware watchdog
 
