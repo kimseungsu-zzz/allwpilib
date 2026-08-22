@@ -123,7 +123,10 @@ standard DIO/PWM HAL. The mechanical public HAL audit is recorded in
 [VMX_HAL_COVERAGE.md](hal/src/main/native/vmx/VMX_HAL_COVERAGE.md): it covers 38
 headers and 502 declarations with status counts emitted by
 `./gradlew :hal:checkHalCoverage`, and fails when a newly added public symbol
-is unclassified. The current audit has `MISSING_FEASIBLE=0`; remaining
+is unclassified. A separate Linkage column records whether the VMX `wpiHal`
+defines each header's symbols at all, which is independent of whether the
+hardware supports them, and the cross-compilation gate enforces it against
+object symbol tables. The current audit has `MISSING_FEASIBLE=0`; remaining
 partials are deliberate hardware/SDK or FPGA-semantic boundaries: hardware
 AnalogTrigger coexistence, Counter pulse-length mode, USB `kUSB1`/`kUSB2`, and
 DIO glitch filtering. FPGA-only DMA/relay/radio-LED/main surfaces remain

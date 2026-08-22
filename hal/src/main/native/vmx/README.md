@@ -574,6 +574,15 @@ in [VMX_HAL_COVERAGE.md](VMX_HAL_COVERAGE.md); run
 `./gradlew :hal:checkHalCoverage` to fail a build when a new public symbol has
 no status or an `IMPLEMENTED` status has no VMX/shared definition.
 
+That manifest tracks two independent things. Status says what the VMX hardware
+can do; the Linkage column says whether this backend defines the symbol at all.
+They are not the same question -- an `UNSUPPORTED_HARDWARE` entry point still
+has to resolve, because the HAL C ABI is what wpilibc and the JNI layer link
+against -- and collapsing them once left `HAL_GetErrorMessage` absent rather
+than merely unsupported. Linkage is enforced by the cross-compilation gate
+below, which reads real object symbol tables; a text search cannot tell a
+definition from a forward declaration.
+
 ## Cross-compilation gate
 
 The VMX source set is opt-in (`-PvmxBuild`) and every non-roboRIO platform
