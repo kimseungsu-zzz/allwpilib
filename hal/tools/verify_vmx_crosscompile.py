@@ -5,8 +5,10 @@ Nothing in normal CI compiles hal/src/main/native/vmx.  The Gradle VMX source
 set is opt-in (-PvmxBuild) and Bazel selects the sim backend off the roboRIO,
 so roughly ten thousand lines of backend translation units never reach a
 compiler until somebody builds for real hardware.  This gate closes that hole
-by running the cross compiler in -fsyntax-only mode over every VMX and shared
-translation unit.
+by compiling every VMX and shared translation unit with the cross compiler,
+then reading the resulting object symbol tables for references that nothing
+defines.  A real link needs the vendor library, which is not redistributable,
+but the symbol tables catch the same class of error.
 
 It deliberately does not stub the VMX SDK.  A stub synthesised from our own
 call sites would only prove that we agree with ourselves; it cannot catch a
@@ -49,6 +51,12 @@ INCLUDE_DIRS = [
     ROOT / "wpiutil" / "src" / "main" / "native" / "thirdparty" / "fmtlib" / "include",
     ROOT / "wpiutil" / "src" / "main" / "native" / "thirdparty" / "llvm" / "include",
     ROOT / "wpiutil" / "src" / "main" / "native" / "thirdparty" / "sigslot" / "include",
+]
+
+# Compiled only so their symbols resolve; not themselves gated.
+RESOLUTION_DIRS = [
+    ROOT / "hal" / "src" / "main" / "native" / "cpp",
+    ROOT / "hal" / "src" / "main" / "native" / "cpp" / "handles",
 ]
 
 DEFAULT_STANDARD = "c++20"
@@ -208,20 +216,91 @@ def collect_sources() -> list[Path]:
     return sources
 
 
+def collect_resolution_sources() -> list[Path]:
+    """Platform-independent HAL sources, compiled only to resolve symbols.
+
+    The backend legitimately calls into these -- hal::createHandle and
+    hal::SetLastError, for instance -- so without them every such reference
+    would look like an unresolved symbol.
+    """
+    sources: list[Path] = []
+    for directory in RESOLUTION_DIRS:
+        if directory.is_dir():
+            sources.extend(sorted(directory.glob("*.cpp")))
+    return sources
+
+
+def resolve_nm(compiler: list[str]) -> list[str] | None:
+    """Find the nm matching the compiler, falling back to the host's."""
+    binary = Path(compiler[0]).name
+    if binary.endswith("g++"):
+        candidate = Path(compiler[0]).with_name(binary[: -len("g++")] + "nm")
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            return [str(candidate)]
+        if shutil.which(binary[: -len("g++")] + "nm"):
+            return [binary[: -len("g++")] + "nm"]
+    return ["nm"] if shutil.which("nm") else None
+
+
+def unresolved_backend_symbols(
+    nm: list[str], objects: list[Path]
+) -> list[str] | None:
+    """Symbols the backend needs that nothing in the HAL defines.
+
+    -fsyntax-only accepts a declaration that no translation unit ever defines,
+    and an anonymous-namespace definition of a function declared with external
+    linkage. Both link-fail. Reading the object symbol table catches them; a
+    real link cannot run here because the vendor library is not redistributed.
+    """
+    if not objects:
+        return None
+    result = subprocess.run(
+        [*nm, *[str(path) for path in objects]],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return None
+
+    defined: set[str] = set()
+    undefined: set[str] = set()
+    for line in result.stdout.splitlines():
+        fields = line.split()
+        if len(fields) >= 2 and fields[-2] == "U":
+            undefined.add(fields[-1])
+        elif len(fields) >= 3 and fields[-2] not in {"U", "w"}:
+            defined.add(fields[-1])
+
+    # hal::vmx is the backend's own namespace, and a HAL_/HALSIM_ entry point
+    # is either implemented here or by the shared HAL sources compiled above.
+    # Anything of either kind still missing would be an undefined reference.
+    external = undefined - defined
+    return sorted(
+        symbol
+        for symbol in external
+        if symbol.startswith(("HAL_", "HALSIM_")) or "3hal3vmx" in symbol
+    )
+
+
 def build_command(
     compiler: list[str], sdk_includes: list[Path], standard: str
 ) -> list[str]:
-    command = [*compiler, "-fsyntax-only", f"-std={standard}"]
+    # -c rather than -fsyntax-only: it covers everything syntax checking does,
+    # and leaves object files whose symbol tables reveal link errors.
+    command = [*compiler, "-c", f"-std={standard}"]
     for directory in [*INCLUDE_DIRS, *sdk_includes]:
         command.extend(["-I", str(directory)])
     command.extend(os.environ.get("VMX_CROSS_CXXFLAGS", "").split())
     return command
 
 
-def compile_one(command: list[str], source: Path) -> tuple[Path, int, str]:
+def compile_one(
+    command: list[str], source: Path, objects: Path
+) -> tuple[Path, int, str]:
+    obj = objects / (source.relative_to(ROOT).as_posix().replace("/", "_") + ".o")
     try:
         result = subprocess.run(
-            [*command, str(source)],
+            [*command, str(source), "-o", str(obj)],
             cwd=ROOT,
             capture_output=True,
             text=True,
@@ -304,16 +383,49 @@ def main() -> int:
 
     failures: list[tuple[Path, str]] = []
     deferred: list[Path] = []
-    with concurrent.futures.ThreadPoolExecutor() as pool:
-        futures = [pool.submit(compile_one, command, source) for source in sources]
-        for future in concurrent.futures.as_completed(futures):
-            source, code, output = future.result()
-            if code == 0:
-                continue
-            if sdk_includes or not needs_sdk(output):
-                failures.append((source, output))
-            else:
-                deferred.append(source)
+    unresolved: list[str] | None = None
+    with tempfile.TemporaryDirectory(prefix="vmx-objects-") as objdir:
+        objects = Path(objdir)
+        with concurrent.futures.ThreadPoolExecutor() as pool:
+            futures = [
+                pool.submit(compile_one, command, source, objects)
+                for source in sources
+            ]
+            for future in concurrent.futures.as_completed(futures):
+                source, code, output = future.result()
+                if code == 0:
+                    continue
+                if sdk_includes or not needs_sdk(output):
+                    failures.append((source, output))
+                else:
+                    deferred.append(source)
+
+        if not failures and not deferred:
+            # Only meaningful once every unit compiled: a partial object set
+            # would report absences that are really just missing objects.
+            for source in collect_resolution_sources():
+                compile_one(command, source, objects)
+            nm = resolve_nm(compiler)
+            if nm:
+                unresolved = unresolved_backend_symbols(
+                    nm, sorted(objects.glob("*.o"))
+                )
+
+    if unresolved:
+        print(
+            f"VMX AArch64 cross-compilation gate: FAIL "
+            f"({len(unresolved)} symbols the backend needs are defined nowhere)",
+            file=sys.stderr,
+        )
+        for symbol in unresolved:
+            print(f"  {symbol}", file=sys.stderr)
+        print(
+            "\nThese compile but would not link. A function declared in a "
+            "header\nand defined only inside an anonymous namespace looks like "
+            "this.",
+            file=sys.stderr,
+        )
+        return 1
 
     if failures:
         print(

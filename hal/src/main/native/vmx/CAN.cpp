@@ -635,4 +635,31 @@ void HAL_ReadCANPacketTimeout(HAL_CANHandle handle, int32_t apiId,
                                 timeoutMs, 2, *status);
 }
 
+// Not declared in any public HAL header: an internal helper that the shared
+// CAN power/pneumatics sources call to open a stream on one API id. It used
+// to live only in the athena backend, which was sufficient while CTREPDP and
+// REVPDH were athena sources too. They are now compiled for VMX as well, so
+// this backend has to provide it or fail to link. Semantics follow athena's:
+// resolve the device, build its message id, open a stream session over the
+// full 29-bit mask, and hand back the session.
+uint32_t HAL_StartCANStream(HAL_CANHandle handle, int32_t apiId, int32_t depth,
+                            int32_t* status) {
+  int32_t localStatus = HAL_SUCCESS;
+  if (!status) {
+    status = &localStatus;
+  }
+  *status = HAL_SUCCESS;
+  auto device = hal::vmx::GetCANApiState().Get(handle);
+  if (!device) {
+    *status = HAL_HANDLE_ERROR;
+    return 0;
+  }
+  const uint32_t messageId = hal::vmx::VMXCreateCANId(
+      device->manufacturer, device->deviceId, device->deviceType, apiId);
+  uint32_t session = 0;
+  HAL_CAN_OpenStreamSession(&session, messageId, 0x1FFFFFFF,
+                            static_cast<uint32_t>(depth), status);
+  return session;
+}
+
 }  // extern "C"

@@ -135,12 +135,6 @@ std::unique_ptr<PWMBackend> CreatePWMBackend(int32_t channel) {
   return backend->IsInitialized() ? std::move(backend) : nullptr;
 }
 
-PWMManager& GetPWMManager() {
-  static PWMManager manager{CreatePWMBackend, GetDigitalChannelRegistry(),
-                            &GetVMXCapabilityProvider()};
-  return manager;
-}
-
 void SetPWMHardwareError(int32_t* status, std::string_view message) {
   *status = INCOMPATIBLE_STATE;
   hal::SetLastError(status, message);
@@ -190,6 +184,17 @@ bool CheckPWMHandleForUnsupported(HAL_DigitalHandle handle, int32_t* status) {
 }
 
 }  // namespace
+
+// Declared in PWMInternal.h and called from other translation units, notably
+// AddressableLED, which borrows a PWM handle. It must therefore have external
+// linkage: defining it in the anonymous namespace above compiled cleanly and
+// then failed to link.
+PWMManager& GetPWMManager() {
+  static PWMManager manager{CreatePWMBackend, GetDigitalChannelRegistry(),
+                            &GetVMXCapabilityProvider()};
+  return manager;
+}
+
 }  // namespace hal::vmx
 
 extern "C" {
