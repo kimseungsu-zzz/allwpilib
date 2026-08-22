@@ -1,0 +1,12 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "studica-vmx"
+version = "0.1.0"
+description = "Studica VMX vendor bindings over the shared WPILib native ABI"
+requires-python = ">=3.9"
+
+[tool.setuptools.packages.find]
+where = ["."]

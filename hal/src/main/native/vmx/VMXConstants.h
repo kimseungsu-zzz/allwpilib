@@ -21,6 +21,31 @@ constexpr int32_t kNumVMXAnalogTriggers = 8;
 constexpr int32_t kNumVMXEncoders = 5;
 constexpr int32_t kFirstVMXAnalogChannel = 22;
 
+// Public HAL port-count ABI.  These values describe the VMX logical surface,
+// not a claim that every channel has every FPGA-era capability.
+constexpr int32_t kNumAccumulators = kNumAnalogAccumulators;
+constexpr int32_t kNumAnalogTriggers = kNumVMXAnalogTriggers;
+constexpr int32_t kNumAnalogOutputs = 0;
+constexpr int32_t kNumCounters = 8;
+constexpr int32_t kNumDigitalHeaders = kNumDigitalChannels;
+constexpr int32_t kNumPWMHeaders = kNumPWMChannels;
+constexpr int32_t kNumDigitalPWMOutputs = kNumDIOChannels;
+constexpr int32_t kNumEncoders = kNumVMXEncoders;
+constexpr int32_t kNumInterrupts = 8;
+constexpr int32_t kNumRelayChannels = 0;
+constexpr int32_t kNumRelayHeaders = 0;
+constexpr int32_t kNumCTREPCMModules = 63;
+constexpr int32_t kNumCTRESolenoidChannels = 8;
+constexpr int32_t kNumCTREPDPModules = 63;
+constexpr int32_t kNumCTREPDPChannels = 16;
+constexpr int32_t kNumREVPDHModules = 63;
+constexpr int32_t kNumREVPDHChannels = 24;
+constexpr int32_t kNumREVPHModules = 63;
+constexpr int32_t kNumREVPHChannels = 16;
+constexpr int32_t kNumDutyCycles = 8;
+constexpr int32_t kNumAddressableLEDs = 1;
+constexpr int32_t kSystemClockTicksPerMicrosecond = 1;
+
 constexpr bool IsDIOChannelValid(int32_t channel) {
   return channel >= 0 && channel < kNumDIOChannels;
 }

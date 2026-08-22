@@ -123,8 +123,8 @@ has been tested, so every row remains `hardwareValidated=false`.
 
 | HAL/core | Status | Scope |
 | --- | --- | --- |
-| DIO | `SUPPORTED` | Input/output allocation, reads/writes, pulse generation, and ownership coordination for VMX digital channels. |
-| PWM | `SUPPORTED` | WPILib pulse/speed/position semantics, quantized readback, disable, and reactivation. Unsupported optional modes remain explicit HAL errors. |
+| DIO | `SUPPORTED` | Input/output allocation, reads/writes, pulse generation, general DigitalPWM allocation/rate/duty/output routing, and ownership coordination for VMX digital channels. Glitch filters and PPS remain explicit unsupported HAL results. |
+| PWM | `SUPPORTED` | WPILib pulse/speed/position semantics, quantized readback, disable, and reactivation. DigitalOutput PWM uses the separate VMX PWMGenerator resource; unsupported optional modes remain explicit HAL errors. |
 | AnalogInput | `SUPPORTED` | Four logical analog channels backed by the VMX AccumulatorInput resource. |
 | AnalogAccumulator | `SUPPORTED` | Standard accumulator surface on logical channels 0 and 1, including atomic value/count output and continuity offsets. |
 | Counter | `PARTIAL` | TwoPulse, single-source SemiPeriod, and restricted ExternalDirection InputCapture paths; PulseLength remains unsupported. |
@@ -154,12 +154,12 @@ unchanged `vmxdrivers` sources and then bound to Java, C++, and Python.
 | Vendor sensor/module | Status | Boundary |
 | --- | --- | --- |
 | VMX onboard IMU / NavX-style data | `VENDOR_API` | `studica::VMXIMU` reads the shared VMXRuntime AHRS and exposes orientation, continuous angle/rate, quaternion, raw/world acceleration, gyro/magnetometer, heading, state, timestamp, temperature, firmware, and validity-guarded pressure/altitude. `hardwareValidated=false`; it is not WPILib `BuiltInAccelerometer` or `AnalogGyro`. |
-| Titan Quad / Titan Quad Encoder | `VENDOR_API` | `studica::TitanQuad`, `studica::TitanQuadEncoder`, Java `com.studica.frc` wrappers, and `StudicaTitan_*` C ABI. CAN IDs 1--62, motor ports 0--3, shared controller per CAN ID, 50 ms watchdog refresh, motor/encoder/absolute-angle/limit/configuration paths, and explicit safe zero/disable on stale DS/e-stop/close. `hardwareValidated=false`; this does not promote WPILib motor-controller, Encoder, or DutyCycleEncoder rows. |
-| Studica Cobra | `VENDOR_API` | `softwareValidated=true`, `hardwareValidated=false`; `StudicaCobra_*`, `studica::Cobra`, Java `com.studica.frc.Cobra`, and the future Python ctypes binding wrap immutable `vmxdrivers::Cobra`. Four raw/voltage channels (0--3), strict validation, shared I2C reservation, and metadata access are implemented. |
+| Titan Quad / Titan Quad Encoder | `VENDOR_API` | `studica::TitanQuad`, `studica::TitanQuadEncoder`, Java `com.studica.frc` wrappers, `hal/python/studica.TitanQuad`, and `StudicaTitan_*` C ABI. CAN IDs 1--62, motor ports 0--3, shared controller per CAN ID, 50 ms watchdog refresh, motor/encoder/absolute-angle/limit/configuration paths, and explicit safe zero/disable on stale DS/e-stop/close. `hardwareValidated=false`; this does not promote WPILib motor-controller, Encoder, or DutyCycleEncoder rows. |
+| Studica Cobra | `VENDOR_API` | `softwareValidated=true`, `hardwareValidated=false`; `StudicaCobra_*`, `studica::Cobra`, Java `com.studica.frc.Cobra`, and `hal/python/studica.Cobra` wrap immutable `vmxdrivers::Cobra`. Four raw/voltage channels (0--3), strict validation, shared I2C reservation, and metadata access are implemented. |
 | Studica Sharp | `VENDOR_API` | Distinct from the WPILib `SharpIR` analog class; use the Studica driver API. |
-| Studica Parsec (CAN) | `VENDOR_API` | `softwareValidated=true`, `hardwareValidated=false`; `StudicaParsec_CreateCAN` uses the shared VMX CAN runtime and immutable `vmxdrivers::Parsec`, validates CAN IDs 0..63, and exposes fixed 64-zone snapshots. 4x4/8x8 metadata, raw 0..4000 mm, -1 disabled, -2 invalid, and sentinel-excluding minimum distance are covered by native tests. |
+| Studica Parsec (CAN) | `VENDOR_API` | `softwareValidated=true`, `hardwareValidated=false`; `StudicaParsec_CreateCAN` uses the shared VMX CAN runtime and immutable `vmxdrivers::Parsec`, validates CAN IDs 0..63, and exposes fixed 64-zone snapshots. 4x4/8x8 metadata, raw 0..4000 mm, -1 disabled, -2 invalid, and sentinel-excluding minimum distance are covered by native tests; Python uses the same C ABI. |
 | Studica Parsec (USB) | `VENDOR_API` | `softwareValidated=true`, `hardwareValidated=false`; `StudicaParsec_CreateUSB` uses an explicit `/dev/ttyACM*` or `/dev/serial/by-id/` path and immutable `vmxdrivers::ParsecUsb`. USB ownership is independent from WPILib SerialPort aliases; fixed snapshot/config ABI and lifecycle/error tests pass. |
-| Studica Colore (CAN) | `VENDOR_API` | `softwareValidated=true`, `hardwareValidated=false`; `StudicaColore_CreateCAN` uses the shared VMX CAN runtime and immutable `vmxdrivers::Colore`, exposes XYZ plus normalized sRGB/chromaticity, strict brightness 0..100, and fixed in-memory CIE-xy matching. |
+| Studica Colore (CAN) | `VENDOR_API` | `softwareValidated=true`, `hardwareValidated=false`; `StudicaColore_CreateCAN` uses the shared VMX CAN runtime and immutable `vmxdrivers::Colore`, exposes XYZ plus normalized sRGB/chromaticity, strict brightness 0..100, and fixed in-memory CIE-xy matching; Python uses the same C ABI. |
 | Studica Colore (USB) | `VENDOR_API` | `softwareValidated=true`, `hardwareValidated=false`; `StudicaColore_CreateUSB` uses the explicit Linux vendor USB path and immutable `vmxdrivers::ColoreUsb`. XYZ/sRGB snapshot, strict brightness, matching, disconnect, and exclusive-path semantics are covered by the shared C ABI and host tests. |
 | Studica Light Tower | `VENDOR_API` | `softwareValidated=true`, `hardwareValidated=false`; `StudicaLightTower_*`, `studica::LightTower`, and Java `com.studica.frc.LightTower` delegate solid/blink, red/yellow/green/buzzer, and off to immutable `vmxdrivers::LightTower`. Five physical outputs are centrally reserved. |
 | VMX-specific Power/SOC | `VENDOR_API` | Audit complete, implementation deferred. The imported Studica power path provides input voltage and may expose a NiMH voltage-to-SOC heuristic, but no coulomb counter or validated SOC contract was found. Standard `RobotController.getBatteryVoltage()` remains the only supported public core path; any future `VMXBatteryMonitor` must expose validity/estimate state separately and must not claim current/brownout/rail telemetry. |
@@ -168,6 +168,12 @@ unchanged `vmxdrivers` sources and then bound to Java, C++, and Python.
 types, HAL status handling, compatibility shims, or sensor-specific fixes.
 Those responsibilities belong in `hal/src/main/native/vmx` or in a future
 separate vendor wrapper module.
+
+The vendor bindings have one native implementation and one fixed C ABI across
+languages: C++ facades, Java/JNI wrappers, and the `hal/python/studica`
+ctypes package expose VMXIMU, TitanQuad, Cobra, Parsec, Colore, and LightTower
+without creating language-specific hardware backends. Host software validation
+does not imply physical validation; every row keeps `hardwareValidated=false`.
 
 ## Validation order
 

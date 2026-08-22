@@ -51,7 +51,10 @@ rate transfers plus DIO rising, falling, and both-edge triggers. AnalogTrigger
 sources and exact FPGA AutoSPI stall timing remain explicitly unsupported;
 sensor-level status is still separate from the matrix's HAL/API status.
 ADXRS450 now has its required standard-SPI plus AutoSPI HAL path, and its
-class-level host contract is software-validated. VMX-Pi and VMX2 deployment targets are Linux
+class-level host contract is software-validated. General `DigitalOutput.enablePWM()`
+now routes through the VMX `PWMGenerator` resource with central physical
+conflict checking; roboRIO-specific PPS and glitch-filter semantics remain
+explicit unsupported results. VMX-Pi and VMX2 deployment targets are Linux
 AArch64 only. The currently available VMXPi SDK shared library is ELF32 ARM
 EABI5 and is classified as a legacy/incompatible artifact; Gradle rejects it
 before compilation/linking. ARM32/armhf targets, helper bridges, and forced
@@ -120,14 +123,17 @@ standard DIO/PWM HAL. The mechanical public HAL audit is recorded in
 [VMX_HAL_COVERAGE.md](hal/src/main/native/vmx/VMX_HAL_COVERAGE.md): it covers 38
 headers and 502 declarations with status counts emitted by
 `./gradlew :hal:checkHalCoverage`, and fails when a newly added public symbol
-is unclassified. The next feasible gaps are general DigitalPWM, hardware
+is unclassified. The current audit has `MISSING_FEASIBLE=0`; remaining
+partials are deliberate hardware/SDK or FPGA-semantic boundaries: hardware
 AnalogTrigger coexistence, Counter pulse-length mode, USB `kUSB1`/`kUSB2`, and
-DIO glitch filtering; FPGA-only DMA/relay/radio-LED/main surfaces remain
-deliberate unsupported/not-applicable boundaries.
+DIO glitch filtering. FPGA-only DMA/relay/radio-LED/main surfaces remain
+deliberate unsupported/not-applicable boundaries. `./gradlew vmxReleaseCheck`
+aggregates coverage, tests, vendor ABI, synthetic AArch64 selection,
+immutable-driver, and documentation gates.
 
 The VMX onboard AHRS is now available through the separate
 `studica::VMXIMU` vendor layer and a versioned `StudicaVMXIMU_*` C ABI. Java
-JNI and the future Python/ctypes binding use the same fixed-layout snapshot over
+JNI and the `hal/python/studica` Python/ctypes package use the same fixed-layout snapshot over
 the shared `VMXRuntime` `VMXPi::getAHRS()` instance; no second VMXPi is created
 and no yaw/pitch/roll fields were added to WPILib core HAL. Raw acceleration
 (sensor-frame G including gravity) remains distinct from world-linear
@@ -168,6 +174,9 @@ strict 0..100 brightness, and in-memory (non-persistent) CIE-xy matching.
 CAN and USB rows are software-validated separately, while
 `hardwareValidated=false` remains explicit. Pinned `vmxdrivers` sources are
 unchanged; protocol/lifecycle adaptation lives under `hal/src/main/native/vmx`.
+The `hal/python/studica` package exposes the same fixed ABI for VMXIMU,
+TitanQuad, Cobra, Parsec, Colore, and LightTower; it contains no second
+hardware implementation.
 The synchronized matrix now records the class-level closure harness:
 `wpilibc/src/test/native/cpp/VMXSensorClassIntegrationTest.cpp` instantiates
 the real WPILib classes and drives public reads through HAL mock data, while

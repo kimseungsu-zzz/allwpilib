@@ -137,6 +137,9 @@ class VMXClassLevelIntegrationTest {
       assertFalse(beamBreak.get());
       assertTrue(output.get());
       assertTrue(outputSim.getValue());
+      output.enablePWM(0.25);
+      output.updateDutyCycle(0.75);
+      output.disablePWM();
 
       victor.set(0.4);
       servo.setAngle(90);

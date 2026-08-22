@@ -11,6 +11,11 @@ definition in `hal/src/main/native/vmx` or `hal/src/main/native/shared`.
 The statuses are deliberately about the VMX HAL contract, not physical-board
 validation:
 
+All software classifications in this manifest keep `hardwareValidated=false`
+until the corresponding WPILib class is run on physical VMX-Pi/VMX2 hardware.
+The VMX deployment target is Linux AArch64 only; no ELF32/ARM32 fallback is
+represented by a coverage status.
+
 | Status | Meaning |
 | --- | --- |
 | `IMPLEMENTED` | VMX/shared implementation exists and is exercised by HAL tests. |
@@ -34,10 +39,10 @@ turn a `PARTIAL` or `HARDWARE_VALIDATION_REQUIRED` row into a support claim.
 | `AnalogTrigger.h` | `PARTIAL` | - | Raw/window state works; filtered/pulse modes report unsupported. |
 | `CAN.h` | `IMPLEMENTED` | - | VMX CANAPI backend. |
 | `CANAPI.h` | `IMPLEMENTED` | - | Logical device and stream sessions over one bus. |
-| `Constants.h` | `PARTIAL` | HAL_GetSystemClockTicksPerMicrosecond=MISSING_FEASIBLE | VMX time conversion is not yet exposed through this legacy query. |
+| `Constants.h` | `IMPLEMENTED` | - | VMX monotonic time is expressed in microseconds, so the legacy tick conversion is one tick per microsecond. |
 | `Counter.h` | `PARTIAL` | HAL_SetCounterPulseLengthMode=UNSUPPORTED_HARDWARE | InputCapture-backed modes; pulse-length semantics are not equivalent. |
 | `CTREPCM.h` | `IMPLEMENTED` | - | Shared canonical CANAPI implementation. |
-| `DIO.h` | `PARTIAL` | HAL_AllocateDigitalPWM=MISSING_FEASIBLE; HAL_FreeDigitalPWM=MISSING_FEASIBLE; HAL_SetDigitalPWMRate=MISSING_FEASIBLE; HAL_SetDigitalPWMDutyCycle=MISSING_FEASIBLE; HAL_SetDigitalPWMPPS=UNSUPPORTED_HARDWARE; HAL_SetDigitalPWMOutputChannel=MISSING_FEASIBLE; HAL_SetFilterSelect=UNSUPPORTED_HARDWARE; HAL_GetFilterSelect=UNSUPPORTED_HARDWARE; HAL_SetFilterPeriod=UNSUPPORTED_HARDWARE; HAL_GetFilterPeriod=UNSUPPORTED_HARDWARE | Normal DIO, pulse, and output paths work. General DigitalPWM is the next feasible gap; PPS and glitch filtering remain deliberate boundaries. |
+| `DIO.h` | `PARTIAL` | HAL_SetDigitalPWMPPS=UNSUPPORTED_HARDWARE; HAL_SetFilterSelect=UNSUPPORTED_HARDWARE; HAL_GetFilterSelect=UNSUPPORTED_HARDWARE; HAL_SetFilterPeriod=UNSUPPORTED_HARDWARE; HAL_GetFilterPeriod=UNSUPPORTED_HARDWARE | Normal DIO, pulse, output, and general DigitalPWM paths use the VMX PWMGenerator resource. PPS and glitch filtering remain deliberate boundaries. |
 | `DMA.h` | `UNSUPPORTED_HARDWARE` | - | FPGA DMA has no VMX SDK equivalent. |
 | `DriverStation.h` | `PARTIAL` | - | VMX KauaiLabs-compatible transport/state adapter. |
 | `DutyCycle.h` | `IMPLEMENTED` | - | FlexDIO PWMCapture adapter. |
@@ -48,7 +53,7 @@ turn a `PARTIAL` or `HARDWARE_VALIDATION_REQUIRED` row into a support claim.
 | `LEDs.h` | `UNSUPPORTED_HARDWARE` | - | roboRIO radio/RSL LED surface has no VMX equivalent. |
 | `Main.h` | `NOT_APPLICABLE` | - | roboRIO main-loop launcher surface. |
 | `Notifier.h` | `IMPLEMENTED` | - | One global VMX timer-notification scheduler. |
-| `Ports.h` | `MISSING_FEASIBLE` | HAL_GetNumAnalogTriggers=IMPLEMENTED | Static VMX channel counts are available for a future complete port-count ABI. |
+| `Ports.h` | `IMPLEMENTED` | - | Static VMX logical port counts are exposed; zero counts mark unsupported relay/analog-output surfaces. |
 | `Power.h` | `PARTIAL` | - | VMX voltage/thermal subset; FPGA-only rails are explicit errors. |
 | `PowerDistribution.h` | `IMPLEMENTED` | - | Shared CTREPDP/REVPDH CANAPI implementation. |
 | `PWM.h` | `PARTIAL` | HAL_LatchPWMZero=UNSUPPORTED_HARDWARE; HAL_SetPWMPeriodScale=UNSUPPORTED_HARDWARE; HAL_SetPWMAlwaysHighMode=UNSUPPORTED_HARDWARE; HAL_GetPWMLoopTiming=UNSUPPORTED_HARDWARE; HAL_GetPWMCycleStartTime=UNSUPPORTED_HARDWARE | Normal PWM, Servo, and PWMVictorSPX paths are implemented. |
@@ -71,7 +76,13 @@ this document. Run:
 ./gradlew :hal:checkHalCoverage
 ```
 
-Next implementation candidates, in priority order, are general DigitalPWM,
-hardware AnalogTrigger coexistence, Counter pulse-length mode, USB serial
+The current audit is 38 headers / 502 symbols with
+`IMPLEMENTED=226`, `PARTIAL=169`, `MISSING_FEASIBLE=0`,
+`UNSUPPORTED_HARDWARE=62`, and `NOT_APPLICABLE=45`. `PARTIAL` is retained
+only where the VMX SDK or roboRIO FPGA semantics cannot honestly be emulated;
+the release gate rejects any return to `MISSING_FEASIBLE`.
+
+Next implementation candidates, in priority order, are hardware AnalogTrigger
+coexistence, Counter pulse-length mode, USB serial
 `kUSB1`/`kUSB2`, and DIO glitch filtering. FPGA-only DMA/relay/radio-LED/main
 surfaces remain deliberate `NOT_APPLICABLE`/`UNSUPPORTED_HARDWARE` statuses.

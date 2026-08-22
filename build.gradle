@@ -172,3 +172,20 @@ ext.getCurrentArch = {
 wrapper {
     gradleVersion = '8.14.3'
 }
+
+def vmxReleasePython = System.getProperty('os.name').toLowerCase().contains('windows')
+        ? 'python'
+        : 'python3'
+tasks.register('vmxReleaseCheck') {
+    group = 'verification'
+    description = 'Runs the software-only VMX release readiness gate.'
+    dependsOn ':hal:check', ':hal:testCpp', ':hal:spotlessCheck',
+            ':wpilibj:spotlessCheck', ':wpilibj:test'
+    doLast {
+        exec {
+            workingDir rootDir
+            commandLine vmxReleasePython,
+                    file('hal/tools/verify_vmx_release.py').absolutePath
+        }
+    }
+}

@@ -61,11 +61,19 @@ C++  (WPILibC) -------------+-> wpiHal -> VMX backend
 Python (RobotPy bindings) ---+
 ```
 
-Do not create VMX-specific Java, C++, or Python hardware APIs. Java's
-target-matched Linux JNI artifact must link this `wpiHal`; C++ links it directly; and a
-future mostrobotpy integration must package/select this same native HAL through
-`robotpy-native-wpihal`. Python bindings and deployment remain in the
-mostrobotpy repository rather than allwpilib.
+Do not create VMX-specific Java, C++, or Python hardware implementations.
+Java's target-matched Linux JNI artifact must link this `wpiHal`; C++ links it
+directly; and `hal/python/studica` provides the vendor ctypes surface over the
+same fixed C ABI. RobotPy deployment selects this target-matched native HAL
+through its normal native-library mechanism; Python does not create a second
+hardware implementation.
+
+The software release gate is `./gradlew vmxReleaseCheck`. It runs the public
+HAL coverage audit, class/native/vendor tests, format checks, fixed ABI header
+checks, synthetic AArch64 SDK-selection validation, immutable `vmxdrivers`
+and documentation checks. A synthetic fixture is never reported as a real
+VMX SDK link; an official ELF64 AArch64 SDK is still required for final native
+link and deployment.
 
 ## Sensor compatibility matrix
 
@@ -105,8 +113,9 @@ no WPILib types, HAL status, or wrapper code is added to `vmxdrivers`.
 
 `StudicaParsec_*` in `hal/src/main/native/include/studica/Parsec.h` is a
 versioned fixed-width C ABI for Parsec over CAN or vendor USB. The C++
-`studica::Parsec`, Java `com.studica.frc.Parsec`, and future Python ctypes
-bindings all share that layout. Snapshots have a fixed 64-zone array and
+`studica::Parsec`, Java `com.studica.frc.Parsec`, and
+`hal/python/studica.Parsec` bindings all share that layout. Snapshots have a
+fixed 64-zone array and
 explicit resolution/zone-count metadata: 4x4 is 16 zones and 8x8 is 64.
 Raw millimetres preserve `0..4000`, `-1` disabled, and `-2` invalid/no-return
 values. `GetMinDistance()` ignores both sentinels and returns an explicit
@@ -138,7 +147,7 @@ handle and never construct a second VMX runtime context.
 Orientation and AHRS data are exposed through the separate
 `studica::VMXIMU` vendor layer. The fixed-layout C ABI in
 `hal/src/main/native/include/studica/VMXIMU.h` is the native contract for
-future Python/ctypes bindings; `hal/src/main/java/studica/vmx/VMXIMU.java`
+`hal/python/studica.VMXIMU`; `hal/src/main/java/studica/vmx/VMXIMU.java`
 and its JNI adapter use that same snapshot contract. No yaw, pitch, roll, or
 quaternion members were added to WPILib's core HAL.
 
@@ -192,7 +201,8 @@ Titan is exposed outside the WPILib HAL sensor/motor-controller contracts.
 `StudicaTitan_*` C ABI, `studica::TitanQuad` and
 `studica::TitanQuadEncoder` C++ facades, and the Java JNI wrappers
 `com.studica.frc.TitanQuad` / `TitanQuadEncoder`. The same ABI is intended for
-Python ctypes; no language-specific hardware implementation is required.
+`hal/python/studica.TitanQuad`; no language-specific hardware implementation
+is required.
 
 The adapter validates CAN IDs 1--62, motor ports 0--3, and motor frequency
 before allocating a handle. It creates one shared imported
@@ -221,7 +231,7 @@ The imported `vmxdrivers/` source files remain unchanged.
 
 `hal/src/main/native/include/studica/Cobra.h` defines the fixed-width
 `StudicaCobra_*` C ABI, `studica::Cobra` facade, and Java
-`com.studica.frc.Cobra`; the same C layout is suitable for Python ctypes. The
+`com.studica.frc.Cobra`; `hal/python/studica.Cobra` uses the same C layout. The
 VMX adapter delegates to the pinned, unchanged `vmxdrivers::Cobra` and exposes
 four channels (`0..3`) with raw ADC and voltage reads, channel count, and
 reference voltage. Invalid channels and reference voltages are rejected before
@@ -237,8 +247,8 @@ reuse the existing `VMXRuntime` context; no VMX driver source is modified.
 ## Studica Light Tower vendor API
 
 `StudicaLightTower_*`, `studica::LightTower`, and
-`com.studica.frc.LightTower` are separate vendor bindings for the pinned
-`vmxdrivers::LightTower`. The adapter exposes red, yellow, green, and buzzer
+`com.studica.frc.LightTower` plus `hal/python/studica.LightTower` are separate
+vendor bindings for the pinned `vmxdrivers::LightTower`. The adapter exposes red, yellow, green, and buzzer
 outputs plus the driver's continuous pin as `SetSolid()`/`SetBlink()` and
 `Off()`. It does not invent custom-frequency blink or turn the tower into a
 WPILib HAL DIO abstraction. Constructor pin arguments are VMX physical DIO

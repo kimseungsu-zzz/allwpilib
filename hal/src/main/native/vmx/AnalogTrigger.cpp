@@ -190,8 +190,4 @@ int32_t HAL_GetAnalogTriggerFPGAIndex(
   return manager.GetIndex(analogTriggerHandle);
 }
 
-int32_t HAL_GetNumAnalogTriggers(void) {
-  return hal::vmx::kNumVMXAnalogTriggers;
-}
-
 }  // extern "C"
