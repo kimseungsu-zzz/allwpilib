@@ -40,6 +40,13 @@
 
 namespace frc {
 
+// Simulation data is process-global and outlives the Sim wrapper objects, so a
+// test that leaves values behind corrupts whichever suite gtest happens to run
+// next. That ordering follows link order and differs per platform: leaving
+// AnalogGyro channel 0 at rate -3.0 here broke AnalogGyroSimTest.SetRate on
+// macOS only, where this file registers first. Reset what these tests dirty,
+// for every Sim class that exposes ResetData.
+
 TEST(VMXSensorClassIntegrationTest, AnalogClassesUsePublicHalValues) {
   HAL_Initialize(500, 0);
 
@@ -64,6 +71,8 @@ TEST(VMXSensorClassIntegrationTest, AnalogClassesUsePublicHalValues) {
   SharpIRSim sharpSim{sharp};
   sharpSim.SetRange(units::centimeter_t{30});
   EXPECT_EQ(sharp.GetRange().value(), 30);
+
+  inputSim.ResetData();
 }
 
 TEST(VMXSensorClassIntegrationTest, EncoderDutyCycleAndTachometerReadbacks) {
@@ -96,6 +105,9 @@ TEST(VMXSensorClassIntegrationTest, EncoderDutyCycleAndTachometerReadbacks) {
   inputDutyCycleSim.SetOutput(0.375);
   EXPECT_EQ(dutyCycle.GetFrequency(), 1000);
   EXPECT_DOUBLE_EQ(dutyCycle.GetOutput(), 0.375);
+
+  encoderSim.ResetData();
+  inputDutyCycleSim.ResetData();
 }
 
 TEST(VMXSensorClassIntegrationTest, UltrasonicUsesPulseRangeAndValidity) {
@@ -147,6 +159,7 @@ TEST(VMXSensorClassIntegrationTest, GyroClassesExposeAngleAndRate) {
     sim.SetRate(-3.0);
     EXPECT_DOUBLE_EQ(gyro.GetAngle(), 12.5);
     EXPECT_DOUBLE_EQ(gyro.GetRate(), -3.0);
+    sim.ResetData();
   }
   {
     ADXRS450_Gyro gyro;
