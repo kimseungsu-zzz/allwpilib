@@ -29,6 +29,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -95,6 +96,36 @@ def resolve_compiler() -> list[str]:
         f"no AArch64 C++ cross compiler found (looked for $VMX_CROSS_CXX, "
         f"{gnu}, aarch64-*-linux-gnu-g++ on PATH, clang++)"
     )
+
+
+def probe_toolchain(compiler: list[str]) -> None:
+    """Reject a compiler that cannot actually target Linux AArch64.
+
+    Finding a compiler on PATH does not mean it can build for this target.
+    A Windows host, for instance, commonly ships clang++, which accepts
+    --target=aarch64-linux-gnu and then fails on the first POSIX header
+    because it has no Linux sysroot. That is an unusable toolchain, not a
+    broken backend, so it must degrade to SKIP rather than fail the build of
+    everyone running :hal:check on a developer machine.
+    """
+    probe = "#include <unistd.h>\n#include <termios.h>\nint main() { return 0; }\n"
+    with tempfile.TemporaryDirectory(prefix="vmx-probe-") as directory:
+        source = Path(directory) / "probe.cpp"
+        source.write_text(probe, encoding="utf-8")
+        try:
+            result = subprocess.run(
+                [*compiler, "-fsyntax-only", str(source)],
+                capture_output=True,
+                text=True,
+            )
+        except OSError as error:
+            raise Unavailable(f"{compiler[0]!r} will not run: {error}") from error
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout).strip().splitlines()
+        raise Unavailable(
+            f"{' '.join(compiler)} cannot target Linux AArch64"
+            + (f": {detail[0]}" if detail else "")
+        )
 
 
 def vendored_sdk_includes() -> list[Path]:
@@ -230,6 +261,7 @@ def main() -> int:
 
     try:
         compiler = resolve_compiler()
+        probe_toolchain(compiler)
     except Unavailable as reason:
         return unavailable(
             reason,
