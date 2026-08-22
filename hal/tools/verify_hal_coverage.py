@@ -63,13 +63,37 @@ def public_headers() -> dict[str, Path]:
     return headers
 
 
+STATEMENT_KEYWORDS = {"return", "case", "else", "do", "co_return"}
+
+PROTOTYPE_RE = re.compile(
+    r"(?:^|\n)[ \t]*((?:const[ \t]+)?[A-Za-z_][\w\s*&]*?)\b"
+    r"(HAL_[A-Za-z0-9_]+)[ \t]*\([^;{]*?\)[ \t]*;",
+    re.DOTALL,
+)
+
+
 def declared_symbols(path: Path) -> set[str]:
+    """Symbols the ABI must carry: out-of-line prototypes and nothing else.
+
+    Matching every `HAL_Foo(` in a header also picks up the inline helpers it
+    defines and the typedefs it names, and no backend defines either out of
+    line. That inflated the surface -- SimDevice.h counted thirty symbols
+    where nine are real -- and would have demanded stub definitions for
+    functions whose bodies sit a few lines above the call.
+    """
     text = strip_comments(path.read_text(encoding="utf-8"))
-    return {
-        match.group(1)
-        for match in SYMBOL_RE.finditer(text)
-        if match.group(1) not in {"HAL_ENUM"}
-    }
+    symbols: set[str] = set()
+    for match in PROTOTYPE_RE.finditer(text):
+        leading, symbol = match.group(1), match.group(2)
+        if symbol == "HAL_ENUM" or "inline" in leading:
+            continue
+        # `return HAL_Foo(a, b);` inside a header's own inline wrapper reads
+        # exactly like a prototype otherwise, and would demand an out-of-line
+        # definition for a function defined a few lines above.
+        if leading.split() and leading.split()[-1] in STATEMENT_KEYWORDS:
+            continue
+        symbols.add(symbol)
+    return symbols
 
 
 def backend_text() -> str:

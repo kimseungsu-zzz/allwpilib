@@ -52,7 +52,7 @@ turn a `PARTIAL` or `HARDWARE_VALIDATION_REQUIRED` row into a support claim.
 | `AnalogAccumulator.h` | `IMPLEMENTED` | `PROVIDED` | - | Atomic value/count and continuity offsets. |
 | `AnalogGyro.h` | `IMPLEMENTED` | `PROVIDED` | - | AnalogInput/AccumulatorInput-backed implementation. |
 | `AnalogInput.h` | `IMPLEMENTED` | `PROVIDED` | - | Four logical analog channels. |
-| `AnalogOutput.h` | `UNSUPPORTED_HARDWARE` | `ABSENT` | - | No VMX analog-output resource. |
+| `AnalogOutput.h` | `UNSUPPORTED_HARDWARE` | `PROVIDED` | - | No VMX analog-output resource. |
 | `AnalogTrigger.h` | `PARTIAL` | `PROVIDED` | - | Raw/window state works; filtered/pulse modes report unsupported. |
 | `CAN.h` | `IMPLEMENTED` | `PROVIDED` | - | VMX CANAPI backend. |
 | `CANAPI.h` | `IMPLEMENTED` | `PROVIDED` | - | Logical device and stream sessions over one bus. |
@@ -60,24 +60,24 @@ turn a `PARTIAL` or `HARDWARE_VALIDATION_REQUIRED` row into a support claim.
 | `Counter.h` | `PARTIAL` | `PROVIDED` | HAL_SetCounterPulseLengthMode=UNSUPPORTED_HARDWARE | InputCapture-backed modes; pulse-length semantics are not equivalent. |
 | `CTREPCM.h` | `IMPLEMENTED` | `PROVIDED` | - | Shared canonical CANAPI implementation. |
 | `DIO.h` | `PARTIAL` | `PROVIDED` | HAL_SetDigitalPWMPPS=UNSUPPORTED_HARDWARE; HAL_SetFilterSelect=UNSUPPORTED_HARDWARE; HAL_GetFilterSelect=UNSUPPORTED_HARDWARE; HAL_SetFilterPeriod=UNSUPPORTED_HARDWARE; HAL_GetFilterPeriod=UNSUPPORTED_HARDWARE | Normal DIO, pulse, output, and general DigitalPWM paths use the VMX PWMGenerator resource. PPS and glitch filtering remain deliberate boundaries. |
-| `DMA.h` | `UNSUPPORTED_HARDWARE` | `ABSENT` | - | FPGA DMA has no VMX SDK equivalent. |
+| `DMA.h` | `UNSUPPORTED_HARDWARE` | `PROVIDED` | - | FPGA DMA has no VMX SDK equivalent. |
 | `DriverStation.h` | `PARTIAL` | `PROVIDED` | - | VMX KauaiLabs-compatible transport/state adapter. |
 | `DutyCycle.h` | `IMPLEMENTED` | `PROVIDED` | - | FlexDIO PWMCapture adapter. |
 | `Encoder.h` | `IMPLEMENTED` | `PROVIDED` | - | Valid-pair, index-source, and readback paths. |
 | `Extensions.h` | `NOT_APPLICABLE` | `ABSENT` | - | roboRIO extension-loader surface. |
 | `I2C.h` | `IMPLEMENTED` | `PROVIDED` | - | Shared CommDIO I2C resource. |
 | `Interrupts.h` | `IMPLEMENTED` | `PROVIDED` | - | DIO edge interrupts and VMX timestamps. |
-| `LEDs.h` | `UNSUPPORTED_HARDWARE` | `ABSENT` | - | roboRIO radio/RSL LED surface has no VMX equivalent. |
+| `LEDs.h` | `UNSUPPORTED_HARDWARE` | `PROVIDED` | - | roboRIO radio/RSL LED surface has no VMX equivalent. |
 | `Main.h` | `NOT_APPLICABLE` | `PROVIDED` | - | roboRIO main-loop launcher surface. |
 | `Notifier.h` | `IMPLEMENTED` | `PROVIDED` | - | One global VMX timer-notification scheduler. |
 | `Ports.h` | `IMPLEMENTED` | `PROVIDED` | - | Static VMX logical port counts are exposed; zero counts mark unsupported relay/analog-output surfaces. |
 | `Power.h` | `PARTIAL` | `PROVIDED` | - | VMX voltage/thermal subset; FPGA-only rails are explicit errors. |
 | `PowerDistribution.h` | `IMPLEMENTED` | `PROVIDED` | - | Shared CTREPDP/REVPDH CANAPI implementation. |
 | `PWM.h` | `PARTIAL` | `PROVIDED` | HAL_LatchPWMZero=UNSUPPORTED_HARDWARE; HAL_SetPWMPeriodScale=UNSUPPORTED_HARDWARE; HAL_SetPWMAlwaysHighMode=UNSUPPORTED_HARDWARE; HAL_GetPWMLoopTiming=UNSUPPORTED_HARDWARE; HAL_GetPWMCycleStartTime=UNSUPPORTED_HARDWARE | Normal PWM, Servo, and PWMVictorSPX paths are implemented. |
-| `Relay.h` | `UNSUPPORTED_HARDWARE` | `ABSENT` | - | VMX has no relay hardware. |
+| `Relay.h` | `UNSUPPORTED_HARDWARE` | `PROVIDED` | - | VMX has no relay hardware. |
 | `REVPH.h` | `IMPLEMENTED` | `PROVIDED` | - | Shared REV PH CANAPI implementation. |
 | `SerialPort.h` | `PARTIAL` | `PROVIDED` | - | kMXP TTL UART works; RS-232/USB aliases remain explicit gaps. |
-| `SimDevice.h` | `NOT_APPLICABLE` | `ABSENT` | - | Simulation-only API is not a VMX production resource. |
+| `SimDevice.h` | `NOT_APPLICABLE` | `PROVIDED` | - | Simulation-only API is not a VMX production resource. |
 | `SPI.h` | `PARTIAL` | `PROVIDED` | - | Basic SPI and HAL-owned AutoSPI; exact AutoStall remains unsupported. |
 | `Threads.h` | `IMPLEMENTED` | `PROVIDED` | - | VMX thread priority/interruptible sleep adapter. |
 | `Value.h` | `NOT_APPLICABLE` | `ABSENT` | - | Simulation value helper types. |
@@ -93,7 +93,7 @@ this document. Run:
 ./gradlew :hal:checkHalCoverage
 ```
 
-The current audit is 38 headers / 502 symbols with
+The current audit is 38 headers / 476 symbols with
 `IMPLEMENTED=226`, `PARTIAL=169`, `MISSING_FEASIBLE=0`,
 `UNSUPPORTED_HARDWARE=62`, and `NOT_APPLICABLE=45`. `PARTIAL` is retained
 only where the VMX SDK or roboRIO FPGA semantics cannot honestly be emulated;

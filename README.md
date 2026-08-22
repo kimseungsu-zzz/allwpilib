@@ -121,7 +121,7 @@ The same class-level closure now covers VMX `DigitalInput`/limit-switch and
 beam-break patterns, `DigitalOutput`, `PWMVictorSPX`, and `Servo` through the
 standard DIO/PWM HAL. The mechanical public HAL audit is recorded in
 [VMX_HAL_COVERAGE.md](hal/src/main/native/vmx/VMX_HAL_COVERAGE.md): it covers 38
-headers and 502 declarations with status counts emitted by
+headers and 476 declarations with status counts emitted by
 `./gradlew :hal:checkHalCoverage`, and fails when a newly added public symbol
 is unclassified. A separate Linkage column records whether the VMX `wpiHal`
 defines each header's symbols at all, which is independent of whether the
