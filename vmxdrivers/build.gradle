@@ -18,7 +18,13 @@ def sdkIncludeDirs = [
     file("${sdkRoot}/include"),
     file("${sdkRoot}/include/vmxpi")
 ]
-def sdkLibraryDir = file("${sdkRoot}/lib")
+// The vendor SDK mirrors its include layout on the library side, shipping
+// lib/vmxpi/libvmxpi_hal_cpp.* rather than lib/. Search both, exactly as
+// sdkIncludeDirs already does, so a stock SDK tree is accepted as-is.
+def sdkLibraryDirs = [
+    file("${sdkRoot}/lib"),
+    file("${sdkRoot}/lib/vmxpi")
+]
 
 // VMX is an AArch64-only deployment target.  Keep this check independent of
 // the host toolchain and of an external `readelf` executable so the same
@@ -85,7 +91,7 @@ def isVmxHalLibraryElf64Aarch64 = { File library ->
 ext {
     vmxSdkRoot = sdkRoot
     vmxSdkIncludeDirs = sdkIncludeDirs
-    vmxSdkLibraryDir = sdkLibraryDir
+    vmxSdkLibraryDirs = sdkLibraryDirs
     vmxSdkLibraries = [
         'vmxpi_hal_cpp',
         'rt',
@@ -98,7 +104,8 @@ ext {
         // A static archive cannot carry system/SDK link flags. Apply them at
         // the final VMX consumer without making that consumer resolve the SDK.
         if (binary instanceof SharedLibraryBinarySpec || binary instanceof NativeExecutableBinarySpec) {
-            binary.linker.args "-L${sdkLibraryDir}", '-lvmxpi_hal_cpp', '-lrt', '-lpthread', '-latomic'
+            sdkLibraryDirs.findAll { it.isDirectory() }.each { binary.linker.args "-L${it}" }
+            binary.linker.args '-lvmxpi_hal_cpp', '-lrt', '-lpthread', '-latomic'
         }
     }
 }
@@ -118,16 +125,21 @@ def verifyVmxSdk = tasks.register('verifyVmxSdk') {
             throw new GradleException(
             "VMXPi.h was not found under ${sdkRoot}/include or ${sdkRoot}/include/vmxpi.")
         }
-        if (!sdkLibraryDir.isDirectory()) {
-            throw new GradleException("VMX SDK library directory does not exist: ${sdkLibraryDir}")
+        def presentLibraryDirs = sdkLibraryDirs.findAll { it.isDirectory() }
+        if (presentLibraryDirs.empty) {
+            throw new GradleException(
+            "VMX SDK library directory does not exist: ${sdkLibraryDirs.join(' or ')}")
         }
 
-        def vmxHalLibraries = fileTree(sdkLibraryDir) {
-            include 'libvmxpi_hal_cpp.a', 'libvmxpi_hal_cpp.so', 'libvmxpi_hal_cpp.so.*'
-        }.files
+        def vmxHalLibraries = presentLibraryDirs.collectMany { directory ->
+            fileTree(directory) {
+                include 'libvmxpi_hal_cpp.a', 'libvmxpi_hal_cpp.so', 'libvmxpi_hal_cpp.so.*'
+            }.files
+        }
         if (vmxHalLibraries.empty) {
             throw new GradleException(
-            "VMX HAL library was not found in ${sdkLibraryDir}; expected libvmxpi_hal_cpp.a or .so.")
+            "VMX HAL library was not found in ${presentLibraryDirs.join(' or ')}; " +
+            "expected libvmxpi_hal_cpp.a or .so.")
         }
 
         def incompatibleLibraries = vmxHalLibraries.findAll { !isVmxHalLibraryElf64Aarch64(it) }
@@ -189,7 +201,7 @@ tasks.register('printVmxSdkConfiguration') {
     doLast {
         println "VMX SDK root: ${configuredSdkRoot ?: '<not configured>'}"
         println "VMX SDK includes: ${sdkIncludeDirs.join(', ')}"
-        println "VMX SDK libraries: ${sdkLibraryDir} (${vmxSdkLibraries.join(', ')})"
+        println "VMX SDK libraries: ${sdkLibraryDirs.join(', ')} (${vmxSdkLibraries.join(', ')})"
         println 'VMX target architecture: AArch64 (ELF64 only; ARM32/ELF32 rejected)'
     }
 }

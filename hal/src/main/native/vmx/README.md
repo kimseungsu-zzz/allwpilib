@@ -50,6 +50,15 @@ Every accepted SDK library must satisfy both `file` and `readelf -h` checks:
 performs the equivalent byte-level check on shared libraries and static
 archives, so an ELF32 artifact fails early with an actionable error.
 
+A stock vendor SDK mirrors its include layout on the library side, shipping
+`lib/vmxpi/libvmxpi_hal_cpp.*` alongside `include/vmxpi/`. Both `lib/` and
+`lib/vmxpi/` are searched, so such a tree is accepted as `VMX_SDK_ROOT`
+without rearranging it. Inspect what was resolved with:
+
+```shell
+./gradlew :vmxdrivers:printVmxSdkConfiguration -PvmxBuild -PvmxSdkRoot=<path>
+```
+
 ## Language bindings
 
 This backend is the single hardware implementation shared by all supported
