@@ -619,6 +619,39 @@ genuine vendor headers, not a reconstruction.
 
 Headers only: linking and running still need the real SDK library.
 
+### Linking for real
+
+The gate stops at object symbol tables because CI has no SDK. With an AArch64
+toolchain and a real SDK, the whole backend links, and that has been done:
+
+```shell
+sudo apt install g++-aarch64-linux-gnu
+export SDK=/path/to/vmx-sdk        # the ELF64 AArch64 one
+```
+
+Cross-compile `wpiutil`, `vmxdrivers` and the HAL (`vmx` + `shared` +
+platform-independent `cpp`) with `-fPIC`, then link:
+
+```shell
+aarch64-linux-gnu-g++ -shared -o libwpiHal.so hal/*.o \
+  -L. -lwpiutil -lvmxdrivers -L"$SDK/lib/vmxpi" -lvmxpi_hal_cpp \
+  -lrt -lpthread -latomic -Wl,--no-undefined
+```
+
+`--no-undefined` is the point: the link only succeeds if every symbol
+resolves. It does. The result is an ELF64 AArch64 shared object recording
+`libvmxpi_hal_cpp.so` among its DT_NEEDED entries, and a consumer executable
+calling `HAL_InitializeRelayPort`, `HAL_InitializeDMA`, `HAL_CreateSimDevice`
+and `HAL_GetErrorMessage` links against it the same way.
+
+Two of wpiutil's translation units are excluded, as the real build excludes
+them: the JNI sources belong to a separate library, and `windows/Demangle.cpp`
+is not Linux.
+
+What this does not establish is behaviour. Nothing here has run: that needs
+the board, and every row of the coverage manifest remains
+`hardwareValidated=false`.
+
 ## Hardware watchdog
 
 The VMX hardware watchdog is configured through the SDK `VMXIO` object with a
