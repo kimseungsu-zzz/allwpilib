@@ -7,6 +7,7 @@
 #include <mutex>
 #include <unordered_map>
 
+#include "DigitalChannelRegistry.h"
 #include "VMXChannelCapabilities.h"
 #include "VMXRuntime.h"
 #include "cobra.hpp"

@@ -11,6 +11,7 @@
 #include <string>
 #include <unordered_map>
 
+#include "VMXPi.h"
 #include "VMXRuntime.h"
 #include "colore.hpp"
 #include "colore_usb.hpp"

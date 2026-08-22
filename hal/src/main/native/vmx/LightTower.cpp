@@ -7,8 +7,9 @@
 #include <mutex>
 #include <unordered_map>
 
-#include "VMXRuntime.h"
+#include "DigitalChannelRegistry.h"
 #include "VMXConstants.h"
+#include "VMXRuntime.h"
 #include "light_tower.hpp"
 
 namespace {

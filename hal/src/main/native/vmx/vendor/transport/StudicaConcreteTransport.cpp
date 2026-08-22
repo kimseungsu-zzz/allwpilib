@@ -12,7 +12,8 @@
 #include <unistd.h>
 
 #include "VMXPi.h"
-#include "VMXRuntime.h"
+
+#include "../../VMXRuntime.h"
 #include "VMXErrors.h"
 
 namespace studica::vendor {

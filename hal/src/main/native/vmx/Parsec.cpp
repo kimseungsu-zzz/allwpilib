@@ -11,6 +11,7 @@
 #include <string>
 #include <unordered_map>
 
+#include "VMXPi.h"
 #include "VMXRuntime.h"
 #include "parsec.hpp"
 #include "parsec_usb.hpp"
@@ -387,7 +388,8 @@ int32_t StudicaParsec_GetLastStatus(StudicaParsecHandle handle,
                                     int32_t* statusOut) {
   if (!statusOut) return STUDICA_PARSEC_INVALID_ARGUMENT;
   std::scoped_lock lock{g_mutex};
-  if (!Find(handle)) return STUDICA_PARSEC_NOT_INITIALIZED;
+  auto* instance = Find(handle);
+  if (!instance) return STUDICA_PARSEC_NOT_INITIALIZED;
   std::scoped_lock instanceLock{instance->mutex};
   *statusOut = instance->lastStatus;
   return STUDICA_PARSEC_OK;
