@@ -242,6 +242,71 @@ def resolve_nm(compiler: list[str]) -> list[str] | None:
     return ["nm"] if shutil.which("nm") else None
 
 
+def object_symbols(
+    nm: list[str], objects: list[Path]
+) -> tuple[set[str], set[str]] | None:
+    """Return (defined, undefined) symbol names across the object files."""
+    if not objects:
+        return None
+    result = subprocess.run(
+        [*nm, *[str(path) for path in objects]],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return None
+    defined: set[str] = set()
+    undefined: set[str] = set()
+    for line in result.stdout.splitlines():
+        fields = line.split()
+        if len(fields) >= 2 and fields[-2] == "U":
+            undefined.add(fields[-1])
+        elif len(fields) >= 3 and fields[-2] not in {"U", "w"}:
+            defined.add(fields[-1])
+    return defined, undefined
+
+
+def linkage_violations(defined: set[str]) -> list[str]:
+    """Check the manifest's Linkage column against what really got defined.
+
+    Status says what the hardware can do; Linkage says whether the symbol
+    exists at all. Only this gate can enforce the second, because it has real
+    symbol tables -- a text search cannot tell a definition from a forward
+    declaration, which is how several absences went unnoticed.
+    """
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    try:
+        import verify_hal_coverage as coverage
+    except ImportError:
+        return []
+
+    try:
+        headers = coverage.public_headers()
+        manifest = coverage.parse_manifest()
+    except (OSError, ValueError):
+        return []
+
+    problems: list[str] = []
+    for header, path in sorted(headers.items()):
+        row = manifest.get(header)
+        if row is None:
+            continue
+        linkage = row[1]
+        symbols = coverage.declared_symbols(path)
+        if linkage == "PROVIDED":
+            for symbol in sorted(symbols - defined):
+                problems.append(
+                    f"{header}: {symbol} is marked PROVIDED but nothing defines it"
+                )
+        elif linkage == "ABSENT":
+            for symbol in sorted(symbols & defined):
+                problems.append(
+                    f"{header}: {symbol} is marked ABSENT but is defined; "
+                    f"the manifest row is stale"
+                )
+    return problems
+
+
 def unresolved_backend_symbols(
     nm: list[str], objects: list[Path]
 ) -> list[str] | None:
@@ -384,6 +449,7 @@ def main() -> int:
     failures: list[tuple[Path, str]] = []
     deferred: list[Path] = []
     unresolved: list[str] | None = None
+    stale_linkage: list[str] = []
     with tempfile.TemporaryDirectory(prefix="vmx-objects-") as objdir:
         objects = Path(objdir)
         with concurrent.futures.ThreadPoolExecutor() as pool:
@@ -407,9 +473,29 @@ def main() -> int:
                 compile_one(command, source, objects)
             nm = resolve_nm(compiler)
             if nm:
+                symbols = object_symbols(nm, sorted(objects.glob("*.o")))
+                if symbols is not None:
+                    defined, _undefined = symbols
+                    stale_linkage = linkage_violations(defined)
                 unresolved = unresolved_backend_symbols(
                     nm, sorted(objects.glob("*.o"))
                 )
+
+    if stale_linkage:
+        print(
+            f"VMX AArch64 cross-compilation gate: FAIL "
+            f"({len(stale_linkage)} manifest Linkage rows disagree with reality)",
+            file=sys.stderr,
+        )
+        for problem in stale_linkage:
+            print(f"  {problem}", file=sys.stderr)
+        print(
+            "Linkage records whether the VMX wpiHal defines a symbol, "
+            "which is separate from whether the hardware supports it. "
+            "See VMX_HAL_COVERAGE.md.",
+            file=sys.stderr,
+        )
+        return 1
 
     if unresolved:
         print(

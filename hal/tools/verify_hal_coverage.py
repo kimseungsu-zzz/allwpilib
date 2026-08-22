@@ -23,6 +23,14 @@ STATUSES = {
     "HARDWARE_VALIDATION_REQUIRED",
 }
 
+# Orthogonal to status: whether the VMX wpiHal defines the header's symbols at
+# all. An UNSUPPORTED_HARDWARE symbol still has to resolve if anything links
+# against it, so the two axes cannot be collapsed. The cross-compilation gate
+# checks these against real object symbol tables; here they are only validated
+# structurally, because a text search cannot distinguish a definition from a
+# forward declaration.
+LINKAGES = {"PROVIDED", "ABSENT"}
+
 ROOT = Path(__file__).resolve().parents[2]
 HAL_INCLUDE = ROOT / "hal" / "src" / "main" / "native" / "include" / "hal"
 GENERATED_INCLUDE = ROOT / "hal" / "src" / "generated" / "main" / "native" / "include" / "hal"
@@ -75,20 +83,25 @@ def backend_text() -> str:
     return "\n".join(chunks)
 
 
-def parse_manifest() -> dict[str, tuple[str, dict[str, str]]]:
-    rows: dict[str, tuple[str, dict[str, str]]] = {}
+def parse_manifest() -> dict[str, tuple[str, str, dict[str, str]]]:
+    rows: dict[str, tuple[str, str, dict[str, str]]] = {}
     for line in MANIFEST.read_text(encoding="utf-8").splitlines():
         if not line.startswith("|") or line.startswith("| ---"):
             continue
         columns = [column.strip() for column in line.strip().strip("|").split("|")]
-        if len(columns) < 4 or columns[0] in {"Header", "Status"}:
+        if len(columns) < 5 or columns[0] in {"Header", "Status", "Linkage"}:
             continue
         header = columns[0].strip("`")
         default = columns[1].strip("`")
-        override_text = columns[2]
-        notes = columns[3]
+        linkage = columns[2].strip("`")
+        override_text = columns[3]
         if default not in STATUSES:
             raise ValueError(f"{header}: invalid default status {default!r}")
+        if linkage not in LINKAGES:
+            raise ValueError(
+                f"{header}: invalid linkage {linkage!r}; expected one of "
+                + ", ".join(sorted(LINKAGES))
+            )
         if header in rows:
             raise ValueError(f"duplicate manifest row for {header}")
         overrides: dict[str, str] = {}
@@ -103,7 +116,7 @@ def parse_manifest() -> dict[str, tuple[str, dict[str, str]]]:
                 if symbol in overrides:
                     raise ValueError(f"{header}: duplicate override for {symbol}")
                 overrides[symbol] = status
-        rows[header] = (default, overrides)
+        rows[header] = (default, linkage, overrides)
     return rows
 
 
@@ -134,7 +147,7 @@ def main() -> int:
         symbol_count = 0
         absent_implemented: list[str] = []
         for header, path in sorted(headers.items()):
-            default, overrides = manifest[header]
+            default, _linkage, overrides = manifest[header]
             symbols = declared_symbols(path)
             unknown_overrides = sorted(set(overrides) - symbols)
             if unknown_overrides:
