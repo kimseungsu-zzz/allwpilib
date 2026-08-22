@@ -28,8 +28,14 @@ float Clamp01(float value) {
   return std::clamp(value, 0.0F, 1.0F);
 }
 
-void XYZToSRGB(float x, float y, float z, float& red, float& green,
-              float& blue) {
+// The sRGB primaries matrix, without the sRGB gamma transfer function, so
+// these components are linear-light and not display-encoded sRGB. Adding the
+// transfer function would change reported colour on hardware nobody has
+// validated this against, so it is left out deliberately rather than by
+// oversight. Matching is unaffected either way: it works in CIE-xy
+// chromaticity, which this conversion does not feed.
+void XYZToLinearRGB(float x, float y, float z, float& red, float& green,
+                    float& blue) {
   red = Clamp01(3.2406F * x - 1.5372F * y - 0.4986F * z);
   green = Clamp01(-0.9689F * x + 1.8758F * y + 0.0415F * z);
   blue = Clamp01(0.0557F * x - 0.2040F * y + 1.0570F * z);
@@ -109,12 +115,14 @@ struct ColoreInstance final {
       snapshot.z = sample.z;
     }
     if (sample.has_srgb) {
+      // Passed through as the device reported it, so these are gamma-encoded
+      // sRGB -- unlike the derived branch below and unlike the CAN path.
       snapshot.red = static_cast<float>(sample.r) / 255.0F;
       snapshot.green = static_cast<float>(sample.g) / 255.0F;
       snapshot.blue = static_cast<float>(sample.b) / 255.0F;
     } else {
-      XYZToSRGB(snapshot.x, snapshot.y, snapshot.z, snapshot.red,
-                snapshot.green, snapshot.blue);
+      XYZToLinearRGB(snapshot.x, snapshot.y, snapshot.z, snapshot.red,
+                     snapshot.green, snapshot.blue);
     }
     SetChromaticity(snapshot);
     snapshot.sequence = sample.seq;
@@ -149,8 +157,8 @@ struct ColoreInstance final {
     snapshot.x = static_cast<float>(read16(2)) / 10000.0F;
     snapshot.y = static_cast<float>(read16(4)) / 10000.0F;
     snapshot.z = static_cast<float>(read16(6)) / 10000.0F;
-    XYZToSRGB(snapshot.x, snapshot.y, snapshot.z, snapshot.red,
-              snapshot.green, snapshot.blue);
+    XYZToLinearRGB(snapshot.x, snapshot.y, snapshot.z, snapshot.red,
+                   snapshot.green, snapshot.blue);
     SetChromaticity(snapshot);
     snapshot.sequence = static_cast<uint64_t>(
         static_cast<uint16_t>(frame[0]) |

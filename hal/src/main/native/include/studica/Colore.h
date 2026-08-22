@@ -77,7 +77,15 @@ typedef struct StudicaColoreMatchResult {
 #ifdef __cplusplus
 namespace studica {
 
-/** Vendor wrapper for Studica's CIE-XYZ/sRGB Colore sensor. */
+/** Vendor wrapper for Studica's CIE-XYZ Colore sensor.
+ *
+ * XYZ and chromaticity are the well-defined outputs. red/green/blue are not
+ * a single colour space: over USB, when the device reports RGB itself, they
+ * are passed through as gamma-encoded sRGB; over CAN, and over USB when it
+ * does not, they are derived from XYZ through the sRGB primaries matrix with
+ * no transfer function, and so are linear-light. Match on chromaticity, not
+ * on these components, if the distinction matters.
+ */
 class Colore final {
  public:
   explicit Colore(uint8_t canId) noexcept;
