@@ -233,3 +233,31 @@ TEST(StudicaColoreVendorTest, XYZRgbBrightnessAndMatchingContract) {
   EXPECT_EQ(result.valid, 0);
   StudicaColore_Destroy(handle);
 }
+
+TEST(StudicaColoreVendorTest, NearerTightReferenceDoesNotMaskAContainingOne) {
+  StudicaColoreHandle handle = 0;
+  ASSERT_EQ(StudicaColore_CreateUSB("/dev/mock-colore-thresholds", &handle),
+            STUDICA_COLORE_OK);
+  StudicaColoreSnapshot snapshot{};
+  snapshot.structSize = sizeof(snapshot);
+  snapshot.connected = 1;
+  snapshot.valid = 1;
+  // 0.010 away from "tight", which excludes it; 0.135 away from "loose",
+  // which accepts it. "tight" is the nearer of the two.
+  snapshot.chromaticityX = 0.31F;
+  snapshot.chromaticityY = 0.30F;
+  ASSERT_EQ(StudicaColore_SetMockSnapshot(handle, &snapshot),
+            STUDICA_COLORE_OK);
+
+  ASSERT_EQ(StudicaColore_SetReference(handle, "tight", 0.30F, 0.30F, 0.005F),
+            STUDICA_COLORE_OK);
+  ASSERT_EQ(StudicaColore_SetReference(handle, "loose", 0.40F, 0.40F, 0.200F),
+            STUDICA_COLORE_OK);
+
+  StudicaColoreMatchResult result{};
+  ASSERT_EQ(StudicaColore_Match(handle, &result), STUDICA_COLORE_OK);
+  EXPECT_EQ(result.valid, 1);
+  EXPECT_STREQ(result.label, "loose");
+  EXPECT_GT(result.confidence, 0.0F);
+  StudicaColore_Destroy(handle);
+}
