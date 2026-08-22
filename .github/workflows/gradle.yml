@@ -67,6 +67,25 @@ jobs:
           name: ${{ matrix.artifact-name }}
           path: build/allOutputs
 
+  vmx-crosscompile:
+    # The VMX HAL backend is opt-in (-PvmxBuild) and every other platform
+    # selects the sim backend, so none of the jobs above ever compile
+    # hal/src/main/native/vmx. Run the AArch64 cross compiler over it in
+    # syntax-only mode. The proprietary VMX SDK is not available here, so this
+    # covers the translation units that never reach VMXPi.h and reports the
+    # rest as deferred; add VMX_SDK_ROOT and --require to cover all of them.
+    name: "VMX AArch64 cross-compile"
+    runs-on: ubuntu-22.04
+    needs: [validation]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cross-compile the VMX backend
+        uses: wpilibsuite/docker-run-action@v4
+        with:
+          image: wpilib/aarch64-cross-ubuntu:bookworm-22.04
+          options: -v ${{ github.workspace }}:/work -w /work
+          run: python3 hal/tools/verify_vmx_crosscompile.py
+
   build-host:
     env:
       MACOSX_DEPLOYMENT_TARGET: 13.3

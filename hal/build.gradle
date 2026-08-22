@@ -177,6 +177,20 @@ tasks.register('checkHalCoverage', Exec) {
     commandLine halCoveragePython, file('tools/verify_hal_coverage.py').absolutePath
 }
 
+// Nothing in ordinary CI compiles src/main/native/vmx: the VMX source set is
+// opt-in and every other platform selects the sim backend. This task runs the
+// AArch64 cross compiler over that backend in syntax-only mode. It reports
+// PARTIAL rather than failing when the proprietary SDK is absent, since the
+// translation units that never reach VMXPi.h still compile without it.
+tasks.register('checkVmxCrossCompile', Exec) {
+    group = 'verification'
+    description = 'Cross-compiles the VMX HAL backend for AArch64 (syntax only).'
+    workingDir rootDir
+    commandLine halCoveragePython,
+            file('tools/verify_vmx_crosscompile.py').absolutePath
+}
+
 tasks.named('check') {
     dependsOn tasks.named('checkHalCoverage')
+    dependsOn tasks.named('checkVmxCrossCompile')
 }

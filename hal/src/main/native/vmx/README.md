@@ -556,6 +556,32 @@ in [VMX_HAL_COVERAGE.md](VMX_HAL_COVERAGE.md); run
 `./gradlew :hal:checkHalCoverage` to fail a build when a new public symbol has
 no status or an `IMPLEMENTED` status has no VMX/shared definition.
 
+## Cross-compilation gate
+
+The VMX source set is opt-in (`-PvmxBuild`) and every non-roboRIO platform
+otherwise selects the sim backend, so an ordinary build never compiles this
+directory. `./gradlew :hal:checkVmxCrossCompile` runs an AArch64 cross
+compiler over every VMX and shared translation unit in `-fsyntax-only` mode to
+close that gap, and `:hal:check` depends on it.
+
+The gate reports its own limits rather than overstating them:
+
+| Situation | Result |
+| --- | --- |
+| No AArch64 cross compiler | `SKIP` — nothing was compiled |
+| Compiler but no VMX SDK | `PARTIAL` — the translation units that never reach `VMXPi.h` are compiled; the rest are reported as deferred |
+| Compiler and `VMX_SDK_ROOT` | `PASS` — every translation unit is compiled |
+
+Pass `--require` to turn a missing compiler or SDK into a failure; the
+`vmxReleaseCheck` gate does this, because a release must not sign off on a
+backend that was never compiled. `VMX_CROSS_CXX` overrides compiler discovery
+and `VMX_CROSS_CXXFLAGS` appends flags.
+
+The SDK is deliberately not stubbed. A stub synthesised from our own call
+sites would only prove that the backend agrees with itself; it cannot catch a
+VMXPi method that does not exist or takes different arguments, which is the
+breakage a first hardware build actually hits.
+
 ## Hardware watchdog
 
 The VMX hardware watchdog is configured through the SDK `VMXIO` object with a

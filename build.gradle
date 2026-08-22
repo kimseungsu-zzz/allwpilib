@@ -187,5 +187,14 @@ tasks.register('vmxReleaseCheck') {
             commandLine vmxReleasePython,
                     file('hal/tools/verify_vmx_release.py').absolutePath
         }
+        // A release gate must not sign off on a backend that was never
+        // compiled, so the SDK and cross compiler are mandatory here even
+        // though the everyday :hal:check variant tolerates their absence.
+        exec {
+            workingDir rootDir
+            commandLine vmxReleasePython,
+                    file('hal/tools/verify_vmx_crosscompile.py').absolutePath,
+                    '--require'
+        }
     }
 }
